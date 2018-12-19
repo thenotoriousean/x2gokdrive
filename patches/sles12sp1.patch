@@ -1,0 +1,154 @@
+diff --git a/os.c b/os.c
+index 80426eb..041b960 100644
+--- a/os.c
++++ b/os.c
+@@ -47,4 +47,5 @@ EphyrInit(void)
+ 
+ KdOsFuncs EphyrOsFuncs = {
+     .Init = EphyrInit,
++    .pollEvents = pollEvents,
+ };
+diff --git a/remote.c b/remote.c
+index 9553f82..680424f 100644
+--- a/remote.c
++++ b/remote.c
+@@ -1332,7 +1332,7 @@ void *send_frame_thread (void *threadid)
+         //only accept one client, close server socket
+         shutdown(remoteVars.serversock, SHUT_RDWR);
+         close(remoteVars.serversock);
+-        SetNotifyFd(remoteVars.clientsock, clientReadNotify, X_NOTIFY_READ, NULL);
++        //SetNotifyFd(remoteVars.clientsock, clientReadNotify, X_NOTIFY_READ, NULL);
+         remoteVars.client_connected=TRUE;
+         remoteVars.client_initialized=FALSE;
+         remoteVars.con_start_time=time(NULL);
+@@ -1347,7 +1347,7 @@ void *send_frame_thread (void *threadid)
+             if(!remoteVars.client_connected)
+             {
+                 EPHYR_DBG ("TCP connection closed\n");
+-                RemoveNotifyFd(remoteVars.clientsock);
++                //RemoveNotifyFd(remoteVars.clientsock);
+                 shutdown(remoteVars.clientsock, SHUT_RDWR);
+                 close(remoteVars.clientsock);
+                 pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+@@ -1838,6 +1838,28 @@ clientReadNotify(int fd, int ready, void *data)
+     }
+ }
+ 
++void pollEvents(void)
++{
++    //EPHYR_DBG("polling events");
++    struct pollfd fds[2];
++    int    nfds = 1;
++    BOOL con;
++    pthread_mutex_lock(&remoteVars.sendqueue_mutex);
++    con=remoteVars.client_connected;
++    pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
++    if(!con)
++        return;
++
++    memset(fds, 0 , sizeof(fds));
++    fds[0].fd = remoteVars.clientsock;
++    fds[0].events = POLLIN;
++    if(poll(fds, nfds, 0))
++    {
++       clientReadNotify(remoteVars.clientsock, 0, NULL);
++    }
++}
++
++
+ unsigned int checkSocketConnection(OsTimerPtr timer, CARD32 time, void* args)
+ {
+     EPHYR_DBG("CHECKING ACCEPTED CONNECTION");
+diff --git a/remote.h b/remote.h
+index a92c20f..83e118b 100644
+--- a/remote.h
++++ b/remote.h
+@@ -87,6 +87,8 @@
+ #include <netinet/in.h>
+ #include <netdb.h>
+ #include <arpa/inet.h>
++#include <poll.h>
++
+ 
+ 
+ 
+@@ -330,6 +332,8 @@ struct RemoteHostVars
+ typedef struct RemoteHostVars RemoteHostVars;
+ 
+ 
++void clientReadNotify(int fd, int ready, void *data);
++void pollEvents(void);
+ void clear_cache_data(uint32_t maxsize);
+ void clear_frame_cache(uint32_t max_elements);
+ 
+diff --git a/x2gokdrive.c b/x2gokdrive.c
+index 08c4616..ff0fff8 100644
+--- a/x2gokdrive.c
++++ b/x2gokdrive.c
+@@ -231,7 +231,7 @@ ephyrMapFramebuffer(KdScreenInfo * screen)
+     buffer_height = ephyrBufferHeight(screen);
+ 
+     priv->base =
+-         remote_screen_init(screen, screen->x, screen->y,
++         remote_screen_init(screen, 0, 0,
+                           screen->width, screen->height, buffer_height,
+                           &priv->bytes_per_line, &screen->fb.bitsPerPixel);
+ 
+@@ -350,7 +350,7 @@ ephyrScreenBlockHandler(ScreenPtr pScreen, void *timeout)
+     EphyrScrPriv *scrpriv = screen->driver;
+ 
+     pScreen->BlockHandler = scrpriv->BlockHandler;
+-    (*pScreen->BlockHandler)(pScreen, timeout);
++    (*pScreen->BlockHandler)(pScreen, timeout,NULL);
+     scrpriv->BlockHandler = pScreen->BlockHandler;
+     pScreen->BlockHandler = ephyrScreenBlockHandler;
+ 
+@@ -1095,11 +1095,11 @@ ScreenPtr ephyrCursorScreen; /* screen containing the cursor */
+ static void
+ ephyrWarpCursor(DeviceIntPtr pDev, ScreenPtr pScreen, int x, int y)
+ {
+-    input_lock();
++    //input_lock();
+     ephyrCursorScreen = pScreen;
+     miPointerWarpCursor(inputInfo.pointer, pScreen, x, y);
+ 
+-    input_unlock();
++    //input_unlock();
+ }
+ 
+ miPointerScreenFuncRec ephyrPointerScreenFuncs = {
+diff --git a/x2gokdriveinit.c b/x2gokdriveinit.c
+index 3b4bfce..390ee41 100644
+--- a/x2gokdriveinit.c
++++ b/x2gokdriveinit.c
+@@ -51,6 +51,9 @@ void processScreenOrOutputArg(const char *screen_size, const char *output, char
+ void processOutputArg(const char *output, char *parent_id);
+ void processScreenArg(const char *screen_size, char *parent_id);
+ 
++int dix_main(int argc, char *argv[], char *envp[]);
++
++
+ int
+ main(int argc, char *argv[], char *envp[])
+ {
+@@ -75,9 +78,19 @@ static const ExtensionModule ephyrExtensions[] = {
+ static
+ void ephyrExtensionInit(void)
+ {
+-    LoadExtensionList(ephyrExtensions, ARRAY_SIZE(ephyrExtensions), TRUE);
++ int i;
++
++ for (i = 0; i < ARRAY_SIZE(ephyrExtensions); i++)
++ LoadExtension(&ephyrExtensions[i], TRUE);
+ }
+ 
++/*
++static
++void ephyrExtensionInit(void)
++{
++    LoadExtensionList(ephyrExtensions, ARRAY_SIZE(ephyrExtensions), TRUE);
++}
++*/
+ 
+ void
+ InitOutput(ScreenInfo * pScreenInfo, int argc, char **argv)
