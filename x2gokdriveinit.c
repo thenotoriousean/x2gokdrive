@@ -218,7 +218,7 @@ ddxProcessArgument(int argc, char **argv, int i)
         //compat with nxagent
         return 1;
     }
-    else if (!strcmp(argv[i], "-E")) {
+    else if (!strcmp(argv[i], "-K")) {
         //compat with nxagent
         return 1;
     }
