@@ -1326,6 +1326,32 @@ void *send_frame_thread (void *threadid)
                 continue;
             }
         }
+        if(strlen(remoteVars.cookie))
+        {
+//             EPHYR_DBG("Checking cookie: %s",remoteVars.cookie);
+            char msg[33];
+            int length=read(remoteVars.clientsock,msg, 32);
+            if(length!=32)
+            {
+                EPHYR_DBG("Wrong cookie size: %d",length);
+                shutdown(remoteVars.clientsock, SHUT_RDWR);
+                close(remoteVars.clientsock);
+                continue;
+            }
+            if(strncmp(msg,remoteVars.cookie,32))
+            {
+                EPHYR_DBG("Wrong cookie");
+                shutdown(remoteVars.clientsock, SHUT_RDWR);
+                close(remoteVars.clientsock);
+                continue;
+            }
+            EPHYR_DBG("Cookie approved");
+        }
+        else
+        {
+            EPHYR_DBG("Warning: not checking client's cookie");
+        }
+
 
 
         pthread_mutex_lock(&remoteVars.sendqueue_mutex);
@@ -1966,6 +1992,11 @@ void processConfigFileSetting(char* key, char* value)
         strncpy(remoteVars.acceptAddr, value, 255);
         remoteVars.acceptAddr[255]=0;
         EPHYR_DBG("accept %s", remoteVars.acceptAddr);
+    }
+    else if(!strcmp(key, "cookie"))
+    {
+        strncpy(remoteVars.cookie, value, 32);
+        remoteVars.cookie[32]=0;
     }
     else if(!strcmp(key, "listen"))
     {
