@@ -88,6 +88,7 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 
+#include "x2gokdriveselection.h"
 
 
 #define EPHYR_WANT_DEBUG 1
@@ -170,7 +171,6 @@ typedef struct
     point_t lt_corner;
     rect_size size;
 }rectangle;
-
 
 struct cache_elem;
 
@@ -256,10 +256,26 @@ struct sendqueue_element
     struct sendqueue_element* next;
 };
 
-struct RemoteHostVars
+typedef struct
 {
+    BOOL clipBoardChanged;
+    unsigned char* clipboard;
+    uint32_t clipboardSize;
+    int clipBoardMimeData;
+    BOOL readingIncremental;
+    uint32_t incrementalPosition;
+    BOOL selectionChanged;
+    unsigned char* selection;
+    uint32_t selectionSize;
+    int selectionMimeData;
     Window clipWinId;
     WindowPtr clipWinPtr;
+    BOOL callBackInstalled;
+}SelectionStructure;
+
+
+struct RemoteHostVars
+{
     unsigned char compression;
     OsTimerPtr checkConnectionTimer;
     int agentState;
@@ -331,25 +347,12 @@ struct RemoteHostVars
     BOOL client_connected;
     BOOL client_initialized;
 
-    BOOL clipBoardChanged;
-    unsigned char* clipboard;
-    uint32_t clipboardSize;
-    int clipBoardMimeData;
-    BOOL readingIncremental;
-    uint32_t incrementalPosition;
-
-    BOOL selectionChanged;
-    unsigned char* selection;
-    uint32_t selectionSize;
-    int selectionMimeData;
-
+    SelectionStructure selstruct;
 };
 typedef struct RemoteHostVars RemoteHostVars;
 
 
 
-void selection_init();
-int create_selection_window();
 
 int send_selection(int sel, char* data, uint32_t length, uint32_t mimeData);
 
@@ -403,6 +406,8 @@ void remote_send_main_image();
 
 
 int remote_init(void);
+
+void remote_selection_init(void);
 
 
 void *remote_screen_init(KdScreenInfo *screen,
