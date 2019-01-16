@@ -263,7 +263,8 @@ static void process_selection(Atom selection, Atom target,
         {
             format=PIXMAP;
         }
-        if(!strcmp( NameForAtom(prop->type), "INCR"))
+        //read incrementinal data only for clipboard
+        if(!strcmp( NameForAtom(prop->type), "INCR") && selection==atomClipboard)
         {
             EPHYR_DBG("GOT INCR PROPERTY: %d",*((int*)prop->data));
             remoteVars->selstruct.readingIncremental=TRUE;
@@ -399,7 +400,8 @@ static int proc_change_property(ClientPtr client)
     pthread_mutex_unlock(&remoteVars->sendqueue_mutex);
 
 
-    if(stuff->window == remoteVars->selstruct.clipWinId && imageAtom && imageAtom==stuff->type && incRead)
+    if(stuff->window == remoteVars->selstruct.clipWinId && incRead &&
+        ((imageAtom && imageAtom==stuff->type)||(stuff->type == atomUTFString) || (stuff->type == atomString)) )
         EPHYR_DBG("HAVE NEW DATA for %d: %s %s", stuff->window, NameForAtom(stuff->property), NameForAtom(stuff->type));
     else
         return rc;
