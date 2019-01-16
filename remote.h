@@ -149,6 +149,7 @@ enum SelectionMime{STRING,UTF_STRING,PIXMAP};
 #define MOUSEMOTION 6
 #define GEOMETRY 7
 #define UPDATE 8
+#define SELECTIONEVENT 9
 
 #define EVLENGTH 41
 
@@ -262,6 +263,7 @@ typedef struct
     uint32_t size;
     int mimeData;
     uint32_t position;
+    int target;
 }inputBuffer;
 
 typedef struct
@@ -284,7 +286,7 @@ typedef struct
     outputBuffer clipboard;
     outputBuffer selection;
 //Input selection
-    BOOL readIngInputBuffer;
+    BOOL readingInputBuffer;
     inputBuffer inBuffer;
     inputBuffer inSelection;
     inputBuffer inClipboard;

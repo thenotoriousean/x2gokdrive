@@ -1765,159 +1765,230 @@ clientReadNotify(int fd, int ready, void *data)
         char* buff=buffer+l;
         uint32_t event_type=*((uint32_t*)buff);
 
-        switch(event_type)
+        if(remoteVars.selstruct.readingInputBuffer)
         {
-            case MotionNotify:
+            int leftToRead=remoteVars.selstruct.inBuffer.size - remoteVars.selstruct.inBuffer.position;
+            int chunk=(leftToRead < EVLENGTH)?leftToRead:EVLENGTH;
+            memcpy(remoteVars.selstruct.inBuffer.data+remoteVars.selstruct.inBuffer.position, buff, chunk);
+            remoteVars.selstruct.inBuffer.position+=chunk;
+            if(! (remoteVars.selstruct.inBuffer.position < remoteVars.selstruct.inBuffer.size))
             {
-                uint32_t x=*((uint32_t*)buff+1);
-                uint32_t y=*((uint32_t*)buff+2);
-                //                   EPHYR_DBG("HAVE MOTION EVENT %d, %d from client\n",x,y);
-                ephyrClientMouseMotion(x,y);
-                break;
-            }
-            case ButtonPress:
-            case ButtonRelease:
-            {
-                uint32_t state=*((uint32_t*)buff+1);
-                uint32_t button=*((uint32_t*)buff+2);
-                //                   EPHYR_DBG("HAVE BUTTON PRESS/RELEASE EVENT %d, %d from client\n",state,button);
-                ephyrClientButton(event_type,state, button);
-                break;
-            }
-            case KeyPress:
-            {
-                uint32_t state=*((uint32_t*)buff+1);
-                uint32_t key=*((uint32_t*)buff+2);
-                /*EPHYR_DBG("HAVE KEY PRESS EVENT state: %d(%x), key: %d(%x) from client\n",state,state, key, key);
-
-                if (state & ShiftMask)
+                inputBuffer* selbuff;
+                if(remoteVars.selstruct.inBuffer.target==PRIMARY)
                 {
-                    EPHYR_DBG("SHIFT");
-                }
-                if (state & LockMask)
-                {
-                    EPHYR_DBG("LOCK");
-                }
-                if (state & ControlMask)
-                {
-                    EPHYR_DBG("CONTROL");
-                }
-                if (state & Mod1Mask)
-                {
-                    EPHYR_DBG("MOD1");
-                }
-                if (state & Mod2Mask)
-                {
-                    EPHYR_DBG("MOD2");
-                }
-                if (state & Mod3Mask)
-                {
-                    EPHYR_DBG("MOD3");
-                }
-                if (state & Mod4Mask)
-                {
-                    EPHYR_DBG("MOD4");
-                }
-                if (state & Mod5Mask)
-                {
-                    EPHYR_DBG("MOD5");
-                }*/
-
-                ephyrClientKey(event_type,state, key);
-                break;
-            }
-            case KeyRelease:
-            {
-                uint32_t state=*((uint32_t*)buff+1);
-                uint32_t key=*((uint32_t*)buff+2);
-                /*EPHYR_DBG("HAVE KEY RELEASE EVENT state: %d(%x), key: %d(%x) from client\n",state,state, key, key);
-                if (state & ShiftMask)
-                {
-                    EPHYR_DBG("SHIFT");
-                }
-                if (state & LockMask)
-                {
-                    EPHYR_DBG("LOCK");
-                }
-                if (state & ControlMask)
-                {
-                    EPHYR_DBG("CONTROL");
-                }
-                if (state & Mod1Mask)
-                {
-                    EPHYR_DBG("MOD1");
-                }
-                if (state & Mod2Mask)
-                {
-                    EPHYR_DBG("MOD2");
-                }
-                if (state & Mod3Mask)
-                {
-                    EPHYR_DBG("MOD3");
-                }
-                if (state & Mod4Mask)
-                {
-                    EPHYR_DBG("MOD4");
-                }
-                if (state & Mod5Mask)
-                {
-                    EPHYR_DBG("MOD5");
-                }*/
-                ephyrClientKey(event_type,state, key);
-                break;
-            }
-            case GEOMETRY:
-            {
-                remoteVars.client_initialized=TRUE;
-                uint16_t width=*((uint16_t*)buff+2);
-                uint16_t height=*((uint16_t*)buff+3);
-                uint8_t primaryInd=*((uint8_t*)buff+8);
-
-                EPHYR_DBG("Client want resize to %dx%d",width,height);
-
-                struct VirtScreen screens[4];
-                memset(screens,0, sizeof(struct VirtScreen)*4);
-                for(int i=0;i<4;++i)
-                {
-                    char* record=buff+9+i*8;
-                    screens[i].width=*((uint16_t*)record);
-                    screens[i].height=*((uint16_t*)record+1);
-                    screens[i].x=*((int16_t*)record+2);
-                    screens[i].y=*((int16_t*)record+3);
-
-                    if(!screens[i].width || !screens[i].height)
-                    {
-                        break;
-                    }
-                    EPHYR_DBG("SCREEN %d - (%dx%d) - %d,%d", i, screens[i].width, screens[i].height, screens[i].x, screens[i].y);
-                }
-                ephyrResizeScreen (remoteVars.ephyrScreen->pScreen,width,height, screens);
-                break;
-            }
-            case UPDATE:
-            {
-                int32_t width=*((uint32_t*)buff+1);
-                int32_t height=*((uint32_t*)buff+2);
-
-                int32_t x=*((uint32_t*)buff+3);
-                int32_t y=*((uint32_t*)buff+4);
-
-                EPHYR_DBG("HAVE UPDATE EVENT from client %dx%d %d,%d\n",width, height, x,y );
-                pthread_mutex_lock(&remoteVars.mainimg_mutex);
-
-                EPHYR_DBG("DBF: %p, %d, %d",remoteVars.main_img, remoteVars.main_img_width, remoteVars.main_img_height);
-
-                if(remoteVars.main_img  && x+width <= remoteVars.main_img_width  && y+height <= remoteVars.main_img_height )
-                {
-                    pthread_mutex_unlock(&remoteVars.mainimg_mutex);
-                    add_frame(width, height, x, y, 0, 0);
+                    selbuff=&remoteVars.selstruct.inSelection;
                 }
                 else
                 {
-                    EPHYR_DBG("UPDATE: skip request");
-                    pthread_mutex_unlock(&remoteVars.mainimg_mutex);
+                    selbuff=&remoteVars.selstruct.inClipboard;
                 }
-                break;
+                if(selbuff->data)
+                    free(selbuff->data);
+                selbuff->data=remoteVars.selstruct.inBuffer.data;
+                remoteVars.selstruct.inBuffer.data=NULL;
+                selbuff->size=remoteVars.selstruct.inBuffer.size;
+                remoteVars.selstruct.inBuffer.size=0;
+                selbuff->mimeData=remoteVars.selstruct.inBuffer.mimeData;
+                remoteVars.selstruct.readingInputBuffer=FALSE;
+                EPHYR_DBG("READY TARGET %d, MIME %d, Read %d from %d",remoteVars.selstruct.inBuffer.target, selbuff->mimeData,
+                          remoteVars.selstruct.inBuffer.position, selbuff->size);
+            }
+        }
+        else
+        {
+            switch(event_type)
+            {
+                case MotionNotify:
+                {
+                    uint32_t x=*((uint32_t*)buff+1);
+                    uint32_t y=*((uint32_t*)buff+2);
+                    //                   EPHYR_DBG("HAVE MOTION EVENT %d, %d from client\n",x,y);
+                    ephyrClientMouseMotion(x,y);
+                    break;
+                }
+                case ButtonPress:
+                case ButtonRelease:
+                {
+                    uint32_t state=*((uint32_t*)buff+1);
+                    uint32_t button=*((uint32_t*)buff+2);
+                    //                   EPHYR_DBG("HAVE BUTTON PRESS/RELEASE EVENT %d, %d from client\n",state,button);
+                    ephyrClientButton(event_type,state, button);
+                    break;
+                }
+                case KeyPress:
+                {
+                    uint32_t state=*((uint32_t*)buff+1);
+                    uint32_t key=*((uint32_t*)buff+2);
+                    /*EPHYR_DBG("HAVE KEY PRESS EVENT state: %d(%x), key: %d(%x) from client\n",state,state, key, key);
+                     *
+                     *                if (state & ShiftMask)
+                     *                {
+                     *                    EPHYR_DBG("SHIFT");
+                }
+                if (state & LockMask)
+                {
+                EPHYR_DBG("LOCK");
+                }
+                if (state & ControlMask)
+                {
+                EPHYR_DBG("CONTROL");
+                }
+                if (state & Mod1Mask)
+                {
+                EPHYR_DBG("MOD1");
+                }
+                if (state & Mod2Mask)
+                {
+                EPHYR_DBG("MOD2");
+                }
+                if (state & Mod3Mask)
+                {
+                EPHYR_DBG("MOD3");
+                }
+                if (state & Mod4Mask)
+                {
+                EPHYR_DBG("MOD4");
+                }
+                if (state & Mod5Mask)
+                {
+                EPHYR_DBG("MOD5");
+                }*/
+
+                    ephyrClientKey(event_type,state, key);
+                    break;
+                }
+                case KeyRelease:
+                {
+                    uint32_t state=*((uint32_t*)buff+1);
+                    uint32_t key=*((uint32_t*)buff+2);
+                    /*EPHYR_DBG("HAVE KEY RELEASE EVENT state: %d(%x), key: %d(%x) from client\n",state,state, key, key);
+                     *                if (state & ShiftMask)
+                     *                {
+                     *                    EPHYR_DBG("SHIFT");
+                }
+                if (state & LockMask)
+                {
+                EPHYR_DBG("LOCK");
+                }
+                if (state & ControlMask)
+                {
+                EPHYR_DBG("CONTROL");
+                }
+                if (state & Mod1Mask)
+                {
+                EPHYR_DBG("MOD1");
+                }
+                if (state & Mod2Mask)
+                {
+                EPHYR_DBG("MOD2");
+                }
+                if (state & Mod3Mask)
+                {
+                EPHYR_DBG("MOD3");
+                }
+                if (state & Mod4Mask)
+                {
+                EPHYR_DBG("MOD4");
+                }
+                if (state & Mod5Mask)
+                {
+                EPHYR_DBG("MOD5");
+                }*/
+                    ephyrClientKey(event_type,state, key);
+                    break;
+                }
+                case GEOMETRY:
+                {
+                    remoteVars.client_initialized=TRUE;
+                    uint16_t width=*((uint16_t*)buff+2);
+                    uint16_t height=*((uint16_t*)buff+3);
+                    uint8_t primaryInd=*((uint8_t*)buff+8);
+
+                    EPHYR_DBG("Client want resize to %dx%d",width,height);
+
+                    struct VirtScreen screens[4];
+                    memset(screens,0, sizeof(struct VirtScreen)*4);
+                    for(int i=0;i<4;++i)
+                    {
+                        char* record=buff+9+i*8;
+                        screens[i].width=*((uint16_t*)record);
+                        screens[i].height=*((uint16_t*)record+1);
+                        screens[i].x=*((int16_t*)record+2);
+                        screens[i].y=*((int16_t*)record+3);
+
+                        if(!screens[i].width || !screens[i].height)
+                        {
+                            break;
+                        }
+                        EPHYR_DBG("SCREEN %d - (%dx%d) - %d,%d", i, screens[i].width, screens[i].height, screens[i].x, screens[i].y);
+                    }
+                    ephyrResizeScreen (remoteVars.ephyrScreen->pScreen,width,height, screens);
+                    break;
+                }
+                case UPDATE:
+                {
+                    int32_t width=*((uint32_t*)buff+1);
+                    int32_t height=*((uint32_t*)buff+2);
+
+                    int32_t x=*((uint32_t*)buff+3);
+                    int32_t y=*((uint32_t*)buff+4);
+
+                    EPHYR_DBG("HAVE UPDATE EVENT from client %dx%d %d,%d\n",width, height, x,y );
+                    pthread_mutex_lock(&remoteVars.mainimg_mutex);
+
+                    EPHYR_DBG("DBF: %p, %d, %d",remoteVars.main_img, remoteVars.main_img_width, remoteVars.main_img_height);
+
+                    if(remoteVars.main_img  && x+width <= remoteVars.main_img_width  && y+height <= remoteVars.main_img_height )
+                    {
+                        pthread_mutex_unlock(&remoteVars.mainimg_mutex);
+                        add_frame(width, height, x, y, 0, 0);
+                    }
+                    else
+                    {
+                        EPHYR_DBG("UPDATE: skip request");
+                        pthread_mutex_unlock(&remoteVars.mainimg_mutex);
+                    }
+                    break;
+                }
+                case SELECTIONEVENT:
+                {
+                    uint32_t size;
+                    uint8_t destination, mime;
+                    size=*((uint32_t*)buff+1);
+                    destination=*((uint8_t*)buff+8);
+                    mime=*((uint8_t*)buff+9);
+                    EPHYR_DBG("HAVE NEW INCOMING SELECTION: %d %d %d",size, destination, mime);
+                    inputBuffer* selbuff;
+                    if(destination==CLIPBOARD)
+                        selbuff=&(remoteVars.selstruct.inClipboard);
+                    else
+                        selbuff=&(remoteVars.selstruct.inSelection);
+                    if(size < EVLENGTH-10)
+                    {
+                        if(selbuff->data)
+                            free(selbuff->data);
+                        selbuff->size=size;
+                        selbuff->data=malloc(size);
+                        memcpy(selbuff->data, buff+10, size);
+                        selbuff->mimeData=mime;
+                        EPHYR_DBG("READY INCOMING SELECTION for %d %s",destination, selbuff->data);
+                    }
+                    else
+                    {
+                        selbuff=&(remoteVars.selstruct.inBuffer);
+                        if(selbuff->data)
+                            free(selbuff->data);
+                        selbuff->data=malloc(size);
+                        memcpy(selbuff->data, buff+10, EVLENGTH-10);
+                        selbuff->mimeData=mime;
+                        selbuff->target=destination;
+                        selbuff->position=EVLENGTH-10;
+                        selbuff->size=size;
+                        remoteVars.selstruct.readingInputBuffer=TRUE;
+                        EPHYR_DBG("READ INCOMING BUFFER %d from %d",EVLENGTH-10, size);
+                    }
+                    break;
+                }
             }
         }
 
@@ -2025,6 +2096,18 @@ void terminateServer(int exitStatus)
         free(remoteVars.selstruct.selection.data);
     }
 
+    if(remoteVars.selstruct.inClipboard.data)
+    {
+        free(remoteVars.selstruct.inClipboard.data);
+    }
+    if(remoteVars.selstruct.inSelection.data)
+    {
+        free(remoteVars.selstruct.inSelection.data);
+    }
+    if(remoteVars.selstruct.inBuffer.data)
+    {
+        free(remoteVars.selstruct.inBuffer.data);
+    }
     setAgentState(TERMINATED);
     EPHYR_DBG("exit program with status %d", exitStatus);
     exit(exitStatus);
