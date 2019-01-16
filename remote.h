@@ -258,19 +258,36 @@ struct sendqueue_element
 
 typedef struct
 {
-    BOOL clipBoardChanged;
-    unsigned char* clipboard;
-    uint32_t clipboardSize;
-    int clipBoardMimeData;
+    unsigned char* data;
+    uint32_t size;
+    int mimeData;
+    uint32_t position;
+}inputBuffer;
+
+typedef struct
+{
+    unsigned char* data;
+    uint32_t size;
+    int mimeData;
+    BOOL changed;
+
+}outputBuffer;
+
+typedef struct
+{
     BOOL readingIncremental;
     uint32_t incrementalPosition;
-    BOOL selectionChanged;
-    unsigned char* selection;
-    uint32_t selectionSize;
-    int selectionMimeData;
     Window clipWinId;
     WindowPtr clipWinPtr;
     BOOL callBackInstalled;
+//Output selection
+    outputBuffer clipboard;
+    outputBuffer selection;
+//Input selection
+    BOOL readIngInputBuffer;
+    inputBuffer inBuffer;
+    inputBuffer inSelection;
+    inputBuffer inClipboard;
 }SelectionStructure;
 
 

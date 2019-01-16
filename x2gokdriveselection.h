@@ -30,8 +30,8 @@
 #include "remote.h"
 
 void selection_init( struct RemoteHostVars* obj);
-void install_selection_callbacks();
-static int create_selection_window();
+void install_selection_callbacks(void );
+int create_selection_window(void);
 
 
 #endif

@@ -46,7 +46,7 @@ static int (*proc_send_event_orig)(ClientPtr);
 static int (*proc_convert_selection_orig)(ClientPtr);
 static int (*proc_change_property_orig)(ClientPtr);
 
-static int create_selection_window()
+static int create_selection_window(void)
 {
     int result;
     if(remoteVars->selstruct.clipWinPtr)
@@ -270,10 +270,10 @@ static void process_selection(Atom selection, Atom target,
             remoteVars->selstruct.readingIncremental=TRUE;
             pthread_mutex_lock(&remoteVars->sendqueue_mutex);
 
-            remoteVars->selstruct.clipboardSize=*((int*)prop->data);
-            remoteVars->selstruct.clipboard=malloc(remoteVars->selstruct.clipboardSize);
+            remoteVars->selstruct.clipboard.size=*((int*)prop->data);
+            remoteVars->selstruct.clipboard.data=malloc(remoteVars->selstruct.clipboard.size);
+            remoteVars->selstruct.clipboard.mimeData=format;
             remoteVars->selstruct.incrementalPosition=0;
-            remoteVars->selstruct.clipBoardMimeData=format;
             pthread_mutex_unlock(&remoteVars->sendqueue_mutex);
 
             DeleteProperty(serverClient,remoteVars->selstruct.clipWinPtr, property);
@@ -288,31 +288,23 @@ static void process_selection(Atom selection, Atom target,
         pthread_mutex_lock(&remoteVars->sendqueue_mutex);
 
         remoteVars->selstruct.readingIncremental=FALSE;
-        if(selection==atomClipboard)
+        if(selection==atomClipboard || selection ==atomPrimary)
         {
-            if(remoteVars->selstruct.clipboard)
+            outputBuffer* buff;
+            if(selection==atomClipboard)
+                buff=&remoteVars->selstruct.clipboard;
+            else
+                buff=&remoteVars->selstruct.selection;
+            if(buff->data)
             {
-                free(remoteVars->selstruct.clipboard);
+                free(buff->data);
             }
-            remoteVars->selstruct.clipboardSize=prop->size;
-            remoteVars->selstruct.clipboard=malloc(remoteVars->selstruct.clipboardSize);
-            memcpy(remoteVars->selstruct.clipboard, prop->data, prop->size);
-            remoteVars->selstruct.clipBoardChanged=TRUE;
-            remoteVars->selstruct.clipBoardMimeData=format;
+            buff->size=prop->size;
+            buff->data=malloc(buff->size);
+            memcpy(buff->data, prop->data, prop->size);
+            buff->changed=TRUE;
+            buff->mimeData=format;
             //             EPHYR_DBG("Have new Clipboard %s %d",remoteVars->selstruct.clipboard, remoteVars->selstruct.clipboardSize);
-        }
-        if(selection==atomPrimary)
-        {
-            if(remoteVars->selstruct.selection)
-            {
-                free(remoteVars->selstruct.selection);
-            }
-            remoteVars->selstruct.selectionSize=prop->size;
-            remoteVars->selstruct.selection=malloc(prop->size);
-            memcpy(remoteVars->selstruct.selection, prop->data, prop->size);
-            remoteVars->selstruct.selectionChanged=TRUE;
-            remoteVars->selstruct.selectionMimeData=format;
-            //             EPHYR_DBG("Have new Selection %s %d",remoteVars->selstruct.selection, remoteVars->selstruct.selectionSize);
         }
         pthread_cond_signal(&remoteVars->have_sendqueue_cond);
         pthread_mutex_unlock(&remoteVars->sendqueue_mutex);
@@ -426,17 +418,17 @@ static int proc_change_property(ClientPtr client)
     pthread_mutex_lock(&remoteVars->sendqueue_mutex);
     if(prop->size==0)
     {
-        EPHYR_DBG("READ %d FROM %d", remoteVars->selstruct.incrementalPosition, remoteVars->selstruct.clipboardSize);
+        EPHYR_DBG("READ %d FROM %d", remoteVars->selstruct.incrementalPosition, remoteVars->selstruct.clipboard.size);
         remoteVars->selstruct.readingIncremental=FALSE;
-        if(remoteVars->selstruct.incrementalPosition == remoteVars->selstruct.clipboardSize)
+        if(remoteVars->selstruct.incrementalPosition == remoteVars->selstruct.clipboard.size)
         {
-            remoteVars->selstruct.clipBoardChanged=TRUE;
+            remoteVars->selstruct.clipboard.changed=TRUE;
             pthread_cond_signal(&remoteVars->have_sendqueue_cond);
         }
     }
     else
     {
-        memcpy(remoteVars->selstruct.clipboard+remoteVars->selstruct.incrementalPosition, prop->data, prop->size);
+        memcpy(remoteVars->selstruct.clipboard.data+remoteVars->selstruct.incrementalPosition, prop->data, prop->size);
         remoteVars->selstruct.incrementalPosition+=prop->size;
     }
 

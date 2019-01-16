@@ -1444,13 +1444,13 @@ void *send_frame_thread (void *threadid)
             }
 
             pthread_mutex_lock(&remoteVars.sendqueue_mutex);
-            if(remoteVars.selstruct.clipBoardChanged)
+            if(remoteVars.selstruct.clipboard.changed)
             {
-                size_t sz=remoteVars.selstruct.clipboardSize;
+                size_t sz=remoteVars.selstruct.clipboard.size;
                 char* data=malloc(sz);
-                memcpy(data, remoteVars.selstruct.clipboard, sz);
-                remoteVars.selstruct.clipBoardChanged=FALSE;
-                int format=remoteVars.selstruct.clipBoardMimeData;
+                memcpy(data, remoteVars.selstruct.clipboard.data, sz);
+                remoteVars.selstruct.clipboard.changed=FALSE;
+                int format=remoteVars.selstruct.clipboard.mimeData;
                 pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
                 send_selection(CLIPBOARD,data,sz, format);
                 free(data);
@@ -1459,13 +1459,13 @@ void *send_frame_thread (void *threadid)
                 pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
 
             pthread_mutex_lock(&remoteVars.sendqueue_mutex);
-            if(remoteVars.selstruct.selectionChanged)
+            if(remoteVars.selstruct.selection.changed)
             {
-                size_t sz=remoteVars.selstruct.selectionSize;
+                size_t sz=remoteVars.selstruct.selection.size;
                 char* data=malloc(sz);
-                memcpy(data, remoteVars.selstruct.selection, sz);
-                remoteVars.selstruct.selectionChanged=FALSE;
-                int format=remoteVars.selstruct.selectionMimeData;
+                memcpy(data, remoteVars.selstruct.selection.data, sz);
+                remoteVars.selstruct.selection.changed=FALSE;
+                int format=remoteVars.selstruct.selection.mimeData;
                 pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
                 send_selection(PRIMARY, data, sz, format);
                 free(data);
@@ -2015,14 +2015,14 @@ void terminateServer(int exitStatus)
         free(remoteVars.second_buffer);
     }
 
-    if(remoteVars.selstruct.clipboard)
+    if(remoteVars.selstruct.clipboard.data)
     {
-        free(remoteVars.selstruct.clipboard);
+        free(remoteVars.selstruct.clipboard.data);
     }
 
-    if(remoteVars.selstruct.selection)
+    if(remoteVars.selstruct.selection.data)
     {
-        free(remoteVars.selstruct.selection);
+        free(remoteVars.selstruct.selection.data);
     }
 
     setAgentState(TERMINATED);
