@@ -76,6 +76,8 @@ static
 void ephyrExtensionInit(void)
 {
     LoadExtensionList(ephyrExtensions, ARRAY_SIZE(ephyrExtensions), TRUE);
+    selection_init();
+
 }
 
 

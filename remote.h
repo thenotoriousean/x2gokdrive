@@ -122,9 +122,11 @@ fprintf(stderr, __FILE__ ":%d,%s() " x "\n", __LINE__, __func__, ##a)
 //always 4
 #define XSERVERBPP 4
 
-enum msg_type{FRAME,DELETED,CURSOR, DELETEDCURSOR};
+enum msg_type{FRAME,DELETED,CURSOR, DELETEDCURSOR, SELECTION};
 enum AgentState{STARTING, RUNNING, RESUMING, SUSPENDING, SUSPENDED, TERMINATING, TERMINATED};
 enum Compressions{JPEG,PNG};
+enum SelectionType{PRIMARY,CLIPBOARD};
+enum SelectionMime{STRING,UTF_STRING,PIXMAP};
 
 #define DEFAULT_COMPRESSION JPEG
 
@@ -256,6 +258,8 @@ struct sendqueue_element
 
 struct RemoteHostVars
 {
+    Window clipWinId;
+    WindowPtr clipWinPtr;
     unsigned char compression;
     OsTimerPtr checkConnectionTimer;
     int agentState;
@@ -263,6 +267,7 @@ struct RemoteHostVars
     char optionsFile[256];
     char stateFile[256];
     char acceptAddr[256];
+    char cookie[33];
     int listenPort;
     int jpegQuality;
     uint32_t framenum;
@@ -326,9 +331,27 @@ struct RemoteHostVars
     BOOL client_connected;
     BOOL client_initialized;
 
+    BOOL clipBoardChanged;
+    unsigned char* clipboard;
+    uint32_t clipboardSize;
+    int clipBoardMimeData;
+    BOOL readingIncremental;
+    uint32_t incrementalPosition;
+
+    BOOL selectionChanged;
+    unsigned char* selection;
+    uint32_t selectionSize;
+    int selectionMimeData;
+
 };
 typedef struct RemoteHostVars RemoteHostVars;
 
+
+
+void selection_init();
+int create_selection_window();
+
+int send_selection(int sel, char* data, uint32_t length, uint32_t mimeData);
 
 void clear_cache_data(uint32_t maxsize);
 void clear_frame_cache(uint32_t max_elements);

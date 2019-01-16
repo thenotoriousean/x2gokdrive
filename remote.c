@@ -30,12 +30,424 @@
 #include <kdrive-config.h>
 #endif
 #include "remote.h"
-
+#include "selection.h"
+#include <X11/Xatom.h>
+#include "propertyst.h"
 
 /*init it in os init*/
 static RemoteHostVars remoteVars;
 
 static BOOL remoteInitialized=FALSE;
+
+
+static Atom atomPrimary, atomClipboard, atomTargets, atomString, atomUTFString;
+
+static Atom imageAtom=0;
+
+
+static int (*proc_send_event_orig)(ClientPtr);
+static int (*proc_convert_selection_orig)(ClientPtr);
+static int (*proc_change_property_orig)(ClientPtr);
+
+static void request_selection(Atom selection, Atom rtype)
+{
+
+    Selection *selPtr;
+    int rc;
+
+    rc = create_selection_window();
+    if (rc != Success)
+    {
+        EPHYR_DBG("ERROR! Can't create selection Window");
+        return;
+    }
+
+    /*EPHYR_DBG("Request: %s, %s",
+              NameForAtom(selection), NameForAtom(rtype));*/
+
+    rc = dixLookupSelection(&selPtr, selection, serverClient, DixGetAttrAccess);
+    if (rc != Success)
+        return;
+    xEvent ev;
+    ev.u.u.type = SelectionRequest;
+    ev.u.selectionRequest.owner = selPtr->window;
+    ev.u.selectionRequest.time = currentTime.milliseconds;
+    ev.u.selectionRequest.requestor = remoteVars.clipWinId;
+    ev.u.selectionRequest.selection = selection;
+    ev.u.selectionRequest.target = rtype;
+    ev.u.selectionRequest.property = rtype;
+    WriteEventsToClient(selPtr->client, 1, &ev);
+}
+
+
+
+static void selection_callback(CallbackListPtr *callbacks,
+                                 void * data, void * args)
+{
+    SelectionInfoRec *info = (SelectionInfoRec *) args;
+
+    if (info->kind != SelectionSetOwner)
+        return;
+    if (info->client == serverClient)
+        return;
+
+    /*
+    EPHYR_DBG("Selection owner changed: %s",
+              NameForAtom(info->selection->selection));*/
+
+
+    if ((info->selection->selection != atomPrimary) &&
+        (info->selection->selection != atomClipboard))
+        return;
+
+    request_selection(info->selection->selection, atomTargets);
+}
+
+static Atom find_atom_by_name(const char* name, const Atom list[], size_t size)
+{
+    for (int i = 0;i < size;i++)
+    {
+        if(!strcmp(name, NameForAtom (list[i])))
+        {
+            EPHYR_DBG("Found IMAGE ATOM %s:%d", NameForAtom (list[i]), list[i]);
+            return list [i];
+        }
+    }
+    return 0;
+}
+
+static BOOL find_image_atom(const Atom list[], size_t size)
+{
+    Atom at;
+    at=find_atom_by_name("image/jpg",list,size);
+    if(at)
+    {
+        imageAtom=at;
+        return TRUE;
+    }
+    at=find_atom_by_name("image/jpeg",list,size);
+    if(at)
+    {
+        imageAtom=at;
+        return TRUE;
+    }
+    at=find_atom_by_name("image/png",list,size);
+    if(at)
+    {
+        imageAtom=at;
+        return TRUE;
+    }
+    at=find_atom_by_name("image/bmp",list,size);
+    if(at)
+    {
+        imageAtom=at;
+        return TRUE;
+    }
+    at=find_atom_by_name("image/xpm",list,size);
+    if(at)
+    {
+        imageAtom=at;
+        return TRUE;
+    }
+    at=find_atom_by_name("PIXMAP",list,size);
+    if(at)
+    {
+        imageAtom=at;
+        return TRUE;
+    }
+    at=find_atom_by_name("image/ico",list,size);
+    if(at)
+    {
+        imageAtom=at;
+        return TRUE;
+    }
+
+    imageAtom=0;
+    return FALSE;
+
+}
+
+static Bool prop_has_atom(Atom atom, const Atom list[], size_t size)
+{
+    size_t i;
+
+    for (i = 0;i < size;i++) {
+        if (list[i] == atom)
+            return TRUE;
+    }
+
+    return FALSE;
+}
+
+static void process_selection(Atom selection, Atom target,
+                               Atom property, Atom requestor,
+                               TimeStamp time)
+{
+    PropertyPtr prop;
+    int rc;
+
+    rc = dixLookupProperty(&prop, remoteVars.clipWinPtr, property,
+                           serverClient, DixReadAccess);
+
+    if(rc== BadMatch)
+    {
+        EPHYR_DBG("BAD MATCH!!!");
+    }
+
+    if (rc != Success)
+        return;
+
+    EPHYR_DBG("Selection notification for %s (target %s, property %s, type %s)",
+              NameForAtom(selection), NameForAtom(target),
+              NameForAtom(property), NameForAtom(prop->type));
+
+    if (target != property)
+        return;
+
+    if (target == atomTargets)
+    {
+        if (prop->format != 32)
+            return;
+        if (prop->type != XA_ATOM)
+            return;
+
+
+
+        if(prop_has_atom(atomUTFString, (const Atom*)prop->data, prop->size))
+        {
+            request_selection(selection, atomUTFString);
+        }
+        else if(prop_has_atom(atomString, (const Atom*)prop->data, prop->size))
+        {
+            request_selection(selection, atomString);
+        }
+        else
+        {
+            //requesting pixmap only for clipboard
+            if((selection == atomClipboard) && find_image_atom((const Atom*)prop->data, prop->size) && imageAtom)
+            {
+                request_selection(selection, imageAtom);
+            }
+        }
+    }
+    else if (target == atomString || target == atomUTFString  || (target==imageAtom && imageAtom) )
+    {
+        int format=STRING;
+        if(target==atomUTFString)
+            format=UTF_STRING;
+        if(target == imageAtom)
+            format=PIXMAP;
+        if(!strcmp( NameForAtom(prop->type), "INCR"))
+        {
+            EPHYR_DBG("GOT INCR PROPERTY: %d",*((int*)prop->data));
+            remoteVars.readingIncremental=TRUE;
+            pthread_mutex_lock(&remoteVars.sendqueue_mutex);
+
+            remoteVars.clipboardSize=*((int*)prop->data);
+            remoteVars.clipboard=malloc(remoteVars.clipboardSize);
+            remoteVars.incrementalPosition=0;
+            remoteVars.clipBoardMimeData=format;
+            pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+
+            DeleteProperty(serverClient,remoteVars.clipWinPtr, property);
+            return;
+        }
+
+        if (prop->format != 8)
+            return;
+        if (prop->type != atomString && prop->type != atomUTFString && prop->type!=imageAtom)
+            return;
+
+        pthread_mutex_lock(&remoteVars.sendqueue_mutex);
+
+        remoteVars.readingIncremental=FALSE;
+        if(selection==atomClipboard)
+        {
+            if(remoteVars.clipboard)
+            {
+                free(remoteVars.clipboard);
+            }
+            remoteVars.clipboardSize=prop->size;
+            remoteVars.clipboard=malloc(remoteVars.clipboardSize);
+            memcpy(remoteVars.clipboard, prop->data, prop->size);
+            remoteVars.clipBoardChanged=TRUE;
+            remoteVars.clipBoardMimeData=format;
+//             EPHYR_DBG("Have new Clipboard %s %d",remoteVars.clipboard, remoteVars.clipboardSize);
+        }
+        if(selection==atomPrimary)
+        {
+            if(remoteVars.selection)
+            {
+                free(remoteVars.selection);
+            }
+            remoteVars.selectionSize=prop->size;
+            remoteVars.selection=malloc(prop->size);
+            memcpy(remoteVars.selection, prop->data, prop->size);
+            remoteVars.selectionChanged=TRUE;
+            remoteVars.selectionMimeData=format;
+//             EPHYR_DBG("Have new Selection %s %d",remoteVars.selection, remoteVars.selectionSize);
+        }
+        pthread_cond_signal(&remoteVars.have_sendqueue_cond);
+        pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+    }
+    DeleteProperty(serverClient,remoteVars.clipWinPtr, property);
+}
+
+
+
+
+#define SEND_EVENT_BIT 0x80
+
+static int send_event(ClientPtr client)
+{
+    REQUEST(xSendEventReq);
+    REQUEST_SIZE_MATCH(xSendEventReq);
+
+    stuff->event.u.u.type &= ~(SEND_EVENT_BIT);
+
+
+    if (stuff->event.u.u.type == SelectionNotify &&
+        stuff->event.u.selectionNotify.requestor == remoteVars.clipWinId)
+    {
+        TimeStamp time;
+        time = ClientTimeToServerTime(stuff->event.u.selectionNotify.time);
+
+        process_selection(stuff->event.u.selectionNotify.selection,
+                           stuff->event.u.selectionNotify.target,
+                           stuff->event.u.selectionNotify.property,
+                           stuff->event.u.selectionNotify.requestor,
+                           time);
+    }
+
+    return proc_send_event_orig(client);
+}
+
+
+static int proc_convert_selection(ClientPtr client)
+{
+
+    EPHYR_DBG("PROC CONVERT!!!!");
+/*    Bool paramsOkay;
+    WindowPtr pWin;
+    Selection *pSel;
+    int rc;
+
+    REQUEST(xConvertSelectionReq);
+    REQUEST_SIZE_MATCH(xConvertSelectionReq);
+
+    rc = dixLookupWindow(&pWin, stuff->requestor, client, DixSetAttrAccess);
+    if (rc != Success)
+        return rc;
+
+    paramsOkay = ValidAtom(stuff->selection) && ValidAtom(stuff->target);
+    paramsOkay &= (stuff->property == None) || ValidAtom(stuff->property);
+    if (!paramsOkay) {
+        client->errorValue = stuff->property;
+        return BadAtom;
+    }
+    */
+    return proc_convert_selection_orig(client);
+}
+
+
+static int proc_change_property(ClientPtr client)
+{
+    WindowPtr pWin;
+    char format, mode;
+    unsigned long len;
+    int sizeInBytes, totalSize, err;
+
+    REQUEST(xChangePropertyReq);
+
+    REQUEST_AT_LEAST_SIZE(xChangePropertyReq);
+
+    int rc=proc_change_property_orig(client);
+
+    if(rc!=Success)
+        return rc;
+
+    BOOL incRead;
+
+    pthread_mutex_lock(&remoteVars.sendqueue_mutex);
+    incRead=remoteVars.readingIncremental;
+    pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+
+
+    if(stuff->window == remoteVars.clipWinId && imageAtom && imageAtom==stuff->type && incRead)
+          EPHYR_DBG("HAVE NEW DATA for %d: %s %s", stuff->window, NameForAtom(stuff->property), NameForAtom(stuff->type));
+    else
+        return rc;
+
+    PropertyPtr prop;
+
+
+    rc = dixLookupProperty(&prop, remoteVars.clipWinPtr, stuff->property,
+                           serverClient, DixReadAccess);
+
+    if(rc== BadMatch)
+    {
+        EPHYR_DBG("BAD MATCH!!!");
+        return Success;
+    }
+
+    if (rc != Success)
+        return rc;
+
+    EPHYR_DBG("Have %d bytes for %s ",
+              prop->size, NameForAtom(stuff->property));
+
+    pthread_mutex_lock(&remoteVars.sendqueue_mutex);
+    if(prop->size==0)
+    {
+        EPHYR_DBG("READ %d FROM %d", remoteVars.incrementalPosition, remoteVars.clipboardSize);
+        remoteVars.readingIncremental=FALSE;
+        if(remoteVars.incrementalPosition == remoteVars.clipboardSize)
+        {
+            remoteVars.clipBoardChanged=TRUE;
+            pthread_cond_signal(&remoteVars.have_sendqueue_cond);
+        }
+    }
+    else
+    {
+        memcpy(remoteVars.clipboard+remoteVars.incrementalPosition, prop->data, prop->size);
+        remoteVars.incrementalPosition+=prop->size;
+    }
+
+    pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+
+
+    DeleteProperty(serverClient,remoteVars.clipWinPtr, stuff->property);
+
+
+    return rc;
+}
+
+void selection_init()
+{
+    atomPrimary = MakeAtom("PRIMARY", 7, TRUE);
+    atomClipboard = MakeAtom("CLIPBOARD", 9, TRUE);
+
+    atomTargets = MakeAtom("TARGETS", 7, TRUE);
+//     atomTimestamp = MakeAtom("TIMESTAMP", 9, TRUE);
+    atomString = MakeAtom("STRING", 6, TRUE);
+//     xaTEXT = MakeAtom("TEXT", 4, TRUE);
+    atomUTFString = MakeAtom("UTF8_STRING", 11, TRUE);
+
+    proc_convert_selection_orig = ProcVector[X_ConvertSelection];
+    ProcVector[X_ConvertSelection] = proc_convert_selection;
+    proc_send_event_orig = ProcVector[X_SendEvent];
+    ProcVector[X_SendEvent] = send_event;
+
+    proc_change_property_orig = ProcVector[X_ChangeProperty];
+    ProcVector[X_ChangeProperty] = proc_change_property;
+
+    if (!AddCallback(&SelectionCallback, selection_callback, 0))
+        FatalError("Failed to init selections\n");
+    else
+        EPHYR_DBG("Selections inited");
+
+}
+
 
 void restartTimerOnInit()
 {
@@ -49,6 +461,35 @@ void restartTimerOnInit()
         }
     }
 }
+
+
+int create_selection_window()
+{
+    int result;
+    if(remoteVars.clipWinPtr)
+        return Success;
+
+
+    remoteVars.clipWinId = FakeClientID(0);
+
+
+    remoteVars.clipWinPtr = CreateWindow(remoteVars.clipWinId, remoteVars.ephyrScreen->pScreen->root,
+                           0, 0, 100, 100, 0, InputOnly,
+                           0, NULL, 0, serverClient,
+                           CopyFromParent, &result);
+    if (!remoteVars.clipWinPtr)
+    {
+        EPHYR_DBG("Can't create selection window");
+        return result;
+    }
+
+    if (!AddResource(remoteVars.clipWinPtr->drawable.id, RT_WINDOW, remoteVars.clipWinPtr))
+        return BadAlloc;
+
+    EPHYR_DBG("Selection window created");
+    return Success;
+}
+
 
 void cancelThreadBeforeStart()
 {
@@ -481,6 +922,31 @@ int send_deleted_cursors()
         sent+=l;
     }
     remoteVars.deletedcursor_list_size=0;
+    return sent;
+}
+
+int send_selection(int sel, char* data, uint32_t length, uint32_t format)
+{
+    unsigned char buffer[56];
+    *((uint32_t*)buffer)=SELECTION;
+    *((uint32_t*)buffer+1)=sel;
+    *((uint32_t*)buffer+2)=format;
+    *((uint32_t*)buffer+3)=length;
+
+    #warning check this
+    int ln=write(remoteVars.clientsock,buffer,56);
+    int sent=0;
+
+    while(sent<length)
+    {
+        int l=write(remoteVars.clientsock,data+sent,((length-sent)<MAXMSGSIZE)?(length-sent):MAXMSGSIZE);
+        if(l<0)
+        {
+            EPHYR_DBG("Error sending selection!!!!!");
+            break;
+        }
+        sent+=l;
+    }
     return sent;
 }
 
@@ -1411,6 +1877,35 @@ void *send_frame_thread (void *threadid)
                 pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
             }
 
+            pthread_mutex_lock(&remoteVars.sendqueue_mutex);
+            if(remoteVars.clipBoardChanged)
+            {
+                size_t sz=remoteVars.clipboardSize;
+                char* data=malloc(sz);
+                memcpy(data, remoteVars.clipboard, sz);
+                remoteVars.clipBoardChanged=FALSE;
+                int format=remoteVars.clipBoardMimeData;
+                pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+                send_selection(CLIPBOARD,data,sz, format);
+                free(data);
+            }
+            else
+                pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+
+            pthread_mutex_lock(&remoteVars.sendqueue_mutex);
+            if(remoteVars.selectionChanged)
+            {
+                size_t sz=remoteVars.selectionSize;
+                char* data=malloc(sz);
+                memcpy(data, remoteVars.selection, sz);
+                remoteVars.selectionChanged=FALSE;
+                int format=remoteVars.selectionMimeData;
+                pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+                send_selection(PRIMARY, data, sz, format);
+                free(data);
+            }
+            else
+                pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
 
             pthread_mutex_lock(&remoteVars.sendqueue_mutex);
             if(remoteVars.first_sendqueue_element)
@@ -1952,6 +2447,16 @@ void terminateServer(int exitStatus)
     {
         free(remoteVars.main_img);
         free(remoteVars.second_buffer);
+    }
+
+    if(remoteVars.clipboard)
+    {
+        free(remoteVars.clipboard);
+    }
+
+    if(remoteVars.selection)
+    {
+        free(remoteVars.selection);
     }
 
     setAgentState(TERMINATED);
