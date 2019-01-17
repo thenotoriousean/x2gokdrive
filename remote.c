@@ -1396,6 +1396,7 @@ void *send_frame_thread (void *threadid)
         remoteVars.con_start_time=time(NULL);
         remoteVars.data_sent=0;
         remoteVars.data_copy=0;
+        remoteVars.evBufferOffset=0;
         setAgentState(RUNNING);
         pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
 
@@ -1733,9 +1734,8 @@ clientReadNotify(int fd, int ready, void *data)
     if(!con)
         return;
 
-    //read max 10 events
-    char buffer[EVLENGTH*10];
-    int length=read(remoteVars.clientsock,buffer,EVLENGTH*10);
+    //read max 99 events
+    int length=read(remoteVars.clientsock,remoteVars.eventBuffer + remoteVars.evBufferOffset, EVLENGTH*99);
 
 
     if(length<0)
@@ -1751,19 +1751,14 @@ clientReadNotify(int fd, int ready, void *data)
     }
     //       EPHYR_DBG("Got ev bytes - %d\n",eventnum++);
 
-    if(length%EVLENGTH)
-    {
-        EPHYR_DBG("Wrong ev data - %d\n",length);
-        // doesn't usually happens, but in case just drop event which doesn't has correct length
-        // not sure it's a good idea, but it works for the moment
-        length-=(length%EVLENGTH);
-    }
-    remoteVars.eventbytes+=length;
 
-    for(int l=0;l<=length-EVLENGTH;l+=EVLENGTH)
+    length+=remoteVars.evBufferOffset;
+    int iterations=length/EVLENGTH;
+
+
+    for(int i=0;i<iterations;++i)
     {
-        char* buff=buffer+l;
-        uint32_t event_type=*((uint32_t*)buff);
+        char* buff=remoteVars.eventBuffer+i*EVLENGTH;
 
         if(remoteVars.selstruct.readingInputBuffer)
         {
@@ -1795,9 +1790,11 @@ clientReadNotify(int fd, int ready, void *data)
                           remoteVars.selstruct.inBuffer.position, selbuff->size);
                 own_selection(selbuff->target);
             }
+//             EPHYR_DBG("CHUNK IS DONE %d",remoteVars.selstruct.readingInputBuffer);
         }
         else
         {
+            uint32_t event_type=*((uint32_t*)buff);
             switch(event_type)
             {
                 case MotionNotify:
@@ -1994,11 +1991,25 @@ clientReadNotify(int fd, int ready, void *data)
                     }
                     break;
                 }
+                default:
+                {
+                    EPHYR_DBG("UNSUPPORTED EVENT: %d",event_type);
+                    //looks like we have some corrupted data, let's try to reset event buffer
+                    remoteVars.evBufferOffset=0;
+                    length=0;
+                    break;
+                }
             }
         }
-
         //           EPHYR_DBG("Processed event - %d %d\n",eventnum++, eventbytes);
     }
+    int restDataLength=length%EVLENGTH;
+    int restDataPos=length-restDataLength;
+
+    if(restDataLength)
+       memcpy(remoteVars.eventBuffer, remoteVars.eventBuffer+restDataPos, restDataLength);
+    remoteVars.evBufferOffset=restDataLength;
+
 }
 
 unsigned int checkSocketConnection(OsTimerPtr timer, CARD32 time, void* args)

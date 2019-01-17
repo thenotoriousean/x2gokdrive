@@ -193,17 +193,7 @@ static void selection_callback(CallbackListPtr *callbacks,
         (info->selection->selection != atomClipboard))
         return;
 
-    if(remoteVars->selstruct.inSelection.data && (info->selection->selection == atomPrimary))
-    {
-        free(remoteVars->selstruct.inSelection.data);
-        remoteVars->selstruct.inSelection.size=0;
-    }
 
-    if(remoteVars->selstruct.inClipboard.data && (info->selection->selection == atomClipboard))
-    {
-        free(remoteVars->selstruct.inClipboard.data);
-        remoteVars->selstruct.inClipboard.size=0;
-    }
 
     request_selection(info->selection->selection, atomTargets);
 }
@@ -272,6 +262,7 @@ static BOOL find_image_atom(const Atom list[], size_t size)
 
 }
 
+/*
 static void listAtoms(const Atom list[], size_t size)
 {
     size_t i;
@@ -281,7 +272,7 @@ static void listAtoms(const Atom list[], size_t size)
         EPHYR_DBG("%d:%s", list[i], NameForAtom( list[i]));
     }
 }
-
+*/
 static Bool prop_has_atom(Atom atom, const Atom list[], size_t size)
 {
     size_t i;
@@ -326,7 +317,7 @@ static void process_selection(Atom selection, Atom target,
         if (prop->type != XA_ATOM)
             return;
 
-        listAtoms((const Atom*)prop->data, prop->size);
+//         listAtoms((const Atom*)prop->data, prop->size);
 
 
         if(prop_has_atom(atomUTFString, (const Atom*)prop->data, prop->size))
@@ -449,8 +440,7 @@ static int convert_selection(ClientPtr client, Atom selection,
     if(selection==atomClipboard)
         buff=&remoteVars->selstruct.inClipboard;
 
-    EPHYR_DBG("Selection request for %s (type %s)",
-              NameForAtom(selection), NameForAtom(target));
+//     EPHYR_DBG("Selection request for %s (type %s)",  NameForAtom(selection), NameForAtom(target));
 
 
 

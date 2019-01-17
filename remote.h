@@ -309,6 +309,8 @@ struct RemoteHostVars
     uint32_t framenum_sent;
     uint32_t eventnum;
     uint32_t eventbytes;
+    char eventBuffer[EVLENGTH*100];
+    uint32_t evBufferOffset;
 
     long send_thread_id;
 
