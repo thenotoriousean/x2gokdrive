@@ -34,17 +34,88 @@
 #include "selection.h"
 #include <X11/Xatom.h>
 #include "propertyst.h"
-
+#include "xace.h"
 
 RemoteHostVars *remoteVars;
 
-static Atom atomPrimary, atomClipboard, atomTargets, atomString, atomUTFString;
+static Atom atomPrimary, atomClipboard, atomTargets, atomString, atomUTFString, atomTimestamp;
 static Atom imageAtom=0;
+static Atom atomJPEG, atomJPG;
 
 
 static int (*proc_send_event_orig)(ClientPtr);
 static int (*proc_convert_selection_orig)(ClientPtr);
 static int (*proc_change_property_orig)(ClientPtr);
+
+int own_selection(int target)
+{
+    Selection *pSel;
+    int rc;
+
+    SelectionInfoRec info;
+
+    Atom selection=atomPrimary;
+    if(target==CLIPBOARD)
+        selection=atomClipboard;
+
+
+    rc = create_selection_window();
+
+    if (rc != Success)
+        return rc;
+
+    rc = dixLookupSelection(&pSel, selection, serverClient, DixSetAttrAccess);
+    if (rc == Success)
+    {
+        if (pSel->client && (pSel->client != serverClient))
+        {
+            xEvent event =
+            {
+                .u.selectionClear.time = currentTime.milliseconds,
+                .u.selectionClear.window = pSel->window,
+                .u.selectionClear.atom = pSel->selection
+            };
+            event.u.u.type = SelectionClear;
+            WriteEventsToClient(pSel->client, 1, &event);
+        }
+    }
+    else if (rc == BadMatch)
+    {
+        pSel = dixAllocateObjectWithPrivates(Selection, PRIVATE_SELECTION);
+        if (!pSel)
+            return BadAlloc;
+
+        pSel->selection = selection;
+
+        rc = XaceHookSelectionAccess(serverClient, &pSel,
+                                     DixCreateAccess | DixSetAttrAccess);
+        if (rc != Success)
+        {
+            free(pSel);
+            return rc;
+        }
+
+        pSel->next = CurrentSelections;
+        CurrentSelections = pSel;
+    }
+    else
+        return rc;
+
+    pSel->lastTimeChanged = currentTime;
+    pSel->window = remoteVars->selstruct.clipWinId;
+    pSel->pWin = remoteVars->selstruct.clipWinPtr;
+    pSel->client = serverClient;
+
+    EPHYR_DBG("OWN selection: %s", NameForAtom(selection));
+
+    info.selection = pSel;
+    info.client = serverClient;
+    info.kind = SelectionSetOwner;
+    CallCallbacks(&SelectionCallback, &info);
+
+    return Success;
+}
+
 
 static int create_selection_window(void)
 {
@@ -68,7 +139,7 @@ static int create_selection_window(void)
     if (!AddResource(remoteVars->selstruct.clipWinPtr->drawable.id, RT_WINDOW, remoteVars->selstruct.clipWinPtr))
         return BadAlloc;
 
-    EPHYR_DBG("!!!!!Selection window created %d, %p",remoteVars->selstruct.clipWinId, remoteVars->selstruct.clipWinPtr);
+    EPHYR_DBG("Selection window created %d, %p",remoteVars->selstruct.clipWinId, remoteVars->selstruct.clipWinPtr);
     return Success;
 }
 
@@ -118,10 +189,21 @@ static void selection_callback(CallbackListPtr *callbacks,
      *    EPHYR_DBG("Selection owner changed: %s",
      *              NameForAtom(info->selection->selection));*/
 
-
     if ((info->selection->selection != atomPrimary) &&
         (info->selection->selection != atomClipboard))
         return;
+
+    if(remoteVars->selstruct.inSelection.data && (info->selection->selection == atomPrimary))
+    {
+        free(remoteVars->selstruct.inSelection.data);
+        remoteVars->selstruct.inSelection.size=0;
+    }
+
+    if(remoteVars->selstruct.inClipboard.data && (info->selection->selection == atomClipboard))
+    {
+        free(remoteVars->selstruct.inClipboard.data);
+        remoteVars->selstruct.inClipboard.size=0;
+    }
 
     request_selection(info->selection->selection, atomTargets);
 }
@@ -190,6 +272,16 @@ static BOOL find_image_atom(const Atom list[], size_t size)
 
 }
 
+static void listAtoms(const Atom list[], size_t size)
+{
+    size_t i;
+
+    for (i = 0;i < size;i++)
+    {
+        EPHYR_DBG("%d:%s", list[i], NameForAtom( list[i]));
+    }
+}
+
 static Bool prop_has_atom(Atom atom, const Atom list[], size_t size)
 {
     size_t i;
@@ -234,6 +326,7 @@ static void process_selection(Atom selection, Atom target,
         if (prop->type != XA_ATOM)
             return;
 
+        listAtoms((const Atom*)prop->data, prop->size);
 
 
         if(prop_has_atom(atomUTFString, (const Atom*)prop->data, prop->size))
@@ -341,30 +434,135 @@ static int send_event(ClientPtr client)
     return proc_send_event_orig(client);
 }
 
+static int convert_selection(ClientPtr client, Atom selection,
+                               Atom target, Atom property,
+                               Window requestor, CARD32 time)
+{
+    Selection *pSel;
+    WindowPtr pWin;
+    int rc;
+
+    Atom realProperty;
+
+    xEvent event;
+    inputBuffer* buff=&remoteVars->selstruct.inSelection;
+    if(selection==atomClipboard)
+        buff=&remoteVars->selstruct.inClipboard;
+
+    EPHYR_DBG("Selection request for %s (type %s)",
+              NameForAtom(selection), NameForAtom(target));
+
+
+
+    rc = dixLookupSelection(&pSel, selection, client, DixGetAttrAccess);
+    if (rc != Success)
+        return rc;
+
+    rc = dixLookupWindow(&pWin, requestor, client, DixSetAttrAccess);
+    if (rc != Success)
+        return rc;
+
+    if (property != None)
+        realProperty = property;
+    else
+        realProperty = target;
+
+
+    if (target == atomTargets)
+    {
+        Atom string_targets[] = { atomTargets, atomTimestamp, atomUTFString };
+        Atom pixmap_targets[] = { atomTargets, atomTimestamp, atomJPEG, atomJPG };
+        if(buff->mimeData == PIXMAP)
+        {
+            rc = dixChangeWindowProperty(serverClient, pWin, realProperty,
+                                         XA_ATOM, 32, PropModeReplace,
+                                         sizeof(pixmap_targets)/sizeof(pixmap_targets[0]),
+                                         pixmap_targets, TRUE);
+        }
+        else
+        {
+            rc = dixChangeWindowProperty(serverClient, pWin, realProperty,
+                                         XA_ATOM, 32, PropModeReplace,
+                                         sizeof(string_targets)/sizeof(string_targets[0]),
+                                         string_targets, TRUE);
+        }
+        if (rc != Success)
+            return rc;
+    }
+    else if (target == atomTimestamp)
+    {
+        rc = dixChangeWindowProperty(serverClient, pWin, realProperty,
+                                     XA_INTEGER, 32, PropModeReplace, 1,
+                                     &pSel->lastTimeChanged.milliseconds,
+                                     TRUE);
+        if (rc != Success)
+            return rc;
+    }
+    else if (target == atomUTFString || target == atomJPEG || target == atomJPG )
+    {
+        rc = dixChangeWindowProperty(serverClient, pWin, realProperty,
+                                     target, 8, PropModeReplace,
+                                     buff->size, buff->data, TRUE);
+        if (rc != Success)
+            return rc;
+    }
+    else
+    {
+        return BadMatch;
+    }
+
+    event.u.u.type = SelectionNotify;
+    event.u.selectionNotify.time = time;
+    event.u.selectionNotify.requestor = requestor;
+    event.u.selectionNotify.selection = selection;
+    event.u.selectionNotify.target = target;
+    event.u.selectionNotify.property = property;
+    WriteEventsToClient(client, 1, &event);
+    return Success;
+}
+
 
 static int proc_convert_selection(ClientPtr client)
 {
+    Bool paramsOkay;
+    WindowPtr pWin;
+    Selection *pSel;
+    int rc;
+    REQUEST(xConvertSelectionReq);
+    REQUEST_SIZE_MATCH(xConvertSelectionReq);
+    rc = dixLookupWindow(&pWin, stuff->requestor, client, DixSetAttrAccess);
+    if (rc != Success)
+       return rc;
+    paramsOkay = ValidAtom(stuff->selection) && ValidAtom(stuff->target);
+    paramsOkay &= (stuff->property == None) || ValidAtom(stuff->property);
+    if (!paramsOkay)
+    {
+        client->errorValue = stuff->property;
+        return BadAtom;
+    }
 
-    EPHYR_DBG("PROC CONVERT!!!!");
-    /*    Bool paramsOkay;
-     *    WindowPtr pWin;
-     *    Selection *pSel;
-     *    int rc;
-     *
-     *    REQUEST(xConvertSelectionReq);
-     *    REQUEST_SIZE_MATCH(xConvertSelectionReq);
-     *
-     *    rc = dixLookupWindow(&pWin, stuff->requestor, client, DixSetAttrAccess);
-     *    if (rc != Success)
-     *        return rc;
-     *
-     *    paramsOkay = ValidAtom(stuff->selection) && ValidAtom(stuff->target);
-     *    paramsOkay &= (stuff->property == None) || ValidAtom(stuff->property);
-     *    if (!paramsOkay) {
-     *        client->errorValue = stuff->property;
-     *        return BadAtom;
-}
-*/
+    rc = dixLookupSelection(&pSel, stuff->selection, client, DixReadAccess);
+    if (rc == Success && pSel->client == serverClient &&  pSel->window == remoteVars->selstruct.clipWinId)
+    {
+        rc = convert_selection(client, stuff->selection,
+                                 stuff->target, stuff->property,
+                                 stuff->requestor, stuff->time);
+        if (rc != Success)
+        {
+            xEvent event;
+            memset(&event, 0, sizeof(xEvent));
+            event.u.u.type = SelectionNotify;
+            event.u.selectionNotify.time = stuff->time;
+            event.u.selectionNotify.requestor = stuff->requestor;
+            event.u.selectionNotify.selection = stuff->selection;
+            event.u.selectionNotify.target = stuff->target;
+            event.u.selectionNotify.property = None;
+            WriteEventsToClient(client, 1, &event);
+        }
+
+        return Success;
+    }
+
     return proc_convert_selection_orig(client);
 }
 
@@ -462,10 +660,12 @@ void install_selection_callbacks()
     atomClipboard = MakeAtom("CLIPBOARD", 9, TRUE);
 
     atomTargets = MakeAtom("TARGETS", 7, TRUE);
-    //     atomTimestamp = MakeAtom("TIMESTAMP", 9, TRUE);
+    atomTimestamp = MakeAtom("TIMESTAMP", 9, TRUE);
     atomString = MakeAtom("STRING", 6, TRUE);
-    //     xaTEXT = MakeAtom("TEXT", 4, TRUE);
     atomUTFString = MakeAtom("UTF8_STRING", 11, TRUE);
+
+    atomJPEG = MakeAtom("image/jpeg",487,TRUE);
+    atomJPG = MakeAtom("image/jpg",488,TRUE);
 
     remoteVars->selstruct.clipWinPtr=0;
 

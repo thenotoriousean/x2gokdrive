@@ -1784,6 +1784,7 @@ clientReadNotify(int fd, int ready, void *data)
                 }
                 if(selbuff->data)
                     free(selbuff->data);
+                selbuff->target=remoteVars.selstruct.inBuffer.target;
                 selbuff->data=remoteVars.selstruct.inBuffer.data;
                 remoteVars.selstruct.inBuffer.data=NULL;
                 selbuff->size=remoteVars.selstruct.inBuffer.size;
@@ -1792,6 +1793,7 @@ clientReadNotify(int fd, int ready, void *data)
                 remoteVars.selstruct.readingInputBuffer=FALSE;
                 EPHYR_DBG("READY TARGET %d, MIME %d, Read %d from %d",remoteVars.selstruct.inBuffer.target, selbuff->mimeData,
                           remoteVars.selstruct.inBuffer.position, selbuff->size);
+                own_selection(selbuff->target);
             }
         }
         else
@@ -1969,9 +1971,12 @@ clientReadNotify(int fd, int ready, void *data)
                             free(selbuff->data);
                         selbuff->size=size;
                         selbuff->data=malloc(size);
+                        selbuff->target=destination;
                         memcpy(selbuff->data, buff+10, size);
                         selbuff->mimeData=mime;
-                        EPHYR_DBG("READY INCOMING SELECTION for %d %s",destination, selbuff->data);
+                        EPHYR_DBG("READY INCOMING SELECTION for %d",destination);
+                        own_selection(selbuff->target);
+
                     }
                     else
                     {

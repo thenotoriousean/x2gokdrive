@@ -31,7 +31,8 @@
 
 void selection_init( struct RemoteHostVars* obj);
 void install_selection_callbacks(void );
-int create_selection_window(void);
+static int create_selection_window(void);
+int own_selection(int target);
 
 
 #endif
