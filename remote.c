@@ -1362,13 +1362,20 @@ void *send_frame_thread (void *threadid)
         {
 //             EPHYR_DBG("Checking cookie: %s",remoteVars.cookie);
             char msg[33];
-            int length=read(remoteVars.clientsock,msg, 32);
-            if(length!=32)
+            int length=32;
+            int ready=0;
+            while(ready<length)
             {
-                EPHYR_DBG("Wrong cookie size: %d",length);
-                shutdown(remoteVars.clientsock, SHUT_RDWR);
-                close(remoteVars.clientsock);
-                continue;
+                int chunk=read(remoteVars.clientsock, msg+ready, 32-ready);
+                if(chunk<=0)
+                {
+                    EPHYR_DBG("READ COOKIE ERROR");
+                    shutdown(remoteVars.clientsock, SHUT_RDWR);
+                    close(remoteVars.clientsock);
+                    continue;
+                }
+                ready+=chunk;
+                EPHYR_DBG("got %d COOKIE BYTES from client", ready);
             }
             if(strncmp(msg,remoteVars.cookie,32))
             {
@@ -1392,6 +1399,11 @@ void *send_frame_thread (void *threadid)
         close(remoteVars.serversock);
         SetNotifyFd(remoteVars.clientsock, clientReadNotify, X_NOTIFY_READ, NULL);
         remoteVars.client_connected=TRUE;
+        if(remoteVars.checkConnectionTimer)
+        {
+            TimerFree(remoteVars.checkConnectionTimer);
+            remoteVars.checkConnectionTimer=0;
+        }
         remoteVars.client_initialized=FALSE;
         remoteVars.con_start_time=time(NULL);
         remoteVars.data_sent=0;
