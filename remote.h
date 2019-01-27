@@ -128,6 +128,7 @@ enum AgentState{STARTING, RUNNING, RESUMING, SUSPENDING, SUSPENDED, TERMINATING,
 enum Compressions{JPEG,PNG};
 enum SelectionType{PRIMARY,CLIPBOARD};
 enum SelectionMime{STRING,UTF_STRING,PIXMAP};
+enum ClipboardMode{CLIP_NONE,CLIP_CLIENT,CLIP_SERVER,CLIP_BOTH};
 
 #define DEFAULT_COMPRESSION JPEG
 
@@ -282,6 +283,7 @@ typedef struct
     Window clipWinId;
     WindowPtr clipWinPtr;
     BOOL callBackInstalled;
+    unsigned char selectionMode;
 //Output selection
     outputBuffer clipboard;
     outputBuffer selection;

@@ -2185,6 +2185,29 @@ void processConfigFileSetting(char* key, char* value)
         sscanf(value, "%d",&remoteVars.listenPort);
         EPHYR_DBG("listen %d", remoteVars.listenPort);
     }
+    else if(!strcmp(key, "clipboard"))
+    {
+        if(!strcmp(value,"client"))
+        {
+            remoteVars.selstruct.selectionMode=CLIP_CLIENT;
+            EPHYR_DBG("CLIPBOARD MODE: client");
+        }
+        else if(!strcmp(value,"server"))
+        {
+            remoteVars.selstruct.selectionMode=CLIP_SERVER;
+            EPHYR_DBG("CLIPBOARD MODE: server");
+        }
+        else if(!strcmp(value,"both"))
+        {
+            remoteVars.selstruct.selectionMode=CLIP_BOTH;
+            EPHYR_DBG("CLIPBOARD MODE: both");
+        }
+        else
+        {
+            remoteVars.selstruct.selectionMode=CLIP_NONE;
+            EPHYR_DBG("CLIPBOARD MODE: disabled");
+        }
+    }
 }
 
 void readOptionsFromFile()

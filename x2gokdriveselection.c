@@ -49,6 +49,13 @@ static int (*proc_change_property_orig)(ClientPtr);
 
 int own_selection(int target)
 {
+
+    if(remoteVars->selstruct.selectionMode == CLIP_SERVER || remoteVars->selstruct.selectionMode == CLIP_NONE)
+    {
+        EPHYR_DBG("CLIENT selection disabled, not accepting selection event");
+        return Success;
+    }
+
     Selection *pSel;
     int rc;
 
@@ -193,9 +200,8 @@ static void selection_callback(CallbackListPtr *callbacks,
         (info->selection->selection != atomClipboard))
         return;
 
-
-
-    request_selection(info->selection->selection, atomTargets);
+    if(remoteVars->selstruct.selectionMode == CLIP_BOTH || remoteVars->selstruct.selectionMode == CLIP_SERVER)
+       request_selection(info->selection->selection, atomTargets);
 }
 
 static Atom find_atom_by_name(const char* name, const Atom list[], size_t size)
@@ -646,6 +652,12 @@ void selection_init(struct RemoteHostVars *obj)
 
 void install_selection_callbacks()
 {
+    if(remoteVars->selstruct.selectionMode == CLIP_CLIENT || remoteVars->selstruct.selectionMode == CLIP_NONE)
+    {
+        EPHYR_DBG("SERVER CLIPBOARD disabled, not installing callbacks");
+        return;
+    }
+
     atomPrimary = MakeAtom("PRIMARY", 7, TRUE);
     atomClipboard = MakeAtom("CLIPBOARD", 9, TRUE);
 
