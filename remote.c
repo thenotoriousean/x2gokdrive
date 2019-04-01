@@ -2138,7 +2138,8 @@ void terminateServer(int exitStatus)
     }
     setAgentState(TERMINATED);
     EPHYR_DBG("exit program with status %d", exitStatus);
-    exit(exitStatus);
+
+    GiveUp(SIGTERM);
 }
 
 void processConfigFileSetting(char* key, char* value)
