@@ -27,7 +27,7 @@
 
 
 #ifdef HAVE_CONFIG_H
-#include <kdrive-config.h>
+#include <dix-config.h>
 #endif
 #include "remote.h"
 

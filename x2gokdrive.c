@@ -28,7 +28,7 @@
 
 
 #ifdef HAVE_CONFIG_H
-#include <kdrive-config.h>
+#include <dix-config.h>
 #endif
 
 #include <xcb/xcb_keysyms.h>
