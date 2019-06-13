@@ -32,7 +32,7 @@
 #include "x2gokdrive.h"
 #include "x2gokdrivelog.h"
 #include "glx_extinit.h"
-
+#include "remote.h"
 
 extern Window EphyrPreExistingHostWin;
 extern Bool EphyrWantGrayScale;
@@ -241,7 +241,10 @@ OsVendorInit(void)
 //     if (hostx_want_host_cursor())
         ephyrFuncs.initCursor = &ephyrCursorInit;
 
-    KdOsInit(&EphyrOsFuncs);
+    if (!KdCardInfoLast()) {
+        processScreenArg("800x600", NULL);
+    }
+    remote_init();
 }
 
 KdCardFuncs ephyrFuncs = {
