@@ -1,0 +1,96 @@
+--- a/configure.ac
++++ b/configure.ac
+@@ -31,7 +31,7 @@
+ RELEASE_NAME="Clam Chowder"
+ AC_CONFIG_SRCDIR([Makefile.am])
+ AC_CONFIG_MACRO_DIR([m4])
+-AM_INIT_AUTOMAKE([foreign dist-bzip2])
++AM_INIT_AUTOMAKE([foreign dist-bzip2 subdir-objects])
+ AC_USE_SYSTEM_EXTENSIONS
+ 
+ # Require xorg-macros minimum of 1.14 for XORG_COMPILER_BRAND in XORG_DEFAULT_OPTIONS
+@@ -659,6 +659,7 @@
+ dnl kdrive and its subsystems
+ AC_ARG_ENABLE(kdrive,         AS_HELP_STRING([--enable-kdrive], [Build kdrive servers (default: no)]), [KDRIVE=$enableval], [KDRIVE=no])
+ AC_ARG_ENABLE(xephyr,         AS_HELP_STRING([--enable-xephyr], [Build the kdrive Xephyr server (default: auto)]), [XEPHYR=$enableval], [XEPHYR=auto])
++AC_ARG_ENABLE(x2gokdrive,     AS_HELP_STRING([--enable-x2gokdrive], [Build the kdrive x2gokdrive server (default: auto)]), [X2GOKDRIVE=$enableval], [X2GOKDRIVE=auto])
+ AC_ARG_ENABLE(xfake,          AS_HELP_STRING([--enable-xfake], [Build the kdrive 'fake' server (default: auto)]), [XFAKE=$enableval], [XFAKE=auto])
+ AC_ARG_ENABLE(xfbdev,         AS_HELP_STRING([--enable-xfbdev], [Build the kdrive framebuffer device server (default: auto)]), [XFBDEV=$enableval], [XFBDEV=auto])
+ dnl kdrive options
+@@ -2370,9 +2371,15 @@
+ XEPHYR_LIBS=
+ XEPHYR_INCS=
+ 
++X2GOKDRIVE_LIBS=
++X2GOKDRIVE_INCS=
++
+ AM_CONDITIONAL(KDRIVE, [test x$KDRIVE = xyes])
+ 
+ if test "$KDRIVE" = yes; then
++
++    ### XEPHYR
++
+     AC_DEFINE(KDRIVESERVER,1,[Build Kdrive X server])
+     AC_DEFINE(KDRIVEDDXACTIONS,,[Build kdrive ddx])
+ 
+@@ -2483,6 +2490,43 @@
+ 
+     AC_SUBST([XEPHYR_LIBS])
+     AC_SUBST([XEPHYR_INCS])
++
++    ### X2GOKDRIVE
++
++    X2GOKDRIVE_REQUIRED_LIBS="xau xdmcp xcb xcb-shape xcb-render xcb-renderutil xcb-aux xcb-image xcb-icccm xcb-shm >= 1.9.3 xcb-keysyms xcb-randr xcb-xkb libjpeg libpng"
++    if test "x$DRI" = xyes && test "x$GLX" = xyes; then
++        X2GOKDRIVE_REQUIRED_LIBS="$X2GOKDRIVE_REQUIRED_LIBS $LIBDRM xcb-glx xcb-xf86dri > 1.6"
++    fi
++
++    if test "x$X2GOKDRIVE" = xauto; then
++        PKG_CHECK_MODULES(X2GOKDRIVE, $X2GOKDRIVE_REQUIRED_LIBS, [X2GOKDRIVE="yes"], [X2GOKDRIVE="no"])
++    elif test "x$X2GOKDRIVE" = xyes ; then
++        PKG_CHECK_MODULES(X2GOKDRIVE, $X2GOKDRIVE_REQUIRED_LIBS)
++    fi
++
++    # X2GOKDRIVE needs nanosleep() which is in librt on Solaris
++    AC_CHECK_FUNC([nanosleep], [],
++        AC_CHECK_LIB([rt], [nanosleep], X2GOKDRIVE_LIBS="$X2GOKDRIVE_LIBS -lrt"))
++    
++    # damage shadow extension glx (NOTYET) fb mi
++    KDRIVE_INC='-I$(top_srcdir)/hw/kdrive/src'
++    KDRIVE_PURE_INCS="$KDRIVE_INC $MIEXT_SYNC_INC $MIEXT_DAMAGE_INC $MIEXT_SHADOW_INC $XEXT_INC $FB_INC $MI_INC"
++    KDRIVE_OS_INC='-I$(top_srcdir)/hw/kdrive/linux'
++    KDRIVE_INCS="$KDRIVE_PURE_INCS $KDRIVE_OS_INC"
++    
++    KDRIVE_CFLAGS="$XSERVER_CFLAGS"
++
++    KDRIVE_PURE_LIBS="$FB_LIB $MI_LIB $FIXES_LIB $XEXT_LIB $DBE_LIB $RECORD_LIB $GLX_LIBS $RANDR_LIB $RENDER_LIB $DAMAGE_LIB $DRI3_LIB $PRESENT_LIB $MIEXT_SYNC_LIB $MIEXT_DAMAGE_LIB $MIEXT_SHADOW_LIB $XI_LIB $XKB_LIB $XKB_STUB_LIB $COMPOSITE_LIB $OS_LIB"
++    KDRIVE_LIB='$(top_builddir)/hw/kdrive/src/libkdrive.la'
++    KDRIVE_MAIN_LIB="$MAIN_LIB"
++    KDRIVE_LOCAL_LIBS="$DIX_LIB $KDRIVE_LIB"
++    KDRIVE_LOCAL_LIBS="$KDRIVE_LOCAL_LIBS $FB_LIB $MI_LIB $KDRIVE_PURE_LIBS"
++    KDRIVE_LOCAL_LIBS="$KDRIVE_LOCAL_LIBS $KDRIVE_OS_LIB"
++    KDRIVE_LIBS="$KDRIVE_LOCAL_LIBS $XSERVER_SYS_LIBS $GLX_SYS_LIBS $DLOPEN_LIBS"
++
++    AC_SUBST([X2GOKDRIVE_LIBS])
++    AC_SUBST([X2GOKDRIVE_INCS])
++
+ fi
+ AC_SUBST([KDRIVE_INCS])
+ AC_SUBST([KDRIVE_PURE_INCS])
+@@ -2498,6 +2542,7 @@
+ AM_CONDITIONAL(TSLIB, [test "x$HAVE_TSLIB" = xyes])
+ AM_CONDITIONAL(KDRIVEFBDEV, [test "x$XFBDEV" = xyes])
+ AM_CONDITIONAL(XEPHYR, [test "x$KDRIVE" = xyes && test "x$XEPHYR" = xyes])
++AM_CONDITIONAL(X2GOKDRIVE, [test "x$KDRIVE" = xyes && test "x$X2GOKDRIVE" = xyes])
+ AM_CONDITIONAL(BUILD_KDRIVEFBDEVLIB, [test "x$KDRIVE" = xyes && test "x$KDRIVEFBDEVLIB" = xyes])
+ AM_CONDITIONAL(XFAKESERVER, [test "x$KDRIVE" = xyes && test "x$XFAKE" = xyes])
+ 
+@@ -2680,6 +2725,8 @@
+ hw/kdrive/Makefile
+ hw/kdrive/ephyr/Makefile
+ hw/kdrive/ephyr/man/Makefile
++hw/kdrive/x2gokdrive/Makefile
++hw/kdrive/x2gokdrive/man/Makefile
+ hw/kdrive/fake/Makefile
+ hw/kdrive/fbdev/Makefile
+ hw/kdrive/linux/Makefile

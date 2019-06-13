@@ -1,0 +1,32 @@
+Index: xorg-server/hw/kdrive/Makefile.am
+===================================================================
+--- xorg-server.orig/hw/kdrive/Makefile.am
++++ xorg-server/hw/kdrive/Makefile.am
+@@ -6,6 +6,10 @@ if XFAKESERVER
+ XFAKE_SUBDIRS = fake
+ endif
+ 
++if X2GOKDRIVE
++X2GOKDRIVE_SUBDIRS = x2gokdrive
++endif
++
+ if XEPHYR
+ XEPHYR_SUBDIRS = ephyr
+ endif
+@@ -17,6 +21,7 @@ endif
+ SERVER_SUBDIRS = 		\
+ 	$(FBDEV_SUBDIRS)	\
+ 	$(XEPHYR_SUBDIRS)       \
++	$(X2GOKDRIVE_SUBDIRS)	\
+ 	$(XFAKE_SUBDIRS)
+ 
+ SUBDIRS =			\
+@@ -24,7 +29,7 @@ SUBDIRS =			\
+ 	$(LINUX_SUBDIRS)	\
+ 	$(SERVER_SUBDIRS)
+ 
+-DIST_SUBDIRS = fbdev ephyr src linux fake
++DIST_SUBDIRS = fbdev ephyr x2gokdrive src linux fake
+ 
+ relink:
+ 	$(AM_V_at)for i in $(SERVER_SUBDIRS) ; do $(MAKE) -C $$i relink || exit 1 ; done
