@@ -1,0 +1,62 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+# Sample debian/rules that uses debhelper.
+# This file was originally written by Joey Hess and Craig Small.
+# As a special exception, when this file is copied by dh-make into a
+# dh-make output file, you may use that output file without restriction.
+# This special exception was added by Craig Small in version 0.37 of dh-make.
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+include debian/rules.flags
+
+%:
+	dh $@ --with quilt --parallel
+
+override_dh_auto_configure:
+
+	# prepare xorg-server build tree
+	mkdir $(CURDIR)/BUILD -p
+	cd $(CURDIR)/BUILD && tar -xvf /usr/src/xorg-server.tar.xz
+	mkdir $(CURDIR)/BUILD/xorg-server/hw/kdrive/x2gokdrive/ -p
+
+	# inject x2gokdrive into xorg-server build tree
+	cp Makefile.am *.c *.h $(CURDIR)/BUILD/xorg-server/hw/kdrive/x2gokdrive/
+	cp -r $(CURDIR)/man/ BUILD/xorg-server/hw/kdrive/x2gokdrive/
+
+	# patch xorg-server build tree, so that it will build x2gokdrive
+	set -x; export XORG_UPSTREAM_VERSION=`cat $(CURDIR)/BUILD/xorg-server/configure.ac | grep AC_INIT | sed -r 's/^AC_INIT[^,]*, ([^,]+),.*/\\1/'` \
+	        && cd $(CURDIR)/BUILD/xorg-server \
+	        && QUILT_PATCHES=../../patches.xorg/$$XORG_UPSTREAM_VERSION/ quilt push -a
+	        $()
+
+	# run autoreconf
+	cd $(CURDIR)/BUILD/xorg-server && autoreconf -vfi
+
+	# run configure
+	dh_auto_configure --builddirectory=BUILD/xorg-server/ --sourcedirectory=BUILD/xorg-server/ -- \
+	    $(confflags) \
+	    $(confflags_main) \
+	    $(vars)
+
+override_dh_auto_build:
+	dh_auto_build --builddirectory=BUILD/xorg-server/ --sourcedirectory=BUILD/xorg-server/ 
+
+override_dh_auto_test:
+	# disabled, nothing to test for x2gokdrive...
+
+override_dh_auto_install:
+	dh_auto_install --builddirectory=BUILD/xorg-server/ \
+	    --destdir=debian/tmp/
+
+	# oh, yuck.
+	find $(CURDIR)/debian/tmp/usr/lib/xorg -type f -name '*.la' | \
+	    xargs rm -f
+
+override_dh_auto_clean:
+	-dh_auto_clean
+
+override_dh_clean:
+	-dh_clean
+	rm -Rf $(CURDIR)/BUILD/
