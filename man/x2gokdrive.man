@@ -1,0 +1,66 @@
+.\"
+.\" Copyright (c) Mike Gabriel <mike.gabriel@das-netzwerkteam.de>
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.TH x2gokdrive @appmansuffix@ @vendorversion@
+.SH NAME
+x2gokdrive - X server providing a graphical backend for X2Go Server
+.SH SYNOPSIS
+.B x2gokdrive
+.RI [\fB:\fP display ]
+.RI [ option
+.IR ... ]
+.SH DESCRIPTION
+.B x2gokdrive
+is a kdrive server that provides a graphical backend for X2Go desktop
+sessions, suppporting modern extensions like composite, damage and randr.
+.PP
+Unlike
+.I nxagent (aka x2goagent)
+which is an X proxy, i.e. limited to the capabilities of the host X server,
+.B x2gokdrive
+is a real X server which uses the host X server window as "framebuffer"
+via fast SHM XImages.
+
+.SH OPTIONS
+The server accepts all the standard options of Xserver(@appmansuffix@).
+.PP
+Furthermore, it understands the \fInxagent\fR-way of providing session
+options via the $DISPLAY environment variable. Currently, only a subset
+of \fInxagent's\fR nx/nx display options is supported. Non-supported
+nx/nx options get ignored.
+
+.SH "SIGNALS"
+Sending the SIGHUP signal to \fBx2gokdrive\fR switches the X server
+from running to suspend state and back.
+.PP
+Sending the SIGTERM signal to \fBx2gokdrive\fR shuts down the X server
+(and ends all applications attached to its $DISPLAY).
+
+.SH CAVEATS
+.PP
+.IP \(bu 2
+The '-host-cursor' cursor is static in its appearance.
+.IP \(bu 2
+The build gets a warning about 'nanosleep'. I think the various '-D'
+build flags are causing this. I haven't figured as yet how to work
+round it. It doesn't appear to break anything however.
+
+.SH "SEE ALSO"
+X(@miscmansuffix@), Xserver(@appmansuffix@), nxagent(@appmansuffic@), x2goagent(@appmansuffix@)
+
+.SH AUTHOR
+This man page has been written by Mike Gabriel
+<mike.gabriel@das-netzwerkteam.de> for the X2Go Project
+(https://wiki.x2go.org).
