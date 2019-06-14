@@ -42,7 +42,7 @@ Index: xorg-server/configure.ac
 +
 +    ### X2GOKDRIVE
 +
-+    X2GOKDRIVE_REQUIRED_LIBS="xau xdmcp xcb xcb-shape xcb-render xcb-renderutil xcb-aux xcb-image xcb-icccm xcb-shm >= 1.9.3 xcb-keysyms xcb-randr xcb-xkb libjpeg libpng"
++    X2GOKDRIVE_REQUIRED_LIBS="xau xdmcp xcb xcb-shape xcb-render xcb-renderutil xcb-aux xcb-image xcb-icccm xcb-shm >= 1.9.3 xcb-keysyms xcb-randr xcb-xkb zlib libjpeg libpng"
 +    if test "x$DRI" = xyes && test "x$GLX" = xyes; then
 +        X2GOKDRIVE_REQUIRED_LIBS="$X2GOKDRIVE_REQUIRED_LIBS $LIBDRM xcb-glx xcb-xf86dri > 1.6"
 +    fi
