@@ -51,7 +51,7 @@ x2gokdrive_LDADD = 					\
 
 x2gokdrive_DEPENDENCIES = @KDRIVE_LOCAL_LIBS@
 
-x2gokdrive_LDFLAGS = $(LD_EXPORT_SYMBOLS_FLAG) -lz -ljpeg -lpng -lpthread
+x2gokdrive_LDFLAGS = $(LD_EXPORT_SYMBOLS_FLAG)
 
 relink:
 	$(AM_V_at)rm -f $(bin_PROGRAMS) && $(MAKE) $(bin_PROGRAMS)
