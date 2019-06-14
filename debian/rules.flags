@@ -34,6 +34,7 @@ confflags += \
 	--disable-linux-apm \
 	--disable-xquartz \
 	--disable-xwin \
+	--disable-xnest \
 	--disable-xfake \
 	--disable-xfbdev \
 	--disable-install-setuid
