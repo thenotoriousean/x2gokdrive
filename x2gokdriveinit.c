@@ -76,7 +76,6 @@ static
 void ephyrExtensionInit(void)
 {
     LoadExtensionList(ephyrExtensions, ARRAY_SIZE(ephyrExtensions), TRUE);
-    remote_selection_init();
 }
 
 
@@ -85,6 +84,8 @@ InitOutput(ScreenInfo * pScreenInfo, int argc, char **argv)
 {
     if (serverGeneration == 1)
         ephyrExtensionInit();
+
+    remote_selection_init();
 
     KdInitOutput(pScreenInfo, argc, argv);
 }
