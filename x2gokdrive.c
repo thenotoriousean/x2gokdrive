@@ -501,9 +501,8 @@ ephyrRandRSetConfig(ScreenPtr pScreen,
     screen->width = newwidth;
     screen->height = newheight;
 
-    #warning get this values from client!!!!
-    screen->width_mm=(int)(screen->width*0.311);
-    screen->height_mm=(int)(screen->height*0.309);
+    screen->width_mm=(int)((double)screen->width/monitorResolution*25.4);
+    screen->height_mm=(int)((double)screen->height/monitorResolution*25.4);
 
     scrpriv->win_width = screen->width;
     scrpriv->win_height = screen->height;
