@@ -64,7 +64,10 @@ InitCard(char *name)
 void
 InitOutput(ScreenInfo * pScreenInfo, int argc, char **argv)
 {
-    remote_selection_init();
+    if (serverGeneration == 1)
+    {
+        remote_selection_init();
+    }
 
     KdInitOutput(pScreenInfo, argc, argv);
 }
