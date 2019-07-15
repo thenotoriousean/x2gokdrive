@@ -29,6 +29,11 @@
 
 #ifdef HAVE_CONFIG_H
 #include <dix-config.h>
+
+#if XORG_VERSION_CURRENT < 11999901
+#include <kdrive-config.h>
+#endif /* XORG_VERSION_CURRENT */
+
 #endif
 
 #include <xcb/xcb_keysyms.h>
