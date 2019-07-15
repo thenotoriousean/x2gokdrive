@@ -976,6 +976,35 @@ ephyrCreateResources(ScreenPtr pScreen)
     }
 }
 
+#if XORG_VERSION_CURRENT < 11999901
+void
+ephyrPreserve(KdCardInfo * card)
+{
+}
+
+Bool
+ephyrEnable(ScreenPtr pScreen)
+{
+    return TRUE;
+}
+
+Bool
+ephyrDPMS(ScreenPtr pScreen, int mode)
+{
+    return TRUE;
+}
+
+void
+ephyrDisable(ScreenPtr pScreen)
+{
+}
+
+void
+ephyrRestore(KdCardInfo * card)
+{
+}
+#endif /* XORG_VERSION_CURRENT */
+
 void
 ephyrScreenFini(KdScreenInfo * screen)
 {

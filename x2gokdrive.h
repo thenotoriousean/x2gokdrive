@@ -207,6 +207,10 @@ extern KdPointerDriver EphyrMouseDriver;
 
 extern KdKeyboardDriver EphyrKeyboardDriver;
 
+#if XORG_VERSION_CURRENT < 11999901
+extern KdOsFuncs EphyrOsFuncs;
+#endif /* XORG_VERSION_CURRENT */
+
 extern Bool ephyrCursorInit(ScreenPtr pScreen);
 
 extern int ephyrBufferHeight(KdScreenInfo * screen);

@@ -61,9 +61,30 @@ InitCard(char *name)
     KdCardInfoAdd(&ephyrFuncs, 0);
 }
 
+#if XORG_VERSION_CURRENT < 11999901
+
+static const ExtensionModule ephyrExtensions[] = {
+#ifdef GLXEXT
+ { GlxExtensionInit, "GLX", &noGlxExtension },
+#endif
+};
+
+static
+void ephyrExtensionInit(void)
+{
+    LoadExtensionList(ephyrExtensions, ARRAY_SIZE(ephyrExtensions), TRUE);
+}
+
+#endif /* XORG_VERSION_CURRENT */
+
 void
 InitOutput(ScreenInfo * pScreenInfo, int argc, char **argv)
 {
+#if XORG_VERSION_CURRENT < 11999901
+    if (serverGeneration == 1)
+        ephyrExtensionInit();
+#endif /* XORG_VERSION_CURRENT */
+
     if (serverGeneration == 1)
     {
         remote_selection_init();
@@ -228,6 +249,9 @@ OsVendorInit(void)
 //     if (hostx_want_host_cursor())
         ephyrFuncs.initCursor = &ephyrCursorInit;
 
+#if XORG_VERSION_CURRENT < 11999901
+    KdOsInit(&EphyrOsFuncs);
+#endif
     if (serverGeneration == 1) {
         if (!KdCardInfoLast()) {
             processScreenArg("800x600", NULL);
@@ -242,10 +266,23 @@ KdCardFuncs ephyrFuncs = {
     ephyrInitScreen,            /* initScreen */
     ephyrFinishInitScreen,      /* finishInitScreen */
     ephyrCreateResources,       /* createRes */
+#if XORG_VERSION_CURRENT < 11999901
+    ephyrPreserve,              /* preserve */
+    ephyrEnable,                /* enable */
+    ephyrDPMS,                  /* dpms */
+    ephyrDisable,               /* disable */
+    ephyrRestore,               /* restore */
+#endif /* XORG_VERSION_CURRENT */
     ephyrScreenFini,            /* scrfini */
     ephyrCardFini,              /* cardfini */
 
     0,                          /* initCursor */
+#if XORG_VERSION_CURRENT < 11999901
+    0,                          /* enableCursor */
+    0,                          /* disableCursor */
+    0,                          /* finiCursor */
+    0,                          /* recolorCursor */
+#endif /* XORG_VERSION_CURRENT */
 
     0,                          /* initAccel */
     0,                          /* enableAccel */
@@ -257,3 +294,15 @@ KdCardFuncs ephyrFuncs = {
 
     ephyrCloseScreen,           /* closeScreen */
 };
+
+#if XORG_VERSION_CURRENT < 11999901
+/*
+ * Fake nearly empty EphyrOsFuncs for builds against X.Org << 1.19.99.901
+ */
+int
+ephyrInitFake(void) { return 1; }
+
+KdOsFuncs EphyrOsFuncs = {
+    .Init = ephyrInitFake,
+};
+#endif /* XORG_VERSION_CURRENT */
