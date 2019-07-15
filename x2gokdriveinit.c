@@ -42,6 +42,11 @@ extern Bool kdHasPointer;
 extern Bool kdHasKbd;
 
 
+#ifdef KDRIVE_EVDEV
+extern KdPointerDriver LinuxEvdevMouseDriver;
+extern KdKeyboardDriver LinuxEvdevKeyboardDriver;
+#endif
+
 void processScreenOrOutputArg(const char *screen_size, const char *output, char *parent_id);
 void processOutputArg(const char *output, char *parent_id);
 void processScreenArg(const char *screen_size, char *parent_id);
@@ -98,6 +103,11 @@ InitInput(int argc, char **argv)
 {
     KdKeyboardInfo *ki;
     KdPointerInfo *pi;
+
+#ifdef KDRIVE_EVDEV
+    KdAddKeyboardDriver(&LinuxEvdevKeyboardDriver);
+    KdAddPointerDriver(&LinuxEvdevMouseDriver);
+#endif
 
     if (!SeatId) {
         KdAddKeyboardDriver(&EphyrKeyboardDriver);
