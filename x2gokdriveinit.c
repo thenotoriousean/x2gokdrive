@@ -41,11 +41,12 @@ extern Bool EphyrWantNoHostGrab;
 extern Bool kdHasPointer;
 extern Bool kdHasKbd;
 
-
+#if XORG_VERSION_CURRENT < 11999901
 #ifdef KDRIVE_EVDEV
 extern KdPointerDriver LinuxEvdevMouseDriver;
 extern KdKeyboardDriver LinuxEvdevKeyboardDriver;
-#endif
+#endif /* KDRIVE_EVDEV */
+#endif /* XORG_VERSION_CURRENT */
 
 void processScreenOrOutputArg(const char *screen_size, const char *output, char *parent_id);
 void processOutputArg(const char *output, char *parent_id);
@@ -104,10 +105,12 @@ InitInput(int argc, char **argv)
     KdKeyboardInfo *ki;
     KdPointerInfo *pi;
 
+#if XORG_VERSION_CURRENT < 11999901
 #ifdef KDRIVE_EVDEV
     KdAddKeyboardDriver(&LinuxEvdevKeyboardDriver);
     KdAddPointerDriver(&LinuxEvdevMouseDriver);
-#endif
+#endif /* KDRIVE_EVDEV */
+#endif /* XORG_VERSION_CURRENT */
 
     if (!SeatId) {
         KdAddKeyboardDriver(&EphyrKeyboardDriver);
