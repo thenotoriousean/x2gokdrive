@@ -314,7 +314,7 @@ struct RemoteHostVars
     char eventBuffer[EVLENGTH*100];
     uint32_t evBufferOffset;
 
-    long send_thread_id;
+    unsigned long send_thread_id;
 
     //for control
     uint32_t cache_elements;
