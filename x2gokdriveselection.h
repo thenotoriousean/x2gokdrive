@@ -27,10 +27,11 @@
 
 #ifndef X2GOKDRIVESELECTION_H
 #define X2GOKDRIVESELECTION_H
+
 #include "x2gokdriveremote.h"
 
-void selection_init( struct RemoteHostVars* obj);
-void install_selection_callbacks(void );
+void selection_init(struct _remoteHostVars *obj);
+void install_selection_callbacks(void);
 int own_selection(int target);
 
 #endif /* X2GOKDRIVESELECTION_H */

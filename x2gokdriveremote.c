@@ -35,9 +35,10 @@
 
 #endif
 #include "x2gokdriveremote.h"
+#include "x2gokdriveselection.h"
 
-/*init it in os init*/
-static RemoteHostVars remoteVars;
+/* init it in OsInit() */
+static struct _remoteHostVars remoteVars;
 
 static BOOL remoteInitialized=FALSE;
 

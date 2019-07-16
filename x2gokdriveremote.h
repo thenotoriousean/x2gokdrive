@@ -88,9 +88,6 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 
-#include "x2gokdriveselection.h"
-
-
 #define EPHYR_WANT_DEBUG 1
 // #warning DEBUG ENABLED
 
@@ -295,7 +292,7 @@ typedef struct
 }SelectionStructure;
 
 
-struct RemoteHostVars
+struct _remoteHostVars
 {
     unsigned char compression;
     OsTimerPtr checkConnectionTimer;
@@ -371,11 +368,7 @@ struct RemoteHostVars
     BOOL client_initialized;
 
     SelectionStructure selstruct;
-};
-typedef struct RemoteHostVars RemoteHostVars;
-
-
-
+} RemoteHostVars;
 
 int send_selection(int sel, char* data, uint32_t length, uint32_t mimeData);
 

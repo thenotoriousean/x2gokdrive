@@ -41,7 +41,7 @@
 #include "propertyst.h"
 #include "xace.h"
 
-RemoteHostVars *remoteVars;
+static struct _remoteHostVars *remoteVars;
 
 static Atom atomPrimary, atomClipboard, atomTargets, atomString, atomUTFString, atomTimestamp;
 static Atom imageAtom=0;
@@ -640,7 +640,7 @@ static int proc_change_property(ClientPtr client)
     return rc;
 }
 
-void selection_init(struct RemoteHostVars *obj)
+void selection_init(struct _remoteHostVars *obj)
 {
     EPHYR_DBG("INITIALIZING selections");
     remoteVars=obj;
