@@ -41,12 +41,11 @@
 #include "propertyst.h"
 #include "xace.h"
 
-static struct _remoteHostVars *remoteVars;
+static struct _remoteHostVars *remoteVars = NULL;
 
-static Atom atomPrimary, atomClipboard, atomTargets, atomString, atomUTFString, atomTimestamp;
-static Atom imageAtom=0;
-static Atom atomJPEG, atomJPG;
-
+static Atom atomPrimary, atomClipboard, atomTargets, atomString, atomUTFString, atomTimestamp = {0};
+static Atom imageAtom = 0;
+static Atom atomJPEG, atomJPG = {0};
 
 static int (*proc_send_event_orig)(ClientPtr);
 static int (*proc_convert_selection_orig)(ClientPtr);
@@ -131,7 +130,8 @@ int own_selection(int target)
 
 static int create_selection_window(void)
 {
-    int result;
+    int result = -1;
+
     if(remoteVars->selstruct.clipWinPtr)
         return Success;
 
@@ -158,9 +158,9 @@ static int create_selection_window(void)
 
 static void request_selection(Atom selection, Atom rtype)
 {
-    xEvent ev;
-    Selection *selPtr;
-    int rc;
+    xEvent ev = {0};
+    Selection *selPtr = NULL;
+    int rc = -1;
 
     rc = create_selection_window();
     if (rc != Success)
@@ -224,7 +224,7 @@ static Atom find_atom_by_name(const char* name, const Atom list[], size_t size)
 
 static BOOL find_image_atom(const Atom list[], size_t size)
 {
-    Atom at;
+    Atom at = {0};
     at=find_atom_by_name("image/jpg",list,size);
     if(at)
     {
@@ -285,7 +285,7 @@ static BOOL find_image_atom(const Atom list[], size_t size)
 
 static Bool prop_has_atom(Atom atom, const Atom list[], size_t size)
 {
-    size_t i;
+    size_t i = 0;
 
     for (i = 0;i < size;i++) {
         if (list[i] == atom)
@@ -300,7 +300,7 @@ static void process_selection(Atom selection, Atom target,
                               TimeStamp time)
 {
     PropertyPtr prop;
-    int rc;
+    int rc = -1;
 
     rc = dixLookupProperty(&prop, remoteVars->selstruct.clipWinPtr, property,
                            serverClient, DixReadAccess);
@@ -439,20 +439,18 @@ static int convert_selection(ClientPtr client, Atom selection,
                                Atom target, Atom property,
                                Window requestor, CARD32 time)
 {
-    Selection *pSel;
-    WindowPtr pWin;
-    int rc;
+    Selection *pSel = NULL;
+    WindowPtr pWin = {0};
+    int rc = -1;
 
-    Atom realProperty;
+    Atom realProperty = {0};
+    xEvent event = {0};
 
-    xEvent event;
     inputBuffer* buff=&remoteVars->selstruct.inSelection;
     if(selection==atomClipboard)
         buff=&remoteVars->selstruct.inClipboard;
 
 //    EPHYR_DBG("Selection request for %s (type %s)",  NameForAtom(selection), NameForAtom(target));
-
-
 
     rc = dixLookupSelection(&pSel, selection, client, DixGetAttrAccess);
     if (rc != Success)
@@ -525,9 +523,10 @@ static int convert_selection(ClientPtr client, Atom selection,
 static int proc_convert_selection(ClientPtr client)
 {
     Bool paramsOkay;
-    WindowPtr pWin;
-    Selection *pSel;
-    int rc;
+    WindowPtr pWin = {0};
+    Selection *pSel = NULL;
+    int rc = -1;
+
     REQUEST(xConvertSelectionReq);
     REQUEST_SIZE_MATCH(xConvertSelectionReq);
     rc = dixLookupWindow(&pWin, stuff->requestor, client, DixSetAttrAccess);
@@ -569,11 +568,9 @@ static int proc_convert_selection(ClientPtr client)
 
 static int proc_change_property(ClientPtr client)
 {
-    int rc;
+    int rc = -1;
     BOOL incRead;
-    PropertyPtr prop;
-
-
+    PropertyPtr prop = {0};
 
     REQUEST(xChangePropertyReq);
 

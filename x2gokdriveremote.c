@@ -38,7 +38,7 @@
 #include "x2gokdriveselection.h"
 
 /* init it in OsInit() */
-static struct _remoteHostVars remoteVars;
+static struct _remoteHostVars remoteVars = {0};
 
 static BOOL remoteInitialized=FALSE;
 
