@@ -1298,7 +1298,7 @@ void sendMainImageFromSendThread(uint32_t width, uint32_t height, int32_t dx ,in
 
     pthread_mutex_lock(&remoteVars.mainimg_mutex);
 
-    for(int j=0;j<9;++i)
+    for(int j=0;j<9;++j)
     {
         regions[j].rect.size.width=0;
         regions[j].source_crc=0;
@@ -1985,7 +1985,7 @@ clientReadNotify(int fd, int ready, void *data)
                     EPHYR_DBG("Client want resize to %dx%d",width,height);
 
                     memset(screens,0, sizeof(struct VirtScreen)*4);
-                    for(int j=0;j<4;++i)
+                    for(int j=0;j<4;++j)
                     {
                         char* record=buff+9+i*8;
                         screens[j].width=*((uint16_t*)record);
