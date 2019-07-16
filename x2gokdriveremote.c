@@ -308,7 +308,7 @@ int32_t send_cursor(struct cursorFrame* cursor)
 
 //     EPHYR_DBG("SENDING CURSOR %d with size %d", cursor->serialNumber, cursor->size);
 
-    #warning check this
+//    #warning check this
     int ln=write(remoteVars.clientsock,buffer,56);
 
     int sent=0;
@@ -355,7 +355,7 @@ int32_t send_frame(u_int32_t width, uint32_t height, uint32_t x, uint32_t y, uin
     else
         EPHYR_DBG("SENDING REFERENCE %x", crc);*/
 
-#warning check this
+// #warning check this
     int ln=write(remoteVars.clientsock, buffer,56);
     uint32_t total=0;
     for(int i=0;i<9;++i)
@@ -379,7 +379,7 @@ int32_t send_frame(u_int32_t width, uint32_t height, uint32_t x, uint32_t y, uin
         *((uint32_t*)buffer+6)=regions[i].rect.size.height;
         *((uint32_t*)buffer+7)=regions[i].size;
 
-        #warning check this
+//        #warning check this
         int ln=write(remoteVars.clientsock, buffer, 64);
 
         int sent=0;
@@ -417,7 +417,7 @@ int send_deleted_elements(void)
     *((uint32_t*)buffer)=DELETED;
     *((uint32_t*)buffer+1)=remoteVars.deleted_list_size;
 
-    #warning check this
+//    #warning check this
     int ln=write(remoteVars.clientsock,buffer,56);
     //     data_sent+=48;
     int sent=0;
@@ -460,7 +460,7 @@ int send_deleted_cursors(void)
     *((uint32_t*)buffer)=DELETEDCURSOR;
     *((uint32_t*)buffer+1)=remoteVars.deletedcursor_list_size;
 
-    #warning check this
+//    #warning check this
     int ln=write(remoteVars.clientsock,buffer,56);
     int sent=0;
 
@@ -504,7 +504,7 @@ int send_selection(int sel, char* data, uint32_t length, uint32_t format)
     *((uint32_t*)buffer+2)=format;
     *((uint32_t*)buffer+3)=length;
 
-    #warning check this
+//    #warning check this
     int ln=write(remoteVars.clientsock,buffer,56);
     int sent=0;
 
@@ -2732,8 +2732,9 @@ void initFrameRegions(struct cache_elem* frame)
                               regions[i].rect.size.width,regions[i].rect.size.height);
                     */
 
-                    #warning check this
+//                    #warning check this
                     uint8_t *data=malloc(regions[i].rect.size.width*regions[i].rect.size.height*CACHEBPP);
+
                     for(int line=0;line<regions[i].rect.size.height;++line)
                     {
                         memcpy(data+line*regions[i].rect.size.width*CACHEBPP,
@@ -2752,8 +2753,9 @@ void initFrameRegions(struct cache_elem* frame)
         }
         else
         {
-            #warning check this
+//            #warning check this
             uint8_t *data=malloc(regions[1].rect.size.width*regions[1].rect.size.height*CACHEBPP);
+
             for(int line=0;line<regions[1].rect.size.height;++line)
             {
                 memcpy(data+line*regions[1].rect.size.width*CACHEBPP,
@@ -2945,7 +2947,9 @@ remote_paint_rect(KdScreenInfo *screen,
 
         width=dirtyx_max-dirtyx_min+1;
         height=dirtyy_max-dirtyy_min+1;
-        int oldsize=size;
+        /*
+         * int oldsize=size;
+         */
         size=width*height*XSERVERBPP;
         if(width<=0 || height<=0||size<=0)
         {
@@ -2958,7 +2962,8 @@ remote_paint_rect(KdScreenInfo *screen,
          *        if(size!=oldsize)
          *        {
          *            EPHYR_DBG("new update rect demensions: %dx%d", width, height);
-    }*/
+         *        }
+         */
 
         add_frame(width, height, dx, dy, calculate_crc(width, height,dx,dy), size);
     }

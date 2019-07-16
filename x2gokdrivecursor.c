@@ -72,9 +72,9 @@ can_argb_cursor(void)
 static Bool
 ephyrRealizeCursor(DeviceIntPtr dev, ScreenPtr screen, CursorPtr cursor)
 {
-    KdScreenPriv(screen);
-    KdScreenInfo *kscr = pScreenPriv->screen;
-    EphyrScrPriv *scr = kscr->driver;
+//    KdScreenPriv(screen);
+//    KdScreenInfo *kscr = pScreenPriv->screen;
+//    EphyrScrPriv *scr = kscr->driver;
     return TRUE;
 }
 

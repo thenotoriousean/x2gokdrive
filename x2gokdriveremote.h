@@ -92,7 +92,7 @@
 
 
 #define EPHYR_WANT_DEBUG 1
-#warning DEBUG ENABLED
+// #warning DEBUG ENABLED
 
 
 #if (EPHYR_WANT_DEBUG)
@@ -328,7 +328,7 @@ struct RemoteHostVars
     KdScreenInfo* ephyrScreen;
     uint32_t main_img_height, main_img_width;
 
-    #warning remove this hack
+//    #warning remove this hack
     int numofimg;
 
     int clientsock, serversock;

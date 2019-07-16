@@ -179,8 +179,8 @@ processScreenOrOutputArg(const char *screen_size, const char *output, char *pare
 
     if (card) {
         KdScreenInfo *screen;
-        unsigned long p_id = 0;
-        Bool use_geometry;
+//        unsigned long p_id = 0;
+//        Bool use_geometry;
 
         screen = KdScreenInfoAdd(card);
         KdParseScreen(screen, screen_size);
@@ -188,11 +188,11 @@ processScreenOrOutputArg(const char *screen_size, const char *output, char *pare
         if (!screen->driver)
             FatalError("Couldn't alloc screen private\n");
 
-        if (parent_id) {
-            p_id = strtol(parent_id, NULL, 0);
-        }
+//        if (parent_id) {
+//            p_id = strtol(parent_id, NULL, 0);
+//        }
 
-        use_geometry = (strchr(screen_size, '+') != NULL);
+//        use_geometry = (strchr(screen_size, '+') != NULL);
         EPHYR_DBG("screen number:%d, size: %s, output %s\n", screen->mynum, screen_size, output);
 //         hostx_add_screen(screen, p_id, screen->mynum, use_geometry, output);
     }
