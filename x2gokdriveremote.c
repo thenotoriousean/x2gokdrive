@@ -1297,12 +1297,12 @@ void sendMainImageFromSendThread(uint32_t width, uint32_t height, int32_t dx ,in
 
     pthread_mutex_lock(&remoteVars.mainimg_mutex);
 
-    for(int i=0;i<9;++i)
+    for(int j=0;j<9;++i)
     {
-        regions[i].rect.size.width=0;
-        regions[i].source_crc=0;
-        regions[i].compressed_data=0;
-        regions[i].size=0;
+        regions[j].rect.size.width=0;
+        regions[j].source_crc=0;
+        regions[j].compressed_data=0;
+        regions[j].size=0;
     }
 
     if(!width || (dx==0 && dy==0 && width==remoteVars.main_img_width && height==remoteVars.main_img_height))
@@ -1534,6 +1534,7 @@ void *send_frame_thread (void *threadid)
                 struct sendqueue_element* current = NULL;
                 uint32_t  x, y = 0;
                 int32_t width, height = 0;
+                uint32_t crc = 0;
 
                 if(remoteVars.maxfr<elems)
                 {
@@ -1560,9 +1561,9 @@ void *send_frame_thread (void *threadid)
 
                 if(frame)
                 {
-                    uint32_t crc = frame->crc;
-                    uint32_t width=frame->width;
-                    uint32_t height=frame->height;
+                    crc = frame->crc;
+                    width=frame->width;
+                    height=frame->height;
 
                     /* unlock sendqueue for main thread */
                     pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
@@ -1983,19 +1984,19 @@ clientReadNotify(int fd, int ready, void *data)
                     EPHYR_DBG("Client want resize to %dx%d",width,height);
 
                     memset(screens,0, sizeof(struct VirtScreen)*4);
-                    for(int i=0;i<4;++i)
+                    for(int j=0;j<4;++i)
                     {
                         char* record=buff+9+i*8;
-                        screens[i].width=*((uint16_t*)record);
-                        screens[i].height=*((uint16_t*)record+1);
-                        screens[i].x=*((int16_t*)record+2);
-                        screens[i].y=*((int16_t*)record+3);
+                        screens[j].width=*((uint16_t*)record);
+                        screens[j].height=*((uint16_t*)record+1);
+                        screens[j].x=*((int16_t*)record+2);
+                        screens[j].y=*((int16_t*)record+3);
 
-                        if(!screens[i].width || !screens[i].height)
+                        if(!screens[j].width || !screens[j].height)
                         {
                             break;
                         }
-                        EPHYR_DBG("SCREEN %d - (%dx%d) - %d,%d", i, screens[i].width, screens[i].height, screens[i].x, screens[i].y);
+                        EPHYR_DBG("SCREEN %d - (%dx%d) - %d,%d", i, screens[j].width, screens[j].height, screens[j].x, screens[j].y);
                     }
                     ephyrResizeScreen (remoteVars.ephyrScreen->pScreen,width,height, screens);
                     break;
