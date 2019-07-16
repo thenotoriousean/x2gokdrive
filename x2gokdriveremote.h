@@ -385,12 +385,12 @@ void clear_frame_cache(uint32_t max_elements);
 uint32_t calculate_crc(uint32_t width, uint32_t height, int32_t dx, int32_t dy);
 
 
-void readOptionsFromFile();
+void readOptionsFromFile(void);
 unsigned int checkSocketConnection(OsTimerPtr timer, CARD32 time, void* args);
 
-void restartTimerOnInit();
+void restartTimerOnInit(void);
 
-void open_socket();
+void open_socket(void);
 
 void setAgentState(int state);
 
@@ -416,7 +416,7 @@ void add_frame(uint32_t width, uint32_t height, int32_t x, int32_t y, uint32_t c
 
 
 
-void disconnect_client();
+void disconnect_client(void);
 
 
 void remote_handle_signal(int signum);
@@ -425,7 +425,7 @@ void remote_handle_signal(int signum);
 void remote_sendCursor(CursorPtr cursor);
 
 void remote_removeCursor(uint32_t serialNumber);
-void remote_send_main_image();
+void remote_send_main_image(void);
 
 
 int remote_init(void);

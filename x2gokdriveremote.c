@@ -42,13 +42,13 @@ static RemoteHostVars remoteVars;
 static BOOL remoteInitialized=FALSE;
 
 
-void remote_selection_init()
+void remote_selection_init(void)
 {
     selection_init(&remoteVars);
 }
 
 
-void restartTimerOnInit()
+void restartTimerOnInit(void)
 {
     if(remoteInitialized)
     {
@@ -62,7 +62,7 @@ void restartTimerOnInit()
 }
 
 
-void cancelThreadBeforeStart()
+void cancelThreadBeforeStart(void)
 {
     shutdown(remoteVars.serversock, SHUT_RDWR);
     close(remoteVars.serversock);
@@ -115,7 +115,7 @@ void remote_handle_signal(int signum)
 }
 
 
-int queue_elements()
+int queue_elements(void)
 {
     int elems=0;
     struct sendqueue_element* current=remoteVars.first_sendqueue_element;
@@ -169,7 +169,7 @@ void addCursorToQueue(struct cursorFrame* cframe)
     }
 }
 
-void freeCursors()
+void freeCursors(void)
 {
     struct sentCursor* cur=remoteVars.sentCursorsHead;
     while(cur)
@@ -411,7 +411,7 @@ int32_t send_frame(u_int32_t width, uint32_t height, uint32_t x, uint32_t y, uin
     return total;
 }
 
-int send_deleted_elements()
+int send_deleted_elements(void)
 {
     unsigned char buffer[56];
     *((uint32_t*)buffer)=DELETED;
@@ -454,7 +454,7 @@ int send_deleted_elements()
     return sent;
 }
 
-int send_deleted_cursors()
+int send_deleted_cursors(void)
 {
     unsigned char buffer[56];
     *((uint32_t*)buffer)=DELETEDCURSOR;
@@ -1593,7 +1593,7 @@ void *send_frame_thread (void *threadid)
 }
 
 //warning! sendqueue_mutex should be locked by thread calling this function!
-void clear_send_queue()
+void clear_send_queue(void)
 {
     struct sendqueue_element* current=remoteVars.first_sendqueue_element;
     while(current)
@@ -1728,7 +1728,7 @@ void setAgentState(int state)
     remoteVars.agentState=state;
 }
 
-void disconnect_client()
+void disconnect_client(void)
 {
     EPHYR_DBG("DISCONNECTING CLIENT, DOING SOME CLEAN UP");
     pthread_mutex_lock(&remoteVars.sendqueue_mutex);
@@ -2048,7 +2048,7 @@ unsigned int checkSocketConnection(OsTimerPtr timer, CARD32 time, void* args)
     return 0;
 }
 
-void open_socket()
+void open_socket(void)
 {
     ssize_t size;
     const int y = 1;
@@ -2216,7 +2216,7 @@ void processConfigFileSetting(char* key, char* value)
     }
 }
 
-void readOptionsFromFile()
+void readOptionsFromFile(void)
 {
     FILE *ptr=fopen(remoteVars.optionsFile,"rt");
     if(ptr)
@@ -2845,7 +2845,7 @@ void add_frame(uint32_t width, uint32_t height, int32_t x, int32_t y, uint32_t c
 }
 
 
-void remote_send_main_image()
+void remote_send_main_image(void)
 {
     add_frame(0, 0, 0, 0, 0, 0);
 }

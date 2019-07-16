@@ -655,7 +655,7 @@ void selection_init(struct RemoteHostVars *obj)
 }
 
 
-void install_selection_callbacks()
+void install_selection_callbacks(void)
 {
     if(remoteVars->selstruct.selectionMode == CLIP_CLIENT || remoteVars->selstruct.selectionMode == CLIP_NONE)
     {
