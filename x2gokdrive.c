@@ -398,11 +398,11 @@ ephyrUnsetInternalDamage(ScreenPtr pScreen)
 Bool
 ephyrRandRGetInfo(ScreenPtr pScreen, Rotation * rotations)
 {
+    rrScrPrivPtr pScrPriv = rrGetScrPriv(pScreen);
+
     EPHYR_DBG("GET RANDR INFO START");
 
     *rotations = RR_Rotate_All | RR_Reflect_All;
-
-    rrScrPrivPtr pScrPriv = rrGetScrPriv(pScreen);
 
     /* remove all sizes. This keep randr from changing our config */
     if (pScrPriv->nSizes)
@@ -437,15 +437,26 @@ Bool
 ephyrRandRSetConfig(ScreenPtr pScreen,
                     Rotation randr, int rate, RRScreenSizePtr pSize)
 {
+    EphyrScrPriv oldscr = {0};
+    KdScreenInfo *screen = NULL;
+    EphyrScrPriv *scrpriv = NULL;
+    Bool wasEnabled;
+    struct VirtScreen *virtualScreens = NULL;
+
+    int oldwidth, oldheight, oldmmwidth, oldmmheight;
+    Bool oldshadow;
+    int newwidth, newheight;
+
+    KdScreenPriv(pScreen);
+
+    rrScrPrivPtr pScrPriv = {0};
 
     EPHYR_DBG("SET RANDR CFG");
 
-    KdScreenPriv(pScreen);
-    KdScreenInfo *screen = pScreenPriv->screen;
-    EphyrScrPriv *scrpriv = screen->driver;
-    Bool wasEnabled = pScreenPriv->enabled;
-    struct VirtScreen* virtualScreens=scrpriv->virtualScreens;
-
+    screen = pScreenPriv->screen;
+    scrpriv = screen->driver;
+    wasEnabled = pScreenPriv->enabled;
+    virtualScreens=scrpriv->virtualScreens;
 
     if(!scrpriv->localRandrCall)
     {
@@ -455,15 +466,8 @@ ephyrRandRSetConfig(ScreenPtr pScreen,
 
     scrpriv->localRandrCall=FALSE;
 
-
     EPHYR_DBG("Trying to get virtual screens");
     EPHYR_DBG("Virtual Screens: %p", scrpriv->virtualScreens);
-
-
-    EphyrScrPriv oldscr;
-    int oldwidth, oldheight, oldmmwidth, oldmmheight;
-    Bool oldshadow;
-    int newwidth, newheight;
 
     if (screen->randr & (RR_Rotate_0 | RR_Rotate_180)) {
         newwidth = pSize->width;
@@ -557,15 +561,11 @@ ephyrRandRSetConfig(ScreenPtr pScreen,
     if (wasEnabled)
         KdEnableScreen(pScreen);
 
-
-
-
-    rrScrPrivPtr pScrPriv = rrGetScrPriv(pScreen);
+    pScrPriv = rrGetScrPriv(pScreen);
 
     EPHYR_DBG("RANDR SET CONFIG, LET'S CHECK OUR RANDR SETTINGS");
     /*EPHYR_DBG("OUTPUTS: %d, CRTCS: %d, SIZES: %d, MODES %d" , pScrPriv->numOutputs,
               pScrPriv->numCrtcs, pScrPriv->nSizes, pScrPriv->outputs[0]->numModes);*/
-
 
     if (pScrPriv->nSizes)
     {
@@ -671,9 +671,14 @@ ephyrRandRSetConfig(ScreenPtr pScreen,
 
 void setOutput(ScreenPtr pScreen, RROutputPtr output, RRCrtcPtr crtc, int width, int height, int x, int y, BOOL primary, BOOL connected)
 {
+    RRModePtr mode = NULL;
+    xRRModeInfo modeInfo = {0};
+    RRModePtr *modes = NULL;
+    char modename[56] = {0};
+
+    rrScrPrivPtr pScrPriv = rrGetScrPriv(pScreen);
 
     EPHYR_DBG("Set output %d %d %d %d", width, height, x,y);
-    rrScrPrivPtr pScrPriv = rrGetScrPriv(pScreen);
     crtc->x=x;
     crtc->y=y;
     if(connected)
@@ -681,14 +686,8 @@ void setOutput(ScreenPtr pScreen, RROutputPtr output, RRCrtcPtr crtc, int width,
     else
         RROutputSetConnection(output, RR_Disconnected);
 
-    RRModePtr mode = NULL;
-
-    xRRModeInfo modeInfo;
-    RRModePtr *modes;
-
     memset(&modeInfo, '\0', sizeof(modeInfo));
 
-    char modename[56];
     snprintf(modename, sizeof(modename), "%dx%d", width, height);
 
     modeInfo.width = width;
@@ -776,7 +775,8 @@ void updateOutput(ScreenPtr pScreen, RROutputPtr output, int width, int height, 
 void addOutput(ScreenPtr pScreen, char* name, int width, int height, int x, int y, BOOL primary, BOOL connected)
 {
 
-    RROutputPtr output;
+    RROutputPtr output = {0};
+    RRCrtcPtr crtc = {0};
 
     /* add new Output */
     EPHYR_DBG("CREATE OUTPUT %s",name);
@@ -786,7 +786,6 @@ void addOutput(ScreenPtr pScreen, char* name, int width, int height, int x, int 
         EPHYR_DBG("Can't create output %s", name);
         terminateServer(-1);
     }
-    RRCrtcPtr crtc;
 
     crtc = RRCrtcCreate(pScreen, NULL);
     if (!crtc)
@@ -847,19 +846,23 @@ ephyrResizeScreen (ScreenPtr           pScreen,
                   int                  newheight,
                   struct VirtScreen* virtualScreens)
 {
-
-    EPHYR_DBG("EPHYR RESIZE SCREEN!!! %p %d %d",pScreen, newwidth, newheight);
+    KdScreenInfo *screen = NULL;
+    EphyrScrPriv *scrpriv = NULL;
 
     KdScreenPriv(pScreen);
-    EPHYR_DBG("EPHYR RESIZE SCREEN 2");
-    KdScreenInfo *screen = pScreenPriv->screen;
-    EphyrScrPriv *scrpriv = screen->driver;
 
-    scrpriv->virtualScreens=virtualScreens;
-    EPHYR_DBG("Virtual Screens: %p", scrpriv->virtualScreens);
     RRScreenSize size = {0};
     Bool ret;
     int t;
+
+    EPHYR_DBG("EPHYR RESIZE SCREEN!!! %p %d %d",pScreen, newwidth, newheight);
+
+    EPHYR_DBG("EPHYR RESIZE SCREEN 2");
+    screen = pScreenPriv->screen;
+    scrpriv = screen->driver;
+
+    scrpriv->virtualScreens=virtualScreens;
+    EPHYR_DBG("Virtual Screens: %p", scrpriv->virtualScreens);
 
     if (screen->randr & (RR_Rotate_90|RR_Rotate_270)) {
         t = newwidth;
