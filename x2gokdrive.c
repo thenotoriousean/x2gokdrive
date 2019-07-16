@@ -617,8 +617,8 @@ ephyrRandRSetConfig(ScreenPtr pScreen,
             }
             else
             {
-                char name[]="X2GoEphyr-x";
-                sprintf(name, "X2GoEphyr-%d",i);
+                char name[]="X2GoKdrive-x";
+                sprintf(name, "X2GoKdrive-%d",i);
                 addOutput(pScreen, name,virtualScreens[i].width,
                           virtualScreens[i].height, virtualScreens[i].x, virtualScreens[i].y, virtualScreens[i].isPrimary, TRUE);
 
@@ -823,7 +823,7 @@ ephyrRandRInit(ScreenPtr pScreen)
 
     RRSetCurrentConfig(pScreen, randr, 0, pSize);
 
-    addOutput(pScreen,"X2GoEphyr-0", screen->width, screen->height, 0,0, TRUE, TRUE);
+    addOutput(pScreen,"X2GoKdrive-0", screen->width, screen->height, 0,0, TRUE, TRUE);
 
     return TRUE;
 }
