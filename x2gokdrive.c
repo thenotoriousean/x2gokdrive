@@ -1095,60 +1095,60 @@ miPointerScreenFuncRec ephyrPointerScreenFuncs = {
     ephyrWarpCursor,
 };
 
-static KdScreenInfo *
-screen_from_window(Window w)
-{
-    int i = 0;
+//static KdScreenInfo *
+//screen_from_window(Window w)
+//{
+//    int i = 0;
+//
+//    for (i = 0; i < screenInfo.numScreens; i++) {
+//        ScreenPtr pScreen = screenInfo.screens[i];
+//        KdPrivScreenPtr kdscrpriv = KdGetScreenPriv(pScreen);
+//        KdScreenInfo *screen = kdscrpriv->screen;
+//        EphyrScrPriv *scrpriv = screen->driver;
+//
+//    }
+//
+//    return NULL;
+//}
 
-    for (i = 0; i < screenInfo.numScreens; i++) {
-        ScreenPtr pScreen = screenInfo.screens[i];
-        KdPrivScreenPtr kdscrpriv = KdGetScreenPriv(pScreen);
-        KdScreenInfo *screen = kdscrpriv->screen;
-        EphyrScrPriv *scrpriv = screen->driver;
+//static void
+//ephyrProcessErrorEvent(xcb_generic_event_t *xev)
+//{
+//    xcb_generic_error_t *e = (xcb_generic_error_t *)xev;
+//
+//    FatalError("X11 error\n"
+//               "Error code: %hhu\n"
+//               "Sequence number: %hu\n"
+//               "Major code: %hhu\tMinor code: %hu\n"
+//               "Error value: %u\n",
+//               e->error_code,
+//               e->sequence,
+//               e->major_code, e->minor_code,
+//               e->resource_id);
+//}
 
-    }
-
-    return NULL;
-}
-
-static void
-ephyrProcessErrorEvent(xcb_generic_event_t *xev)
-{
-    xcb_generic_error_t *e = (xcb_generic_error_t *)xev;
-
-    FatalError("X11 error\n"
-               "Error code: %hhu\n"
-               "Sequence number: %hu\n"
-               "Major code: %hhu\tMinor code: %hu\n"
-               "Error value: %u\n",
-               e->error_code,
-               e->sequence,
-               e->major_code, e->minor_code,
-               e->resource_id);
-}
-
-static void
-ephyrProcessExpose(xcb_generic_event_t *xev)
-{
-    xcb_expose_event_t *expose = (xcb_expose_event_t *)xev;
-    KdScreenInfo *screen = screen_from_window(expose->window);
-    EphyrScrPriv *scrpriv = screen->driver;
-
-    /* Wait for the last expose event in a series of cliprects
-     * to actually paint our screen.
-     */
-    if (expose->count != 0)
-        return;
-
-
-    if (scrpriv) {
-        remote_paint_rect(scrpriv->screen, 0, 0, 0, 0,
-                         scrpriv->win_width,
-                         scrpriv->win_height);
-    } else {
-        EPHYR_LOG_ERROR("failed to get host screen\n");
-    }
-}
+//static void
+//ephyrProcessExpose(xcb_generic_event_t *xev)
+//{
+//    xcb_expose_event_t *expose = (xcb_expose_event_t *)xev;
+//    KdScreenInfo *screen = screen_from_window(expose->window);
+//    EphyrScrPriv *scrpriv = screen->driver;
+//
+//    /* Wait for the last expose event in a series of cliprects
+//     * to actually paint our screen.
+//     */
+//    if (expose->count != 0)
+//        return;
+//
+//
+//    if (scrpriv) {
+//        remote_paint_rect(scrpriv->screen, 0, 0, 0, 0,
+//                         scrpriv->win_width,
+//                         scrpriv->win_height);
+//    } else {
+//        EPHYR_LOG_ERROR("failed to get host screen\n");
+//    }
+//}
 
 
 void
@@ -1179,149 +1179,149 @@ ephyrClientButton(int event_type, int state, int button)
     KdEnqueuePointerEvent(ephyrMouse, mouseState | KD_MOUSE_DELTA, 0, 0, 0);
 }
 
-static void
-ephyrProcessMouseMotion(xcb_generic_event_t *xev)
-{
-    xcb_motion_notify_event_t *motion = (xcb_motion_notify_event_t *)xev;
-    KdScreenInfo *screen = screen_from_window(motion->event);
+//static void
+//ephyrProcessMouseMotion(xcb_generic_event_t *xev)
+//{
+//    xcb_motion_notify_event_t *motion = (xcb_motion_notify_event_t *)xev;
+//    KdScreenInfo *screen = screen_from_window(motion->event);
+//
+//    if (!ephyrMouse ||
+//        !((EphyrPointerPrivate *) ephyrMouse->driverPrivate)->enabled) {
+//        EPHYR_LOG("skipping mouse motion:%d\n", screen->pScreen->myNum);
+//        return;
+//    }
+//
+//    if (ephyrCursorScreen != screen->pScreen) {
+//        EPHYR_LOG("warping mouse cursor. "
+//                  "cur_screen:%d, motion_screen:%d\n",
+//                  ephyrCursorScreen->myNum, screen->pScreen->myNum);
+//        ephyrWarpCursor(inputInfo.pointer, screen->pScreen,
+//                        motion->event_x, motion->event_y);
+//    }
+//    else {
+//        int x = 0, y = 0;
+//
+//        EPHYR_LOG("enqueuing mouse motion:%d\n", screen->pScreen->myNum);
+//        x = motion->event_x;
+//        y = motion->event_y;
+//        EPHYR_LOG("initial (x,y):(%d,%d)\n", x, y);
+//        EPHYR_DBG("initial (x,y):(%d,%d)\n", x, y);
+//
+//        /* convert coords into desktop-wide coordinates.
+//         * fill_pointer_events will convert that back to
+//         * per-screen coordinates where needed */
+//        x += screen->pScreen->x;
+//        y += screen->pScreen->y;
+//
+//        KdEnqueuePointerEvent(ephyrMouse, mouseState | KD_POINTER_DESKTOP, x, y, 0);
+//    }
+//}
 
-    if (!ephyrMouse ||
-        !((EphyrPointerPrivate *) ephyrMouse->driverPrivate)->enabled) {
-        EPHYR_LOG("skipping mouse motion:%d\n", screen->pScreen->myNum);
-        return;
-    }
+//static void
+//ephyrProcessButtonPress(xcb_generic_event_t *xev)
+//{
+//    xcb_button_press_event_t *button = (xcb_button_press_event_t *)xev;
+//
+//    if (!ephyrMouse ||
+//        !((EphyrPointerPrivate *) ephyrMouse->driverPrivate)->enabled) {
+//        EPHYR_LOG("skipping mouse press:%d\n", screen_from_window(button->event)->pScreen->myNum);
+//        return;
+//    }
+//
+//    ephyrUpdateModifierState(button->state);
+//    /* This is a bit hacky. will break for button 5 ( defined as 0x10 )
+//     * Check KD_BUTTON defines in kdrive.h
+//     */
+//    mouseState |= 1 << (button->detail - 1);
+//
+//    EPHYR_LOG("enqueuing mouse press:%d\n", screen_from_window(button->event)->pScreen->myNum);
+//    KdEnqueuePointerEvent(ephyrMouse, mouseState | KD_MOUSE_DELTA, 0, 0, 0);
+//}
 
-    if (ephyrCursorScreen != screen->pScreen) {
-        EPHYR_LOG("warping mouse cursor. "
-                  "cur_screen:%d, motion_screen:%d\n",
-                  ephyrCursorScreen->myNum, screen->pScreen->myNum);
-        ephyrWarpCursor(inputInfo.pointer, screen->pScreen,
-                        motion->event_x, motion->event_y);
-    }
-    else {
-        int x = 0, y = 0;
+//static void
+//ephyrProcessButtonRelease(xcb_generic_event_t *xev)
+//{
+//    xcb_button_press_event_t *button = (xcb_button_press_event_t *)xev;
+//
+//    if (!ephyrMouse ||
+//        !((EphyrPointerPrivate *) ephyrMouse->driverPrivate)->enabled) {
+//        return;
+//    }
+//
+//    ephyrUpdateModifierState(button->state);
+//    mouseState &= ~(1 << (button->detail - 1));
+//
+//    EPHYR_LOG("enqueuing mouse release:%d\n", screen_from_window(button->event)->pScreen->myNum);
+//    KdEnqueuePointerEvent(ephyrMouse, mouseState | KD_MOUSE_DELTA, 0, 0, 0);
+//}
 
-        EPHYR_LOG("enqueuing mouse motion:%d\n", screen->pScreen->myNum);
-        x = motion->event_x;
-        y = motion->event_y;
-        EPHYR_LOG("initial (x,y):(%d,%d)\n", x, y);
-        EPHYR_DBG("initial (x,y):(%d,%d)\n", x, y);
+///* Xephyr wants ctrl+shift to grab the window, but that conflicts with
+//   ctrl+alt+shift key combos. Remember the modifier state on key presses and
+//   releases, if mod1 is pressed, we need ctrl, shift and mod1 released
+//   before we allow a shift-ctrl grab activation.
+//
+//   note: a key event contains the mask _before_ the current key takes
+//   effect, so mod1_was_down will be reset on the first key press after all
+//   three were released, not on the last release. That'd require some more
+//   effort.
+// */
+//static int
+//ephyrUpdateGrabModifierState(int state)
+//{
+//    static int mod1_was_down = 0;
+//
+//    if ((state & (XCB_MOD_MASK_CONTROL|XCB_MOD_MASK_SHIFT|XCB_MOD_MASK_1)) == 0)
+//        mod1_was_down = 0;
+//    else if (state & XCB_MOD_MASK_1)
+//        mod1_was_down = 1;
+//
+//    return mod1_was_down;
+//}
 
-        /* convert coords into desktop-wide coordinates.
-         * fill_pointer_events will convert that back to
-         * per-screen coordinates where needed */
-        x += screen->pScreen->x;
-        y += screen->pScreen->y;
+//static void
+//ephyrProcessKeyPress(xcb_generic_event_t *xev)
+//{
+//    xcb_key_press_event_t *key = (xcb_key_press_event_t *)xev;
+//
+//    if (!ephyrKbd ||
+//        !((EphyrKbdPrivate *) ephyrKbd->driverPrivate)->enabled) {
+//        return;
+//    }
+//
+//    ephyrUpdateGrabModifierState(key->state);
+//    ephyrUpdateModifierState(key->state);
+//    KdEnqueueKeyboardEvent(ephyrKbd, key->detail, FALSE);
+//}
 
-        KdEnqueuePointerEvent(ephyrMouse, mouseState | KD_POINTER_DESKTOP, x, y, 0);
-    }
-}
+//static void
+//ephyrProcessKeyRelease(xcb_generic_event_t *xev)
+//{
+//}
 
-static void
-ephyrProcessButtonPress(xcb_generic_event_t *xev)
-{
-    xcb_button_press_event_t *button = (xcb_button_press_event_t *)xev;
+//static void
+//ephyrProcessConfigureNotify(xcb_generic_event_t *xev)
+//{
+//    xcb_configure_notify_event_t *configure =
+//        (xcb_configure_notify_event_t *)xev;
+//    KdScreenInfo *screen = screen_from_window(configure->window);
+//    EphyrScrPriv *scrpriv = screen->driver;
+//
+////
+//#ifdef RANDR
+//    ephyrResizeScreen(screen->pScreen, configure->width, configure->height, NULL);
+//#endif /* RANDR */
+//}
 
-    if (!ephyrMouse ||
-        !((EphyrPointerPrivate *) ephyrMouse->driverPrivate)->enabled) {
-        EPHYR_LOG("skipping mouse press:%d\n", screen_from_window(button->event)->pScreen->myNum);
-        return;
-    }
+//static void
+//ephyrXcbProcessEvents(Bool queued_only)
+//{
+//}
 
-    ephyrUpdateModifierState(button->state);
-    /* This is a bit hacky. will break for button 5 ( defined as 0x10 )
-     * Check KD_BUTTON defines in kdrive.h
-     */
-    mouseState |= 1 << (button->detail - 1);
-
-    EPHYR_LOG("enqueuing mouse press:%d\n", screen_from_window(button->event)->pScreen->myNum);
-    KdEnqueuePointerEvent(ephyrMouse, mouseState | KD_MOUSE_DELTA, 0, 0, 0);
-}
-
-static void
-ephyrProcessButtonRelease(xcb_generic_event_t *xev)
-{
-    xcb_button_press_event_t *button = (xcb_button_press_event_t *)xev;
-
-    if (!ephyrMouse ||
-        !((EphyrPointerPrivate *) ephyrMouse->driverPrivate)->enabled) {
-        return;
-    }
-
-    ephyrUpdateModifierState(button->state);
-    mouseState &= ~(1 << (button->detail - 1));
-
-    EPHYR_LOG("enqueuing mouse release:%d\n", screen_from_window(button->event)->pScreen->myNum);
-    KdEnqueuePointerEvent(ephyrMouse, mouseState | KD_MOUSE_DELTA, 0, 0, 0);
-}
-
-/* Xephyr wants ctrl+shift to grab the window, but that conflicts with
-   ctrl+alt+shift key combos. Remember the modifier state on key presses and
-   releases, if mod1 is pressed, we need ctrl, shift and mod1 released
-   before we allow a shift-ctrl grab activation.
-
-   note: a key event contains the mask _before_ the current key takes
-   effect, so mod1_was_down will be reset on the first key press after all
-   three were released, not on the last release. That'd require some more
-   effort.
- */
-static int
-ephyrUpdateGrabModifierState(int state)
-{
-    static int mod1_was_down = 0;
-
-    if ((state & (XCB_MOD_MASK_CONTROL|XCB_MOD_MASK_SHIFT|XCB_MOD_MASK_1)) == 0)
-        mod1_was_down = 0;
-    else if (state & XCB_MOD_MASK_1)
-        mod1_was_down = 1;
-
-    return mod1_was_down;
-}
-
-static void
-ephyrProcessKeyPress(xcb_generic_event_t *xev)
-{
-    xcb_key_press_event_t *key = (xcb_key_press_event_t *)xev;
-
-    if (!ephyrKbd ||
-        !((EphyrKbdPrivate *) ephyrKbd->driverPrivate)->enabled) {
-        return;
-    }
-
-    ephyrUpdateGrabModifierState(key->state);
-    ephyrUpdateModifierState(key->state);
-    KdEnqueueKeyboardEvent(ephyrKbd, key->detail, FALSE);
-}
-
-static void
-ephyrProcessKeyRelease(xcb_generic_event_t *xev)
-{
-}
-
-static void
-ephyrProcessConfigureNotify(xcb_generic_event_t *xev)
-{
-    xcb_configure_notify_event_t *configure =
-        (xcb_configure_notify_event_t *)xev;
-    KdScreenInfo *screen = screen_from_window(configure->window);
-    EphyrScrPriv *scrpriv = screen->driver;
-
-
-#ifdef RANDR
-    ephyrResizeScreen(screen->pScreen, configure->width, configure->height, NULL);
-#endif /* RANDR */
-}
-
-static void
-ephyrXcbProcessEvents(Bool queued_only)
-{
-}
-
-static void
-ephyrXcbNotify(int fd, int ready, void *data)
-{
-    ephyrXcbProcessEvents(FALSE);
-}
+//static void
+//ephyrXcbNotify(int fd, int ready, void *data)
+//{
+//    ephyrXcbProcessEvents(FALSE);
+//}
 
 void
 ephyrCardFini(KdCardInfo * card)

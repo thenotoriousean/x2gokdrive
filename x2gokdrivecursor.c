@@ -53,21 +53,21 @@ ephyrGetCursor(CursorPtr cursor)
 }
 
 
-static void
-ephyrRealizeCoreCursor(EphyrScrPriv *scr, CursorPtr cursor)
-{
-}
+//static void
+//ephyrRealizeCoreCursor(EphyrScrPriv *scr, CursorPtr cursor)
+//{
+//}
 
-static void
-ephyrRealizeARGBCursor(EphyrScrPriv *scr, CursorPtr cursor)
-{
-}
+//static void
+//ephyrRealizeARGBCursor(EphyrScrPriv *scr, CursorPtr cursor)
+//{
+//}
 
-static Bool
-can_argb_cursor(void)
-{
-    return TRUE;
-}
+//static Bool
+//can_argb_cursor(void)
+//{
+//    return TRUE;
+//}
 
 static Bool
 ephyrRealizeCursor(DeviceIntPtr dev, ScreenPtr screen, CursorPtr cursor)
@@ -95,10 +95,10 @@ static void
 ephyrSetCursor(DeviceIntPtr dev, ScreenPtr screen, CursorPtr cursor, int x,
                int y)
 {
-    KdScreenPriv(screen);
-    KdScreenInfo *kscr = pScreenPriv->screen;
-    EphyrScrPriv *scr = kscr->driver;
-    uint32_t attr = None;
+//    KdScreenPriv(screen);
+//    KdScreenInfo *kscr = pScreenPriv->screen;
+//    EphyrScrPriv *scr = kscr->driver;
+//    uint32_t attr = None;
     if(cursor)
         remote_sendCursor(cursor);
 }
