@@ -664,6 +664,7 @@ bail4:
     return FALSE;
 }
 
+static
 void setOutput(ScreenPtr pScreen, RROutputPtr output, RRCrtcPtr crtc, int width, int height, int x, int y, BOOL primary, BOOL connected)
 {
     RRModePtr mode = NULL;
@@ -1444,7 +1445,7 @@ EphyrKeyboardInit(KdKeyboardInfo * ki)
     return Success;
 }
 
-
+static
 void EphyrKeyboardConfig(KeySymsPtr keySyms, CARD8 *modmap, XkbControlsPtr controls)
 {
 
