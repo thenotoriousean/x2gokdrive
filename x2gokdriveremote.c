@@ -62,6 +62,7 @@ void restartTimerOnInit(void)
 }
 
 
+static
 void cancelThreadBeforeStart(void)
 {
     shutdown(remoteVars.serversock, SHUT_RDWR);
@@ -114,7 +115,7 @@ void remote_handle_signal(int signum)
     }
 }
 
-
+static
 int queue_elements(void)
 {
     int elems=0;
@@ -127,6 +128,7 @@ int queue_elements(void)
     return elems;
 }
 
+static
 BOOL isCursorSent(uint32_t serialNumber)
 {
     struct sentCursor* current=remoteVars.sentCursorsHead;
@@ -139,6 +141,7 @@ BOOL isCursorSent(uint32_t serialNumber)
     return FALSE;
 }
 
+static
 void addSentCursor(uint32_t serialNumber)
 {
 //    #warning check memory
@@ -156,6 +159,7 @@ void addSentCursor(uint32_t serialNumber)
     }
 }
 
+static
 void addCursorToQueue(struct cursorFrame* cframe)
 {
     if(!remoteVars.firstCursor)
@@ -169,6 +173,7 @@ void addCursorToQueue(struct cursorFrame* cframe)
     }
 }
 
+static
 void freeCursors(void)
 {
     struct sentCursor* cur = NULL;
@@ -293,6 +298,7 @@ void remote_sendCursor(CursorPtr cursor)
     pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
 }
 
+static
 int32_t send_cursor(struct cursorFrame* cursor)
 {
     int ln, l = 0;
@@ -338,7 +344,7 @@ int32_t send_cursor(struct cursorFrame* cursor)
     return sent;
 }
 
-
+static
 int32_t send_frame(u_int32_t width, uint32_t height, uint32_t x, uint32_t y, uint32_t crc, struct frame_region* regions)
 {
 
@@ -419,6 +425,7 @@ int32_t send_frame(u_int32_t width, uint32_t height, uint32_t x, uint32_t y, uin
     return total;
 }
 
+static
 int send_deleted_elements(void)
 {
     unsigned char buffer[56] = {0};
@@ -467,6 +474,7 @@ int send_deleted_elements(void)
     return sent;
 }
 
+static
 int send_deleted_cursors(void)
 {
     unsigned char buffer[56] = {0};
@@ -545,6 +553,7 @@ int send_selection(int sel, char* data, uint32_t length, uint32_t format)
 /*
  * sendqueue_mutex should be locked when calling this function
  */
+static
 struct cache_elem* find_best_match(struct cache_elem* frame, unsigned int* match_val)
 {
     struct cache_elem* current = NULL;
@@ -587,6 +596,7 @@ struct cache_elem* find_best_match(struct cache_elem* frame, unsigned int* match
     return best_match_frame;
 }
 
+static
 BOOL checkShiftedRegion( struct cache_elem* src, struct cache_elem* dst,  int32_t x, int32_t y,
                   int32_t width, int32_t height, int32_t horiz_shift, int32_t vert_shift)
 {
@@ -657,6 +667,7 @@ BOOL checkShiftedRegion( struct cache_elem* src, struct cache_elem* dst,  int32_
     return TRUE;
 }
 
+static
 int32_t checkScrollUp(struct cache_elem* source, struct cache_elem* dest)
 {
 //    EPHYR_DBG("checking for up scroll %u, %u, %u, %u", source->width, source->height, dest->width, dest->height);
@@ -705,6 +716,7 @@ int32_t checkScrollUp(struct cache_elem* source, struct cache_elem* dest)
     return -1;
 }
 
+static
 int32_t checkScrollDown(struct cache_elem* source, struct cache_elem* dest)
 {
 //    EPHYR_DBG("checking for down scroll %u, %u, %u, %u", source->width, source->height, dest->width, dest->height);
@@ -749,6 +761,7 @@ int32_t checkScrollDown(struct cache_elem* source, struct cache_elem* dest)
     return 1;
 }
 
+static
 int32_t checkScrollRight(struct cache_elem* source, struct cache_elem* dest)
 {
 //    EPHYR_DBG("checking for up scroll %u, %u, %u, %u", source->width, source->height, dest->width, dest->height);
@@ -796,6 +809,7 @@ int32_t checkScrollRight(struct cache_elem* source, struct cache_elem* dest)
     return -1;
 }
 
+static
 int32_t checkScrollLeft(struct cache_elem* source, struct cache_elem* dest)
 {
 //    EPHYR_DBG("checking for up scroll %u, %u, %u, %u", source->width, source->height, dest->width, dest->height);
@@ -842,6 +856,7 @@ int32_t checkScrollLeft(struct cache_elem* source, struct cache_elem* dest)
     return 1;
 }
 
+static
 BOOL checkEquality(struct cache_elem* src, struct cache_elem* dst,
                    int32_t shift_horiz, int32_t shift_vert, rectangle* common_rect)
 {
@@ -1068,6 +1083,7 @@ BOOL checkEquality(struct cache_elem* src, struct cache_elem* dst,
      return TRUE;
 }
 
+static
 BOOL checkMovedContent(struct cache_elem* source, struct cache_elem* dest, int32_t* horiz_shift, int32_t* vert_shift)
 {
 //    EPHYR_DBG("checking for moved content %u, %u, %u, %u", source->width, source->height, dest->width, dest->height);
@@ -1140,6 +1156,7 @@ BOOL checkMovedContent(struct cache_elem* source, struct cache_elem* dest, int32
     return FALSE;
 }
 
+static
 BOOL findDiff(struct cache_elem* source, struct cache_elem* dest, rectangle* diff_rect)
 {
     int32_t left_x=source->width-1, top_y=source->height-1, right_x=0, bot_y=0;
@@ -1181,6 +1198,7 @@ BOOL findDiff(struct cache_elem* source, struct cache_elem* dest, rectangle* dif
     return TRUE;
 }
 
+static
 BOOL find_common_regions(struct cache_elem* source, struct cache_elem* dest, BOOL* diff, rectangle* common_rect,
                          int32_t* hshift, int32_t* vshift)
 {
@@ -1249,6 +1267,7 @@ BOOL find_common_regions(struct cache_elem* source, struct cache_elem* dest, BOO
 }
 
 /* use only from send thread */
+static
 void sendMainImageFromSendThread(uint32_t width, uint32_t height, int32_t dx ,int32_t dy)
 {
     uint32_t length = 0;
@@ -1325,6 +1344,7 @@ void sendMainImageFromSendThread(uint32_t width, uint32_t height, int32_t dx ,in
     free(regions[0].compressed_data);
 }
 
+static
 void *send_frame_thread (void *threadid)
 {
     long tid;
@@ -1611,6 +1631,7 @@ void *send_frame_thread (void *threadid)
 }
 
 /* warning! sendqueue_mutex should be locked by thread calling this function! */
+static
 void clear_send_queue(void)
 {
     struct sendqueue_element* current = NULL;
@@ -1721,6 +1742,7 @@ void clear_cache_data(uint32_t maxsize)
     }
 }
 
+static
 char* getAgentStateAsString(int state)
 {
     switch(state)
@@ -2190,6 +2212,7 @@ void terminateServer(int exitStatus)
     GiveUp(SIGTERM);
 }
 
+static
 void processConfigFileSetting(char* key, char* value)
 {
 //    EPHYR_DBG("process setting %s %s", key, value);
@@ -2477,6 +2500,7 @@ unsigned char* image_compress(uint32_t image_width, uint32_t image_height,
        return png_compress(image_width, image_height, RGBA_buffer, compressed_size);
 }
 
+static
 struct cache_elem* add_cache_element(uint32_t crc, int32_t dx, int32_t dy, uint32_t size, uint32_t width, uint32_t height)
 {
     struct cache_elem* el=malloc(sizeof(struct cache_elem));
@@ -2570,6 +2594,7 @@ struct cache_elem* add_cache_element(uint32_t crc, int32_t dx, int32_t dy, uint3
  * in this case we keeping the most recent elements in the tail of
  * list for faster search
  */
+static
 struct cache_elem* find_cache_element(uint32_t crc)
 {
     struct cache_elem* current=remoteVars.last_cache_element;
@@ -2602,7 +2627,7 @@ struct cache_elem* find_cache_element(uint32_t crc)
     return 0;
 }
 
-
+static
 void initFrameRegions(struct cache_elem* frame)
 {
     BOOL haveMultplyRegions=FALSE;
