@@ -34,7 +34,7 @@
 
 #include "os.h"                 /* for OsSignal() */
 #include "kdrive.h"
-#include "remote.h"
+#include "x2gokdriveremote.h"
 //#include "exa.h"
 
 #ifdef RANDR

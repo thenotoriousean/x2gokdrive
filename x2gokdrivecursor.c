@@ -35,7 +35,7 @@
 #endif
 #include "x2gokdrive.h"
 #include "x2gokdrivelog.h"
-#include "remote.h"
+#include "x2gokdriveremote.h"
 #include "cursorstr.h"
 #include <xcb/render.h>
 #include <xcb/xcb_renderutil.h>

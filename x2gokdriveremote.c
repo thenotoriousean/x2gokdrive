@@ -34,7 +34,7 @@
 #endif /* XORG_VERSION_CURRENT */
 
 #endif
-#include "remote.h"
+#include "x2gokdriveremote.h"
 
 /*init it in os init*/
 static RemoteHostVars remoteVars;

@@ -33,8 +33,8 @@ AM_CPPFLAGS = 			\
 bin_PROGRAMS = x2gokdrive
 
 x2gokdrive_SOURCES = \
-	remote.c \
-	remote.h \
+	x2gokdriveremote.c \
+	x2gokdriveremote.h \
 	x2gokdrive.c \
 	x2gokdrivecursor.c \
 	x2gokdrive.h \
