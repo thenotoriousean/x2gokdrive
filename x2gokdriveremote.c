@@ -141,7 +141,7 @@ BOOL isCursorSent(uint32_t serialNumber)
 
 void addSentCursor(uint32_t serialNumber)
 {
-    #warning check memory
+//    #warning check memory
     struct sentCursor* curs=malloc(sizeof(struct sentCursor));
     curs->next=0;
     curs->serialNumber=serialNumber;
@@ -1204,8 +1204,7 @@ BOOL find_common_regions(struct cache_elem* source, struct cache_elem* dest, BOO
         return checkEquality(source, dest, 0, *vshift, common_rect);
     }
 
-
-#warning stop here for the moment, let's see later if we'll use it'
+//    #warning stop here for the moment, let's see later if we'll use it
     return FALSE;
 
     *vshift=0;
