@@ -800,6 +800,7 @@ ephyrRandRInit(ScreenPtr pScreen)
     KdScreenInfo *screen = pScreenPriv->screen;
     Rotation randr;
     EphyrScrPriv *scrpriv = screen->driver;
+    char output_name[]="X2GoKdrive-0";
 
     scrpriv->virtualScreens=NULL;
     scrpriv->localRandrCall=FALSE;
@@ -824,7 +825,7 @@ ephyrRandRInit(ScreenPtr pScreen)
 
     RRSetCurrentConfig(pScreen, randr, 0, pSize);
 
-    addOutput(pScreen,"X2GoKdrive-0", screen->width, screen->height, 0,0, TRUE, TRUE);
+    addOutput(pScreen, output_name, screen->width, screen->height, 0,0, TRUE, TRUE);
 
     return TRUE;
 }
