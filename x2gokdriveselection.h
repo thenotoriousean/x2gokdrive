@@ -31,8 +31,6 @@
 
 void selection_init( struct RemoteHostVars* obj);
 void install_selection_callbacks(void );
-static int create_selection_window(void);
 int own_selection(int target);
-
 
 #endif /* X2GOKDRIVESELECTION_H */
