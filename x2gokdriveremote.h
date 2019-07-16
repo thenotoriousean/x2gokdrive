@@ -26,8 +26,8 @@
  */
 
 
-#ifndef _XLIBS_STUFF_H_
-#define _XLIBS_STUFF_H_
+#ifndef X2GOKDRIVE_REMOTE_H
+#define X2GOKDRIVE_REMOTE_H
 
 #include <X11/X.h>
 #include <X11/Xmd.h>
@@ -442,5 +442,4 @@ void
 remote_paint_rect(KdScreenInfo *screen,
                   int sx, int sy, int dx, int dy, int width, int height);
 
-
-#endif /*_XLIBS_STUFF_H_*/
+#endif /* X2GOKDRIVE_REMOTE_H */

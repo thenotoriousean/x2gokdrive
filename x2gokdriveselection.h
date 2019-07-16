@@ -25,8 +25,8 @@
  *
  */
 
-#ifndef X2GOKDRIVESELECTION
-#define X2GOKDRIVESELECTION
+#ifndef X2GOKDRIVESELECTION_H
+#define X2GOKDRIVESELECTION_H
 #include "x2gokdriveremote.h"
 
 void selection_init( struct RemoteHostVars* obj);
@@ -35,4 +35,4 @@ static int create_selection_window(void);
 int own_selection(int target);
 
 
-#endif
+#endif /* X2GOKDRIVESELECTION_H */

@@ -25,8 +25,9 @@
  * Authors:
  *    Dodji Seketeli <dodji@openedhand.com>
  */
-#ifndef __X2GOKDRIVELOG_H__
-#define __X2GOKDRIVELOG_H__
+
+#ifndef X2GOKDRIVELOG_H
+#define X2GOKDRIVELOG_H
 
 #include <assert.h>
 #include "os.h"
@@ -64,4 +65,4 @@ if (!(cond)) {EPHYR_LOG_ERROR("condition %s failed\n", #cond);return;}
 if (!(cond)) {EPHYR_LOG_ERROR("condition %s failed\n", #cond);return val;}
 #endif                          /*nomadik_return_val_if_fail */
 
-#endif /*__EPHYRLOG_H__*/
+#endif /* X2GOKDRIVELOG_H */

@@ -25,8 +25,8 @@
  *
  */
 
-#ifndef _X2GOKDRIVE_H_
-#define _X2GOKDRIVE_H_
+#ifndef X2GOKDRIVE_H
+#define X2GOKDRIVE_H
 #include <stdio.h>
 #include <unistd.h>
 #include <libgen.h>
@@ -229,4 +229,4 @@ void
 void
  ephyrDrawFini(ScreenPtr pScreen);
 
-#endif
+#endif /* X2GOKDRIVE_H */
