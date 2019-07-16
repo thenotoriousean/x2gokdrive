@@ -1444,21 +1444,21 @@ EphyrKeyboardInit(KdKeyboardInfo * ki)
     return Success;
 }
 
-static
-void EphyrKeyboardConfig(KeySymsPtr keySyms, CARD8 *modmap, XkbControlsPtr controls)
-{
-
-    ephyrKbd->minScanCode = keySyms->minKeyCode;
-    ephyrKbd->maxScanCode = keySyms->maxKeyCode;
-    XkbApplyMappingChange(ephyrKbd->dixdev, &keySyms,
-                                   keySyms->minKeyCode,
-                                   keySyms->maxKeyCode - keySyms->minKeyCode + 1,
-                                   modmap, serverClient);
-    XkbDDXChangeControls(ephyrKbd->dixdev, &controls, &controls);
-    free(keySyms->map);
-
-
-}
+//static
+//void EphyrKeyboardConfig(KeySymsPtr keySyms, CARD8 *modmap, XkbControlsPtr controls)
+//{
+//
+//    ephyrKbd->minScanCode = keySyms->minKeyCode;
+//    ephyrKbd->maxScanCode = keySyms->maxKeyCode;
+//    XkbApplyMappingChange(ephyrKbd->dixdev, &keySyms,
+//                                   keySyms->minKeyCode,
+//                                   keySyms->maxKeyCode - keySyms->minKeyCode + 1,
+//                                   modmap, serverClient);
+//    XkbDDXChangeControls(ephyrKbd->dixdev, &controls, &controls);
+//    free(keySyms->map);
+//
+//
+//}
 
 static Status
 EphyrKeyboardEnable(KdKeyboardInfo * ki)
