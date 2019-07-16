@@ -406,7 +406,7 @@ ephyrRandRGetInfo(ScreenPtr pScreen, Rotation * rotations)
 
     rrScrPrivPtr pScrPriv = rrGetScrPriv(pScreen);
 
-    //remove all sizes. This keep randr from changing our config
+    /* remove all sizes. This keep randr from changing our config */
     if (pScrPriv->nSizes)
     {
         free(pScrPriv->pSizes);
@@ -417,7 +417,7 @@ ephyrRandRGetInfo(ScreenPtr pScreen, Rotation * rotations)
 
     EPHYR_DBG("GET RANDR INFO END, SENDING SIZE NOTIFY");
 
-//     RRScreenSizeNotify(pScreen);
+//    RRScreenSizeNotify(pScreen);
 
     return TRUE;
 }
@@ -576,15 +576,15 @@ ephyrRandRSetConfig(ScreenPtr pScreen,
     pScrPriv->pSizes = NULL;
     pScrPriv->nSizes = 0;
 
-    //do not register any sizes
-/*
-    pSize = RRRegisterSize(pScreen,
-                           screen->width,
-                           screen->height,
-                           screen->width_mm,
-                           screen->height_mm);
+    /* do not register any sizes */
 
-    EPHYR_DBG("new size registered");*/
+//    pSize = RRRegisterSize(pScreen,
+//                           screen->width,
+//                           screen->height,
+//                           screen->width_mm,
+//                           screen->height_mm);
+//
+//    EPHYR_DBG("new size registered");
 
 
     randr = KdSubRotation(scrpriv->randr, screen->randr);
@@ -638,16 +638,16 @@ ephyrRandRSetConfig(ScreenPtr pScreen,
 
 
 
-//     RRSetCurrentConfig(pScreen, randr, 0, pSize);
+//    RRSetCurrentConfig(pScreen, randr, 0, pSize);
     RRScreenSetSizeRange(pScreen, screen->width, screen->height, screen->width, screen->height);
     RRScreenSizeNotify(pScreen);
     RRSendConfigNotify(pScreen);
 
 
-/*    EPHYR_DBG("OUTPUTS: %d, CRTCS: %d, SIZES: %d, MODES %d" , pScrPriv->numOutputs,
-              pScrPriv->numCrtcs, pScrPriv->nSizes, pScrPriv->outputs[0]->numModes);*/
+//    EPHYR_DBG("OUTPUTS: %d, CRTCS: %d, SIZES: %d, MODES %d" , pScrPriv->numOutputs,
+//              pScrPriv->numCrtcs, pScrPriv->nSizes, pScrPriv->outputs[0]->numModes);
 
-//     EPHYR_DBG("Have now sizes: %d",pScrPriv->nSizes);
+//    EPHYR_DBG("Have now sizes: %d",pScrPriv->nSizes);
     EPHYR_DBG("END RANDR SET CONFIG");
 
     remote_send_main_image();
@@ -717,15 +717,15 @@ void setOutput(ScreenPtr pScreen, RROutputPtr output, RRCrtcPtr crtc, int width,
         FreeResource(mode->mode.id, 0);
         terminateServer(-1);
     }
-    //         modes[output->numUserModes++] = mode;
-    //          output->userModes = modes;
+//    modes[output->numUserModes++] = mode;
+//    output->userModes = modes;
     modes[output->numModes++] = mode;
     output->modes = modes;
     output->changed = TRUE;
     pScrPriv->changed = TRUE;
     pScrPriv->configChanged = TRUE;
 
-    //     output->numPreferred=0;
+//    output->numPreferred=0;
 
 
 
@@ -760,7 +760,7 @@ void setOutput(ScreenPtr pScreen, RROutputPtr output, RRCrtcPtr crtc, int width,
 
 void updateOutput(ScreenPtr pScreen, RROutputPtr output, int width, int height, int x, int y, BOOL primary, BOOL connected)
 {
-    //clear old modes
+    /* clear old modes */
     RROutputSetModes(output, NULL, 0, 0);
     if(!output->numCrtcs)
     {
@@ -781,7 +781,7 @@ void addOutput(ScreenPtr pScreen, char* name, int width, int height, int x, int 
     RROutputPtr output;
     int n = 0;
 
-    //add new Output
+    /* add new Output */
     EPHYR_DBG("CREATE OUTPUT %s",name);
     output = RROutputCreate(pScreen, name, strlen(name), NULL);
     if (!output)
@@ -818,22 +818,13 @@ ephyrRandRInit(ScreenPtr pScreen)
     scrpriv->virtualScreens=NULL;
     scrpriv->localRandrCall=FALSE;
 
-
-
-
     if (!RRScreenInit(pScreen))
         return FALSE;
-
-
 
     pScrPriv = rrGetScrPriv(pScreen);
     pScrPriv->rrGetInfo = ephyrRandRGetInfo;
     pScrPriv->rrSetConfig = ephyrRandRSetConfig;
     pScrPriv->rrCrtcSet = ephyrRandRSetCRTC;
-
-
-
-
 
     EPHYR_DBG("RANDR INIT, HERE WE ARE DOING OUR RANDR INITIALIZATION");
     EPHYR_DBG("OUTPUTS: %d, CRTCS: %d, SIZES: %d", pScrPriv->numOutputs, pScrPriv->numCrtcs, pScrPriv->nSizes);
@@ -848,8 +839,6 @@ ephyrRandRInit(ScreenPtr pScreen)
     RRSetCurrentConfig(pScreen, randr, 0, pSize);
 
     addOutput(pScreen,"X2GoEphyr-0", screen->width, screen->height, 0,0, TRUE, TRUE);
-
-
 
     return TRUE;
 }
@@ -875,7 +864,6 @@ ephyrResizeScreen (ScreenPtr           pScreen,
     Bool ret;
     int t;
 
-
     if (screen->randr & (RR_Rotate_90|RR_Rotate_270)) {
         t = newwidth;
         newwidth = newheight;
@@ -883,7 +871,7 @@ ephyrResizeScreen (ScreenPtr           pScreen,
     }
 
     if (newwidth == screen->width && newheight == screen->height) {
-        //return FALSE;
+//        return FALSE;
     }
 
     size.width = newwidth;
@@ -892,18 +880,16 @@ ephyrResizeScreen (ScreenPtr           pScreen,
 
     scrpriv->localRandrCall=TRUE;
     ret = ephyrRandRSetConfig (pScreen, screen->randr, 0, &size );
-/*    if (ret) {
-        RROutputPtr output;
-
-        output = RRFirstOutput(pScreen);
-        if (!output)
-            return FALSE;
-        RROutputSetModes(output, NULL, 0, 0);
-    }*/
+//    if (ret) {
+//        RROutputPtr output;
+//
+//        output = RRFirstOutput(pScreen);
+//        if (!output)
+//            return FALSE;
+//        RROutputSetModes(output, NULL, 0, 0);
+//    }
 
     EPHYR_DBG("END EPHYR RESIZE SCREEN!!!");
-
-
     return ret;
 }
 #endif
@@ -927,7 +913,6 @@ ephyrInitScreen(ScreenPtr pScreen)
 }
 
 
-
 Bool
 ephyrFinishInitScreen(ScreenPtr pScreen)
 {
@@ -949,14 +934,10 @@ ephyrFinishInitScreen(ScreenPtr pScreen)
     scrpriv->BlockHandler = pScreen->BlockHandler;
     pScreen->BlockHandler = ephyrScreenBlockHandler;
 
-
-
-
-
     return TRUE;
 }
 
-/**
+/*
  * Called by kdrive after calling down the
  * pScreen->CreateScreenResources() chain, this gives us a chance to
  * make any pixmaps after the screen and all extensions have been
@@ -1312,7 +1293,6 @@ ephyrProcessKeyPress(xcb_generic_event_t *xev)
     KdEnqueueKeyboardEvent(ephyrKbd, key->detail, FALSE);
 }
 
-
 static void
 ephyrProcessKeyRelease(xcb_generic_event_t *xev)
 {
@@ -1331,8 +1311,6 @@ ephyrProcessConfigureNotify(xcb_generic_event_t *xev)
     ephyrResizeScreen(screen->pScreen, configure->width, configure->height, NULL);
 #endif /* RANDR */
 }
-
-
 
 static void
 ephyrXcbProcessEvents(Bool queued_only)

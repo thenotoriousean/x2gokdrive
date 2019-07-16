@@ -328,7 +328,7 @@ static void process_selection(Atom selection, Atom target,
         if (prop->type != XA_ATOM)
             return;
 
-//         listAtoms((const Atom*)prop->data, prop->size);
+//        listAtoms((const Atom*)prop->data, prop->size);
 
 
         if(prop_has_atom(atomUTFString, (const Atom*)prop->data, prop->size))
@@ -341,7 +341,7 @@ static void process_selection(Atom selection, Atom target,
         }
         else
         {
-            //requesting pixmap only for clipboard
+            /* requesting pixmap only for clipboard */
             if((selection == atomClipboard) && find_image_atom((const Atom*)prop->data, prop->size) && imageAtom)
             {
                 request_selection(selection, imageAtom);
@@ -358,7 +358,7 @@ static void process_selection(Atom selection, Atom target,
         {
             format=PIXMAP;
         }
-        //read incrementinal data only for clipboard
+        /* read incrementinal data only for clipboard */
         if(!strcmp( NameForAtom(prop->type), "INCR") && selection==atomClipboard)
         {
             EPHYR_DBG("GOT INCR PROPERTY: %d",*((int*)prop->data));
@@ -399,7 +399,7 @@ static void process_selection(Atom selection, Atom target,
             memcpy(buff->data, prop->data, prop->size);
             buff->changed=TRUE;
             buff->mimeData=format;
-            //             EPHYR_DBG("Have new Clipboard %s %d",remoteVars->selstruct.clipboard, remoteVars->selstruct.clipboardSize);
+//            EPHYR_DBG("Have new Clipboard %s %d",remoteVars->selstruct.clipboard, remoteVars->selstruct.clipboardSize);
         }
         pthread_cond_signal(&remoteVars->have_sendqueue_cond);
         pthread_mutex_unlock(&remoteVars->sendqueue_mutex);
@@ -451,7 +451,7 @@ static int convert_selection(ClientPtr client, Atom selection,
     if(selection==atomClipboard)
         buff=&remoteVars->selstruct.inClipboard;
 
-//     EPHYR_DBG("Selection request for %s (type %s)",  NameForAtom(selection), NameForAtom(target));
+//    EPHYR_DBG("Selection request for %s (type %s)",  NameForAtom(selection), NameForAtom(target));
 
 
 
@@ -676,7 +676,7 @@ void install_selection_callbacks(void)
 
     remoteVars->selstruct.clipWinPtr=0;
 
-    //try to dele callback to avaid double call
+    /* try to dele callback to avaid double call */
     DeleteCallback(&SelectionCallback, selection_callback, 0);
 
     if (!AddCallback(&SelectionCallback, selection_callback, 0))

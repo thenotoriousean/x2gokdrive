@@ -230,7 +230,7 @@ void remote_removeCursor(uint32_t serialNumber)
 
 void remote_sendCursor(CursorPtr cursor)
 {
-#warning check memory
+//    #warning check memory
     struct cursorFrame* cframe=malloc(sizeof(struct cursorFrame));
     cframe->serialNumber=cursor->serialNumber;
     cframe->size=0;
@@ -262,8 +262,10 @@ void remote_sendCursor(CursorPtr cursor)
         cframe->xhot=cursor->bits->xhot;
         cframe->yhot=cursor->bits->yhot;
 
-        //in X11 implementation we have 2bits for color, not from 0 to 255 but from 0 to 65535.
-        //no idea why, RGBA is still 4bytes. I think one byte per color component is suuficient, so let's just recalculate to 1byte per component
+        /* In X11 implementation we have 2bits for color, not from 0 to 255 but from 0 to 65535.
+         * no idea why, RGBA is still 4bytes. I think one byte per color component is suuficient,
+         * so let's just recalculate to 1byte per component
+         */
 
         cframe->backR=cursor->backRed*255./65535.0;
         cframe->backG=cursor->backGreen*255./65535.0;
@@ -282,7 +284,6 @@ void remote_sendCursor(CursorPtr cursor)
     pthread_cond_signal(&remoteVars.have_sendqueue_cond);
     pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
 }
-
 
 int32_t send_cursor(struct cursorFrame* cursor)
 {
@@ -324,7 +325,7 @@ int32_t send_cursor(struct cursorFrame* cursor)
         sent+=l;
     }
     remoteVars.data_sent+=sent;
-    //     EPHYR_DBG("SENT total %d", total);
+//    EPHYR_DBG("SENT total %d", total);
 
     return sent;
 }
@@ -349,13 +350,13 @@ int32_t send_frame(u_int32_t width, uint32_t height, uint32_t x, uint32_t y, uin
     *((uint32_t*)buffer+4)=y;
     *((uint32_t*)buffer+5)=numofregions;
     *((uint32_t*)buffer+6)=crc;
-/*
-    if(numofregions)
-        EPHYR_DBG("SENDING NEW FRAME %x", crc);
-    else
-        EPHYR_DBG("SENDING REFERENCE %x", crc);*/
 
-// #warning check this
+//    if(numofregions)
+//        EPHYR_DBG("SENDING NEW FRAME %x", crc);
+//    else
+//        EPHYR_DBG("SENDING REFERENCE %x", crc);
+
+//    #warning check this
     int ln=write(remoteVars.clientsock, buffer,56);
     uint32_t total=0;
     for(int i=0;i<9;++i)
@@ -363,13 +364,13 @@ int32_t send_frame(u_int32_t width, uint32_t height, uint32_t x, uint32_t y, uin
         if(!(regions[i].rect.size.width && regions[i].rect.size.height))
             continue;
 
-/*        EPHYR_DBG("SENDING FRAME REGION %x %dx%d %d",regions[i].source_crc, regions[i].rect.size.width, regions[i].rect.size.height,
-                    regions[i].size);
-*/
+//        EPHYR_DBG("SENDING FRAME REGION %x %dx%d %d",regions[i].source_crc, regions[i].rect.size.width, regions[i].rect.size.height,
+//                  regions[i].size);
+
         *((uint32_t*)buffer)=regions[i].source_crc;
 
-        /*if(*((uint32_t*)buffer)=regions[i].source_crc)
-            EPHYR_DBG("SENDING REFERENCE %x", *((uint32_t*)buffer)=regions[i].source_crc);*/
+//      if(*((uint32_t*)buffer)=regions[i].source_crc)
+//          EPHYR_DBG("SENDING REFERENCE %x", *((uint32_t*)buffer)=regions[i].source_crc);
 
         *((uint32_t*)buffer+1)=regions[i].source_coordinates.x;
         *((uint32_t*)buffer+2)=regions[i].source_coordinates.y;
@@ -397,15 +398,16 @@ int32_t send_frame(u_int32_t width, uint32_t height, uint32_t x, uint32_t y, uin
             sent+=l;
         }
         total+=sent;
-//         EPHYR_DBG("SENT %d",sent);
-/*
-        EPHYR_DBG("\ncache elements %d, cache size %lu(%dMB), connection time=%d, sent %lu(%dMB)\n",
-                 cache_elements, cache_size, (int) (cache_size/1024/1024),
-                 time(NULL)-con_start_time, data_sent, (int) (data_sent/1024/1024));
-*/
+//        EPHYR_DBG("SENT %d",sent);
+//
+//        EPHYR_DBG("\ncache elements %d, cache size %lu(%dMB), connection time=%d, sent %lu(%dMB)\n",
+//                  cache_elements, cache_size, (int) (cache_size/1024/1024),
+//                  time(NULL)-con_start_time, data_sent, (int) (data_sent/1024/1024));
+//
 
     }
     remoteVars.data_sent+=total;
+
 //     EPHYR_DBG("SENT total %d", total);
 
     return total;
@@ -419,7 +421,7 @@ int send_deleted_elements(void)
 
 //    #warning check this
     int ln=write(remoteVars.clientsock,buffer,56);
-    //     data_sent+=48;
+//     data_sent+=48;
     int sent=0;
 
     unsigned char* list=malloc(sizeof(uint32_t)*remoteVars.deleted_list_size);
@@ -427,7 +429,7 @@ int send_deleted_elements(void)
     unsigned int i=0;
     while(remoteVars.first_deleted_elements)
     {
-//         EPHYR_DBG("To DELETE FRAME %x", remoteVars.first_deleted_elements->crc);
+//        EPHYR_DBG("To DELETE FRAME %x", remoteVars.first_deleted_elements->crc);
 
         *((uint32_t*)list+i)=remoteVars.first_deleted_elements->crc;
         struct deleted_elem* elem=remoteVars.first_deleted_elements;
@@ -438,7 +440,7 @@ int send_deleted_elements(void)
 
     remoteVars.last_deleted_elements=0l;
 
-    //         EPHYR_DBG("SENDING IMG length - %d, number - %d\n",length,framenum_sent++);
+//    EPHYR_DBG("SENDING IMG length - %d, number - %d\n",length,framenum_sent++);
     int length=remoteVars.deleted_list_size*sizeof(uint32_t);
     while(sent<length)
     {
@@ -471,7 +473,7 @@ int send_deleted_cursors(void)
     {
         *((uint32_t*)list+i)=remoteVars.first_deleted_cursor->serialNumber;
 
-//         EPHYR_DBG("delete cursord %d",first_deleted_cursor->serialNumber);
+//        EPHYR_DBG("delete cursord %d",first_deleted_cursor->serialNumber);
         struct deletedCursor* elem=remoteVars.first_deleted_cursor;
         remoteVars.first_deleted_cursor=elem->next;
         free(elem);
@@ -480,7 +482,7 @@ int send_deleted_cursors(void)
 
     remoteVars.last_deleted_cursor=0l;
 
-//     EPHYR_DBG("Sending list from %d elements", deletedcursor_list_size);
+//    EPHYR_DBG("Sending list from %d elements", deletedcursor_list_size);
     int length=remoteVars.deletedcursor_list_size*sizeof(uint32_t);
     while(sent<length)
     {
@@ -523,7 +525,9 @@ int send_selection(int sel, char* data, uint32_t length, uint32_t format)
 
 
 
-//sendqueue_mutex should be locked when calling this function
+/*
+ * sendqueue_mutex should be locked when calling this function
+ */
 struct cache_elem* find_best_match(struct cache_elem* frame, unsigned int* match_val)
 {
     struct cache_elem* current=frame->prev;
@@ -567,7 +571,7 @@ BOOL checkShiftedRegion( struct cache_elem* src, struct cache_elem* dst,  int32_
                   int32_t width, int32_t height, int32_t horiz_shift, int32_t vert_shift)
 {
 
-//     EPHYR_DBG("FENTER %d %d %d %d %d",x,y,width,height,shift);
+//    EPHYR_DBG("FENTER %d %d %d %d %d",x,y,width,height,shift);
     int32_t vert_point=20;
     int32_t hor_point=20;
 
@@ -611,32 +615,31 @@ BOOL checkShiftedRegion( struct cache_elem* src, struct cache_elem* dst,  int32_
 
             }
 
-//             EPHYR_DBG("Indexes %d, %d, %d, %d %d", src_ind, dst_ind, src->size, dst->size, i);
+//            EPHYR_DBG("Indexes %d, %d, %d, %d %d", src_ind, dst_ind, src->size, dst->size, i);
             if(src->data[src_ind]!=dst->data[dst_ind])
             {
-//                 EPHYR_DBG("FEXIT");
+//                EPHYR_DBG("FEXIT");
                 return FALSE;
             }
             if(src->data[src_ind+1]!=dst->data[dst_ind+1])
             {
-//                 EPHYR_DBG("FEXIT");
+//                EPHYR_DBG("FEXIT");
                 return FALSE;
             }
             if(src->data[src_ind+2]!=dst->data[dst_ind+2])
             {
-//                 EPHYR_DBG("FEXIT");
+//                EPHYR_DBG("FEXIT");
                 return FALSE;
             }
         }
     }
-//     EPHYR_DBG("FEXIT");
+//    EPHYR_DBG("FEXIT");
     return TRUE;
 }
 
-
 int32_t checkScrollUp(struct cache_elem* source, struct cache_elem* dest)
 {
-//     EPHYR_DBG("checking for up scroll %u, %u, %u, %u", source->width, source->height, dest->width, dest->height);
+//    EPHYR_DBG("checking for up scroll %u, %u, %u, %u", source->width, source->height, dest->width, dest->height);
     int32_t max_shift=source->height/3;
     int32_t x=source->width/10;
     int32_t y=source->height/10;
@@ -649,7 +652,7 @@ int32_t checkScrollUp(struct cache_elem* source, struct cache_elem* dest)
     }
     if(width<2)
     {
-//         EPHYR_DBG("DST too small(w), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
+//        EPHYR_DBG("DST too small(w), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
         return -1;
     }
 
@@ -661,11 +664,11 @@ int32_t checkScrollUp(struct cache_elem* source, struct cache_elem* dest)
     }
     if(height<2)
     {
-//         EPHYR_DBG("DST too small(h), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
+//        EPHYR_DBG("DST too small(h), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
         return -1;
     }
 
-//     EPHYR_DBG(" %u %u %u %u %u",x,y,width, height, max_shift);
+//    EPHYR_DBG(" %u %u %u %u %u",x,y,width, height, max_shift);
 
 
     for(int32_t shift=0;shift<max_shift;++shift)
@@ -674,17 +677,16 @@ int32_t checkScrollUp(struct cache_elem* source, struct cache_elem* dest)
             continue;
         if(shift)
         {
-//             EPHYR_DBG("Shift %d, Cursor is matched!\n",shift);
+//            EPHYR_DBG("Shift %d, Cursor is matched!\n",shift);
             return shift;
         }
     }
     return -1;
 }
 
-
 int32_t checkScrollDown(struct cache_elem* source, struct cache_elem* dest)
 {
-//     EPHYR_DBG("checking for down scroll %u, %u, %u, %u", source->width, source->height, dest->width, dest->height);
+//    EPHYR_DBG("checking for down scroll %u, %u, %u, %u", source->width, source->height, dest->width, dest->height);
     int32_t max_shift=source->height/3*-1;
     int32_t x=source->width/10;
     int32_t y=source->height/2;
@@ -692,7 +694,7 @@ int32_t checkScrollDown(struct cache_elem* source, struct cache_elem* dest)
     int32_t width=source->width/2-source->width/5;
     int32_t height=source->height/2-source->height/10;
 
-//     EPHYR_DBG(" %u %u %u %u %u",x,y,width, height, max_shift);
+//    EPHYR_DBG(" %u %u %u %u %u",x,y,width, height, max_shift);
 
     if(x+width >= dest->width)
     {
@@ -700,7 +702,7 @@ int32_t checkScrollDown(struct cache_elem* source, struct cache_elem* dest)
     }
     if(width<2)
     {
-//         EPHYR_DBG("DST too small(w), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
+//        EPHYR_DBG("DST too small(w), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
         return 1;
     }
 
@@ -711,7 +713,7 @@ int32_t checkScrollDown(struct cache_elem* source, struct cache_elem* dest)
     }
     if(height<2)
     {
-//         EPHYR_DBG("DST too small(h), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
+//        EPHYR_DBG("DST too small(h), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
         return 1;
     }
 
@@ -721,16 +723,15 @@ int32_t checkScrollDown(struct cache_elem* source, struct cache_elem* dest)
         if(!checkShiftedRegion( source, dest, x, y, width, height, 0,shift))
             continue;
         if(shift)
-            //         EPHYR_DBG("Shift %d, Cursor is matched!\n",shift);
+//            EPHYR_DBG("Shift %d, Cursor is matched!\n",shift);
             return shift;
     }
     return 1;
 }
 
-
 int32_t checkScrollRight(struct cache_elem* source, struct cache_elem* dest)
 {
-    //     EPHYR_DBG("checking for up scroll %u, %u, %u, %u", source->width, source->height, dest->width, dest->height);
+//    EPHYR_DBG("checking for up scroll %u, %u, %u, %u", source->width, source->height, dest->width, dest->height);
     int32_t max_shift=source->width/3;
     int32_t x=source->width/10;
     int32_t y=source->height/10;
@@ -743,7 +744,7 @@ int32_t checkScrollRight(struct cache_elem* source, struct cache_elem* dest)
     }
     if(height<2)
     {
-//         EPHYR_DBG("DST too small(d), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
+//        EPHYR_DBG("DST too small(d), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
         return -1;
     }
 
@@ -755,11 +756,11 @@ int32_t checkScrollRight(struct cache_elem* source, struct cache_elem* dest)
     }
     if(width<2)
     {
-//         EPHYR_DBG("DST too small(w), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
+//        EPHYR_DBG("DST too small(w), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
         return -1;
     }
 
-//     EPHYR_DBG(" %u %u %u %u %u",x,y,width, height, max_shift);
+//    EPHYR_DBG(" %u %u %u %u %u",x,y,width, height, max_shift);
 
 
     for(int32_t shift=0;shift<max_shift;++shift)
@@ -768,18 +769,16 @@ int32_t checkScrollRight(struct cache_elem* source, struct cache_elem* dest)
             continue;
         if(shift)
         {
-            //             EPHYR_DBG("Shift %d, Cursor is matched!\n",shift);
+//            EPHYR_DBG("Shift %d, Cursor is matched!\n",shift);
             return shift;
         }
     }
     return -1;
 }
 
-
-
 int32_t checkScrollLeft(struct cache_elem* source, struct cache_elem* dest)
 {
-    //     EPHYR_DBG("checking for up scroll %u, %u, %u, %u", source->width, source->height, dest->width, dest->height);
+//    EPHYR_DBG("checking for up scroll %u, %u, %u, %u", source->width, source->height, dest->width, dest->height);
     int32_t max_shift=source->width/3*-1;
     int32_t x=source->width/2;
     int32_t y=source->height/10;
@@ -792,7 +791,7 @@ int32_t checkScrollLeft(struct cache_elem* source, struct cache_elem* dest)
     }
     if(height<2)
     {
-//         EPHYR_DBG("DST too small(d), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
+//        EPHYR_DBG("DST too small(d), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
         return 1;
     }
 
@@ -804,11 +803,11 @@ int32_t checkScrollLeft(struct cache_elem* source, struct cache_elem* dest)
     }
     if(width<2)
     {
-//         EPHYR_DBG("DST too small(w), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
+//        EPHYR_DBG("DST too small(w), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
         return 1;
     }
 
-//     EPHYR_DBG(" %d %d %d %d %d",x,y,width, height, max_shift);
+//    EPHYR_DBG(" %d %d %d %d %d",x,y,width, height, max_shift);
 
 
     for(int32_t shift=0;shift>max_shift;--shift)
@@ -817,14 +816,12 @@ int32_t checkScrollLeft(struct cache_elem* source, struct cache_elem* dest)
             continue;
         if(shift)
         {
-//             EPHYR_DBG("Shift %d, Cursor is matched!\n",shift);
+//            EPHYR_DBG("Shift %d, Cursor is matched!\n",shift);
             return shift;
         }
     }
     return 1;
 }
-
-
 
 BOOL checkEquality(struct cache_elem* src, struct cache_elem* dst,
                    int32_t shift_horiz, int32_t shift_vert, rectangle* common_rect)
@@ -846,7 +843,7 @@ BOOL checkEquality(struct cache_elem* src, struct cache_elem* dst,
 
     if(center_x+shift_horiz >= dst->width  || center_y+shift_vert >=dst->height)
     {
-        //dst is too small for shift
+        /* dst is too small for shift */
         return FALSE;
     }
 
@@ -872,11 +869,11 @@ BOOL checkEquality(struct cache_elem* src, struct cache_elem* dst,
     }
 
 
-//     EPHYR_DBG("Center: %dx%d", center_x, center_y);
+//    EPHYR_DBG("Center: %dx%d", center_x, center_y);
 
 
 
-//     EPHYR_DBG("initial down_right %dx%d",right_x,down_y);
+//    EPHYR_DBG("initial down_right %dx%d",right_x,down_y);
 
     for(y=center_y;y<=down_y;++y)
     {
@@ -885,7 +882,7 @@ BOOL checkEquality(struct cache_elem* src, struct cache_elem* dst,
             int32_t src_ind=(y*src->width+x)*CACHEBPP;
             int32_t dst_ind=((y+shift_vert)*dst->width+x+shift_horiz)*CACHEBPP;
 
-//             EPHYR_DBG("%d %d %d %d %d %d", x, y, right_x, down_y, dst->height, shift_vert);
+//            EPHYR_DBG("%d %d %d %d %d %d", x, y, right_x, down_y, dst->height, shift_vert);
 
             if (src_ind<0 || src_ind +2 > src->size || dst_ind <0 || dst_ind > dst->size )
             {
@@ -910,7 +907,7 @@ BOOL checkEquality(struct cache_elem* src, struct cache_elem* dst,
                 {
                     down_y=y-1;
                 }
-//                 EPHYR_DBG("limit right down to %dx%d",right_x,down_y);
+//                EPHYR_DBG("limit right down to %dx%d",right_x,down_y);
                 break;
             }
         }
@@ -918,7 +915,7 @@ BOOL checkEquality(struct cache_elem* src, struct cache_elem* dst,
 
 
     loop_exit_0:
-//     EPHYR_DBG("initial down_left %dx%d",left_x,down_y);
+//    EPHYR_DBG("initial down_left %dx%d",left_x,down_y);
     for(y=center_y;y<=down_y;++y)
     {
         for(x=center_x; x>=left_x;--x)
@@ -948,7 +945,7 @@ BOOL checkEquality(struct cache_elem* src, struct cache_elem* dst,
                 {
                     down_y=y-1;
                 }
-//                 EPHYR_DBG("limit left down to %dx%d",left_x,down_y);
+//                EPHYR_DBG("limit left down to %dx%d",left_x,down_y);
                 break;
             }
         }
@@ -956,7 +953,7 @@ BOOL checkEquality(struct cache_elem* src, struct cache_elem* dst,
 
     loop_exit_1:
 
-//     EPHYR_DBG("initial top_right %dx%d",right_x,top_y);
+//    EPHYR_DBG("initial top_right %dx%d",right_x,top_y);
 
     for(y=center_y;y>=top_y;--y)
     {
@@ -988,7 +985,7 @@ BOOL checkEquality(struct cache_elem* src, struct cache_elem* dst,
                 {
                     top_y=y+1;
                 }
-//                 EPHYR_DBG("limit right top to %dx%d",right_x,top_y);
+//                EPHYR_DBG("limit right top to %dx%d",right_x,top_y);
                 break;
             }
         }
@@ -996,11 +993,11 @@ BOOL checkEquality(struct cache_elem* src, struct cache_elem* dst,
 
     loop_exit_2:;
 
-//     EPHYR_DBG("top_right %dx%d",right_x,top_y);
+//    EPHYR_DBG("top_right %dx%d",right_x,top_y);
 
 
 
-//     EPHYR_DBG("initial top_left %dx%d\n",left_x,top_y);
+//    EPHYR_DBG("initial top_left %dx%d\n",left_x,top_y);
     for(y=center_y;y>=top_y;--y)
     {
         for(x=center_x; x>=left_x;--x)
@@ -1032,7 +1029,7 @@ BOOL checkEquality(struct cache_elem* src, struct cache_elem* dst,
                 {
                     top_y=y+1;
                 }
-//                 EPHYR_DBG("limit left down to %dx%d",left_x,down_y);
+//                EPHYR_DBG("limit left down to %dx%d",left_x,down_y);
                 break;
             }
         }
@@ -1045,21 +1042,20 @@ BOOL checkEquality(struct cache_elem* src, struct cache_elem* dst,
 
      if(common_rect->size.width<1 || common_rect->size.height <1)
      {
-//          EPHYR_DBG("!!!!!!!NEGATIVE OR NULL GEOMETRY!!!!!!!");
+//         EPHYR_DBG("!!!!!!!NEGATIVE OR NULL GEOMETRY!!!!!!!");
          return FALSE;
      }
 
      common_rect->lt_corner.x=left_x;
      common_rect->lt_corner.y=top_y;
-//      EPHYR_DBG("Geometry: %d:%d  %dx%d shift - %d  %d ", left_x, top_y, common_rect->size.width,
-//                  common_rect->size.height, shift_horiz, shift_vert);
+//     EPHYR_DBG("Geometry: %d:%d  %dx%d shift - %d  %d ", left_x, top_y, common_rect->size.width,
+//               common_rect->size.height, shift_horiz, shift_vert);
      return TRUE;
 }
 
-
 BOOL checkMovedContent(struct cache_elem* source, struct cache_elem* dest, int32_t* horiz_shift, int32_t* vert_shift)
 {
-//     EPHYR_DBG("checking for moved content %u, %u, %u, %u", source->width, source->height, dest->width, dest->height);
+//    EPHYR_DBG("checking for moved content %u, %u, %u, %u", source->width, source->height, dest->width, dest->height);
     int32_t max_shift=source->width/8;
 
     if(max_shift>source->height/8)
@@ -1080,7 +1076,7 @@ BOOL checkMovedContent(struct cache_elem* source, struct cache_elem* dest, int32
     }
     if(height<2)
     {
-//         EPHYR_DBG("DST too small(d), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
+//        EPHYR_DBG("DST too small(d), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
         return FALSE;
     }
 
@@ -1092,12 +1088,11 @@ BOOL checkMovedContent(struct cache_elem* source, struct cache_elem* dest, int32
     }
     if(width<2)
     {
-//         EPHYR_DBG("DST too small(w), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
+//        EPHYR_DBG("DST too small(w), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
         return FALSE;
     }
 
-    //     EPHYR_DBG(" %d %d %d %d %d",x,y,width, height, max_shift);
-
+//    EPHYR_DBG(" %d %d %d %d %d",x,y,width, height, max_shift);
 
     for(int32_t hshift=0;hshift<max_shift;hshift++)
     {
@@ -1167,15 +1162,15 @@ BOOL findDiff(struct cache_elem* source, struct cache_elem* dest, rectangle* dif
     if(eff>0.8)
         return FALSE;
 
-//     EPHYR_DBG("REG_GEOM: %dx%d. DIF_GEOM %d,%d - %dx%d EFF=%f", source->width, source->height, left_x,top_y,
-//                diff_rect->size.width, diff_rect->size.height,eff);
+//    EPHYR_DBG("REG_GEOM: %dx%d. DIF_GEOM %d,%d - %dx%d EFF=%f", source->width, source->height, left_x,top_y,
+//              diff_rect->size.width, diff_rect->size.height,eff);
     return TRUE;
 }
 
 BOOL find_common_regions(struct cache_elem* source, struct cache_elem* dest, BOOL* diff, rectangle* common_rect,
                          int32_t* hshift, int32_t* vshift)
 {
-    //     EPHYR_DBG("checking for common regions");
+//    EPHYR_DBG("checking for common regions");
 
 
 
@@ -1186,7 +1181,7 @@ BOOL find_common_regions(struct cache_elem* source, struct cache_elem* dest, BOO
     *vshift=checkScrollDown(source,dest);
     if(*vshift<0)
     {
-//         EPHYR_DBG("Found scroll down, vert shift %d %u %u %u %u" , *vshift, dest->width, dest->height, dest->crc, source->crc);
+//        EPHYR_DBG("Found scroll down, vert shift %d %u %u %u %u" , *vshift, dest->width, dest->height, dest->crc, source->crc);
         return checkEquality(source, dest, 0, *vshift, common_rect);
     }
 
@@ -1194,7 +1189,7 @@ BOOL find_common_regions(struct cache_elem* source, struct cache_elem* dest, BOO
     *vshift=checkScrollUp(source, dest);
     if(*vshift>0)
     {
-//         EPHYR_DBG("Found scroll up, vert shift %d %u %u %u %u" , *vshift, dest->width, dest->height, dest->crc, source->crc);
+//        EPHYR_DBG("Found scroll up, vert shift %d %u %u %u %u" , *vshift, dest->width, dest->height, dest->crc, source->crc);
         return checkEquality(source, dest, 0, *vshift, common_rect);
     }
 
@@ -1214,7 +1209,7 @@ BOOL find_common_regions(struct cache_elem* source, struct cache_elem* dest, BOO
     *hshift=checkScrollLeft(source, dest);
     if(*hshift<0)
     {
-//         EPHYR_DBG("SCROLL LEFT %d", *hshift);
+//        EPHYR_DBG("SCROLL LEFT %d", *hshift);
         return checkEquality(source, dest, *hshift, 0, common_rect);
     }
 
@@ -1227,7 +1222,7 @@ BOOL find_common_regions(struct cache_elem* source, struct cache_elem* dest, BOO
         {
             *hshift=h_shift;
             *vshift=v_shift;
-//             EPHYR_DBG("found moved content %d, %d", *hshift, *vshift);
+//            EPHYR_DBG("found moved content %d, %d", *hshift, *vshift);
             return checkEquality(source, dest, *hshift, *vshift, common_rect);
         }
     }
@@ -1240,11 +1235,11 @@ BOOL find_common_regions(struct cache_elem* source, struct cache_elem* dest, BOO
         return findDiff(source, dest, common_rect);
     }
 
-//     EPHYR_DBG("Scroll not found %d",dest->crc);
+//    EPHYR_DBG("Scroll not found %d",dest->crc);
     return FALSE;
 }
 
-//use only from send thread
+/* use only from send thread */
 void sendMainImageFromSendThread(uint32_t width, uint32_t height, int32_t dx ,int32_t dy)
 {
 
@@ -1272,7 +1267,6 @@ void sendMainImageFromSendThread(uint32_t width, uint32_t height, int32_t dx ,in
         regions[i].compressed_data=0;
         regions[i].size=0;
     }
-
 
     BOOL mainImage=FALSE;
     if(!width || (dx==0 && dy==0 && width==remoteVars.main_img_width && height==remoteVars.main_img_height))
@@ -1365,7 +1359,7 @@ void *send_frame_thread (void *threadid)
         }
         if(strlen(remoteVars.cookie))
         {
-//             EPHYR_DBG("Checking cookie: %s",remoteVars.cookie);
+//            EPHYR_DBG("Checking cookie: %s",remoteVars.cookie);
             char msg[33];
             int length=32;
             int ready=0;
@@ -1434,15 +1428,15 @@ void *send_frame_thread (void *threadid)
 
             if(!remoteVars.first_sendqueue_element && !remoteVars.firstCursor)
             {
-                //sleep if frame queue is empty
+                /* sleep if frame queue is empty */
                 pthread_cond_wait(&remoteVars.have_sendqueue_cond, &remoteVars.sendqueue_mutex);
             }
 
-            //mutex is locked on this point
+            /* mutex is locked on this point */
 
             if(remoteVars.firstCursor)
             {
-                //get cursor from queue, delete it from queue, unlock mutex and send cursor. After sending free cursor
+                /* get cursor from queue, delete it from queue, unlock mutex and send cursor. After sending free cursor */
                 struct cursorFrame* cframe=remoteVars.firstCursor;
 
                 if(remoteVars.firstCursor->next)
@@ -1499,9 +1493,10 @@ void *send_frame_thread (void *threadid)
                 {
                     remoteVars.maxfr=elems;
                 }
-                //                 EPHYR_DBG("have %d max frames in queue, current %d", remoteVars.,elems);
+//                EPHYR_DBG("have %d max frames in queue, current %d", remoteVars.,elems);
                 struct cache_elem* frame=remoteVars.first_sendqueue_element->frame;
-                //delete first element from frame queue
+
+                /* delete first element from frame queue */
                 struct sendqueue_element* current=remoteVars.first_sendqueue_element;
                 if(remoteVars.first_sendqueue_element->next)
                 {
@@ -1526,7 +1521,7 @@ void *send_frame_thread (void *threadid)
                     uint32_t height=frame->height;
                     BOOL show_time=FALSE;
 
-                    //unlock sendqueue for main thread
+                    /* unlock sendqueue for main thread */
                     pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
                     send_frame(width, height, x, y, crc, frame->regions);
                 }
@@ -1588,11 +1583,11 @@ void *send_frame_thread (void *threadid)
         }
         pthread_exit(0);
     }
-    #warning add some conditions to exit thread properly
+//    #warning add some conditions to exit thread properly
     pthread_exit(0);
 }
 
-//warning! sendqueue_mutex should be locked by thread calling this function!
+/* warning! sendqueue_mutex should be locked by thread calling this function! */
 void clear_send_queue(void)
 {
     struct sendqueue_element* current=remoteVars.first_sendqueue_element;
@@ -1612,14 +1607,16 @@ void clear_send_queue(void)
     remoteVars.first_sendqueue_element=remoteVars.last_sendqueue_element=NULL;
 }
 
-//remove elements from cache and release all images if existing.
-//warning! sendqueue_mutex should be locked by thread calling this function!
+/*
+ * remove elements from cache and release all images if existing.
+ * warning! sendqueue_mutex should be locked by thread calling this function!
+ */
 void clear_frame_cache(uint32_t max_elements)
 {
-//     EPHYR_DBG("cache elements %d, cache size %lu\n",cache_elements, cache_size);
+//    EPHYR_DBG("cache elements %d, cache size %lu\n",cache_elements, cache_size);
     while(remoteVars.first_cache_element && remoteVars.cache_elements > max_elements)
     {
-        //don't delete it now, return to it later;
+        /* don't delete it now, return to it later */
         if(remoteVars.first_cache_element->busy)
         {
             EPHYR_DBG("%x - is busy (%d), not deleting", remoteVars.first_cache_element->crc, remoteVars.first_cache_element->busy);
@@ -1634,12 +1631,12 @@ void clear_frame_cache(uint32_t max_elements)
 
         if(remoteVars.client_connected)
         {
-            //add deleted element to the list for sending
+            /* add deleted element to the list for sending */
             struct deleted_elem* delem=malloc(sizeof(struct deleted_elem));
             ++remoteVars.deleted_list_size;
             delem->next=0l;
             delem->crc=remoteVars.first_cache_element->crc;
-            //         EPHYR_DBG("delete %x",delem->crc);
+//            EPHYR_DBG("delete %x",delem->crc);
 
             if(remoteVars.last_deleted_elements)
             {
@@ -1661,18 +1658,21 @@ void clear_frame_cache(uint32_t max_elements)
         if(next)
           next->prev=NULL;
     }
-    if(!remoteVars.first_cache_element)
+    if(!remoteVars.first_cache_element) {
         remoteVars.last_cache_element=NULL;
-//     EPHYR_DBG("cache elements %d, cache size %d\n", cache_elements, cache_size);
+    }
+//    EPHYR_DBG("cache elements %d, cache size %d\n", cache_elements, cache_size);
 }
 
-//only release images, keep the older frames for crc check
+/*
+ * only release images, keep the older frames for crc check *
+ */
 void clear_cache_data(uint32_t maxsize)
 {
     struct cache_elem* cur=remoteVars.first_cache_element;
     while(cur && remoteVars.cache_size>maxsize)
     {
-        //don't delete it now, return to it later;
+        /* don't delete it now, return to it later */
         if(cur->busy)
         {
             EPHYR_DBG("%x - busy (%d)", cur->crc, cur->busy);
@@ -1751,7 +1751,7 @@ clientReadNotify(int fd, int ready, void *data)
     if(!con)
         return;
 
-    //read max 99 events
+    /* read max 99 events */
     int length=read(remoteVars.clientsock,remoteVars.eventBuffer + remoteVars.evBufferOffset, EVLENGTH*99);
 
 
@@ -1766,7 +1766,7 @@ clientReadNotify(int fd, int ready, void *data)
         disconnect_client();
         return;
     }
-    //       EPHYR_DBG("Got ev bytes - %d\n",eventnum++);
+//    EPHYR_DBG("Got ev bytes - %d\n",eventnum++);
 
 
     length+=remoteVars.evBufferOffset;
@@ -1807,7 +1807,7 @@ clientReadNotify(int fd, int ready, void *data)
                           remoteVars.selstruct.inBuffer.position, selbuff->size);
                 own_selection(selbuff->target);
             }
-//             EPHYR_DBG("CHUNK IS DONE %d",remoteVars.selstruct.readingInputBuffer);
+//            EPHYR_DBG("CHUNK IS DONE %d",remoteVars.selstruct.readingInputBuffer);
         }
         else
         {
@@ -1818,7 +1818,7 @@ clientReadNotify(int fd, int ready, void *data)
                 {
                     uint32_t x=*((uint32_t*)buff+1);
                     uint32_t y=*((uint32_t*)buff+2);
-                    //                   EPHYR_DBG("HAVE MOTION EVENT %d, %d from client\n",x,y);
+//                    EPHYR_DBG("HAVE MOTION EVENT %d, %d from client\n",x,y);
                     ephyrClientMouseMotion(x,y);
                     break;
                 }
@@ -1827,7 +1827,7 @@ clientReadNotify(int fd, int ready, void *data)
                 {
                     uint32_t state=*((uint32_t*)buff+1);
                     uint32_t button=*((uint32_t*)buff+2);
-                    //                   EPHYR_DBG("HAVE BUTTON PRESS/RELEASE EVENT %d, %d from client\n",state,button);
+//                    EPHYR_DBG("HAVE BUTTON PRESS/RELEASE EVENT %d, %d from client\n",state,button);
                     ephyrClientButton(event_type,state, button);
                     break;
                 }
@@ -1835,40 +1835,39 @@ clientReadNotify(int fd, int ready, void *data)
                 {
                     uint32_t state=*((uint32_t*)buff+1);
                     uint32_t key=*((uint32_t*)buff+2);
-                    /*EPHYR_DBG("HAVE KEY PRESS EVENT state: %d(%x), key: %d(%x) from client\n",state,state, key, key);
-                     *
-                     *                if (state & ShiftMask)
-                     *                {
-                     *                    EPHYR_DBG("SHIFT");
-                }
-                if (state & LockMask)
-                {
-                EPHYR_DBG("LOCK");
-                }
-                if (state & ControlMask)
-                {
-                EPHYR_DBG("CONTROL");
-                }
-                if (state & Mod1Mask)
-                {
-                EPHYR_DBG("MOD1");
-                }
-                if (state & Mod2Mask)
-                {
-                EPHYR_DBG("MOD2");
-                }
-                if (state & Mod3Mask)
-                {
-                EPHYR_DBG("MOD3");
-                }
-                if (state & Mod4Mask)
-                {
-                EPHYR_DBG("MOD4");
-                }
-                if (state & Mod5Mask)
-                {
-                EPHYR_DBG("MOD5");
-                }*/
+//                    EPHYR_DBG("HAVE KEY PRESS EVENT state: %d(%x), key: %d(%x) from client\n",state,state, key, key);
+//                    if (state & ShiftMask)
+//                    {
+//                        EPHYR_DBG("SHIFT");
+//                    }
+//                    if (state & LockMask)
+//                    {
+//                        EPHYR_DBG("LOCK");
+//                    }
+//                    if (state & ControlMask)
+//                    {
+//                        EPHYR_DBG("CONTROL");
+//                    }
+//                    if (state & Mod1Mask)
+//                    {
+//                        EPHYR_DBG("MOD1");
+//                    }
+//                    if (state & Mod2Mask)
+//                    {
+//                        EPHYR_DBG("MOD2");
+//                    }
+//                    if (state & Mod3Mask)
+//                    {
+//                        EPHYR_DBG("MOD3");
+//                    }
+//                    if (state & Mod4Mask)
+//                    {
+//                        EPHYR_DBG("MOD4");
+//                    }
+//                    if (state & Mod5Mask)
+//                    {
+//                        EPHYR_DBG("MOD5");
+//                    }
 
                     ephyrClientKey(event_type,state, key);
                     break;
@@ -1877,39 +1876,39 @@ clientReadNotify(int fd, int ready, void *data)
                 {
                     uint32_t state=*((uint32_t*)buff+1);
                     uint32_t key=*((uint32_t*)buff+2);
-                    /*EPHYR_DBG("HAVE KEY RELEASE EVENT state: %d(%x), key: %d(%x) from client\n",state,state, key, key);
-                     *                if (state & ShiftMask)
-                     *                {
-                     *                    EPHYR_DBG("SHIFT");
-                }
-                if (state & LockMask)
-                {
-                EPHYR_DBG("LOCK");
-                }
-                if (state & ControlMask)
-                {
-                EPHYR_DBG("CONTROL");
-                }
-                if (state & Mod1Mask)
-                {
-                EPHYR_DBG("MOD1");
-                }
-                if (state & Mod2Mask)
-                {
-                EPHYR_DBG("MOD2");
-                }
-                if (state & Mod3Mask)
-                {
-                EPHYR_DBG("MOD3");
-                }
-                if (state & Mod4Mask)
-                {
-                EPHYR_DBG("MOD4");
-                }
-                if (state & Mod5Mask)
-                {
-                EPHYR_DBG("MOD5");
-                }*/
+//                    EPHYR_DBG("HAVE KEY RELEASE EVENT state: %d(%x), key: %d(%x) from client\n",state,state, key, key);
+//                    if (state & ShiftMask)
+//                    {
+//                        EPHYR_DBG("SHIFT");
+//                    }
+//                    if (state & LockMask)
+//                    {
+//                        EPHYR_DBG("LOCK");
+//                    }
+//                    if (state & ControlMask)
+//                    {
+//                        EPHYR_DBG("CONTROL");
+//                    }
+//                    if (state & Mod1Mask)
+//                    {
+//                        EPHYR_DBG("MOD1");
+//                    }
+//                    if (state & Mod2Mask)
+//                    {
+//                        EPHYR_DBG("MOD2");
+//                    }
+//                    if (state & Mod3Mask)
+//                    {
+//                        EPHYR_DBG("MOD3");
+//                    }
+//                    if (state & Mod4Mask)
+//                    {
+//                        EPHYR_DBG("MOD4");
+//                    }
+//                    if (state & Mod5Mask)
+//                    {
+//                        EPHYR_DBG("MOD5");
+//                    }
                     ephyrClientKey(event_type,state, key);
                     break;
                 }
@@ -2011,14 +2010,14 @@ clientReadNotify(int fd, int ready, void *data)
                 default:
                 {
                     EPHYR_DBG("UNSUPPORTED EVENT: %d",event_type);
-                    //looks like we have some corrupted data, let's try to reset event buffer
+                    /* looks like we have some corrupted data, let's try to reset event buffer */
                     remoteVars.evBufferOffset=0;
                     length=0;
                     break;
                 }
             }
         }
-        //           EPHYR_DBG("Processed event - %d %d\n",eventnum++, eventbytes);
+//        EPHYR_DBG("Processed event - %d %d\n",eventnum++, eventbytes);
     }
     int restDataLength=length%EVLENGTH;
     int restDataPos=length-restDataLength;
@@ -2149,7 +2148,7 @@ void terminateServer(int exitStatus)
 
 void processConfigFileSetting(char* key, char* value)
 {
-//     EPHYR_DBG("process setting %s %s", key, value);
+//    EPHYR_DBG("process setting %s %s", key, value);
     if(!strcmp(key, "state"))
     {
         strncpy(remoteVars.stateFile, value, 255);
@@ -2230,7 +2229,7 @@ void readOptionsFromFile(void)
             int c=fgetc(ptr);
             if(c==EOF)
                 break;
-//             EPHYR_DBG("%c",c);
+//            EPHYR_DBG("%c",c);
             if(c=='=')
             {
                 key[ind]='\0';
@@ -2252,7 +2251,7 @@ void readOptionsFromFile(void)
                 value[ind++]=(unsigned char)c;
             else
                 key[ind++]=(unsigned char)c;
-            /////read file and get quality and state file
+            /* read file and get quality and state file */
         }
         fclose(ptr);
     }
@@ -2437,8 +2436,6 @@ unsigned char* image_compress(uint32_t image_width, uint32_t image_height,
        return png_compress(image_width, image_height, RGBA_buffer, compressed_size);
 }
 
-
-
 struct cache_elem* add_cache_element(uint32_t crc, int32_t dx, int32_t dy, uint32_t size, uint32_t width, uint32_t height)
 {
     struct cache_elem* el=malloc(sizeof(struct cache_elem));
@@ -2460,19 +2457,18 @@ struct cache_elem* add_cache_element(uint32_t crc, int32_t dx, int32_t dy, uint3
         el->regions[i].rect.size.width=0;
     }
 
-/*    if(CACHEBPP==4)
+//    if(CACHEBPP==4)
+//    {
+//        el->size=size;
+//        el->data=malloc(size);
+//        remoteVars.cache_size+=size;
+//        memcpy(el->data, data, size);
+//    }
+//    else
     {
-        el->size=size;
-        el->data=malloc(size);
-        remoteVars.cache_size+=size;
-        memcpy(el->data, data, size);
-    }
-    else*/
-    {
-
         uint32_t isize=size/4*3;
         el->size=isize;
-//         EPHYR_DBG("SIZE %d %d %d, %d, %d",isize, dx, dy, width, height);
+//        EPHYR_DBG("SIZE %d %d %d, %d, %d",isize, dx, dy, width, height);
         el->data=malloc(isize);
         if(!el->data)
         {
@@ -2481,14 +2477,11 @@ struct cache_elem* add_cache_element(uint32_t crc, int32_t dx, int32_t dy, uint3
         }
         remoteVars.cache_size+=isize;
 
-        //copy RGB channels of every pixel and ignore A channel
-
+        /* copy RGB channels of every pixel and ignore A channel */
         uint32_t numOfPix=size/4;
         uint32_t i=0;
 
         pthread_mutex_lock(&remoteVars.mainimg_mutex);
-
-
 
         for(int32_t y=0;y<height;++y)
         {
@@ -2512,8 +2505,8 @@ struct cache_elem* add_cache_element(uint32_t crc, int32_t dx, int32_t dy, uint3
 
     remoteVars.cache_elements++;
     el->prev=remoteVars.last_cache_element;
-//     EPHYR_DBG("\ncache elements %d, cache size %u(%dMB) %u, %u, %u\n", cache_elements, cache_size, (int) (cache_size/1024/1024), el->rval,
-//               el->gval, el->bval);
+//    EPHYR_DBG("\ncache elements %d, cache size %u(%dMB) %u, %u, %u\n", cache_elements, cache_size, (int) (cache_size/1024/1024), el->rval,
+//              el->gval, el->bval);
     if(remoteVars.last_cache_element)
     {
         remoteVars.last_cache_element->next=el;
@@ -2528,9 +2521,12 @@ struct cache_elem* add_cache_element(uint32_t crc, int32_t dx, int32_t dy, uint3
 
 
 
-//this function looking for the cache elements with specified crc
-//if the element is found we moving it in the end of list
-//in this case we keeping the most recent elements in the tail of list for faster search
+/*
+ * this function looking for the cache elements with specified crc
+ * if the element is found we moving it in the end of list
+ * in this case we keeping the most recent elements in the tail of
+ * list for faster search
+ */
 struct cache_elem* find_cache_element(uint32_t crc)
 {
     struct cache_elem* current=remoteVars.last_cache_element;
@@ -2564,7 +2560,6 @@ struct cache_elem* find_cache_element(uint32_t crc)
 }
 
 
-
 void initFrameRegions(struct cache_elem* frame)
 {
     BOOL haveMultplyRegions=FALSE;
@@ -2576,35 +2571,37 @@ void initFrameRegions(struct cache_elem* frame)
 
     if(frame->width>4 && frame->height>4 && frame->width * frame->height > 100 )
     {
-        unsigned int match_val=0;
+        unsigned int match_val = 0;
+        uint32_t bestm_crc = 0;
+        struct cache_elem* best_match = NULL;
+
         pthread_mutex_lock(&remoteVars.sendqueue_mutex);
-        struct cache_elem* best_match = find_best_match(frame, &match_val);
+        best_match = find_best_match(frame, &match_val);
+
         if(best_match)
         {
             best_match->busy+=1;
         }
         pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
 
-        uint32_t bestm_crc=0;
         if(best_match && best_match->width>4 && best_match->height>4 && best_match->width * best_match->height > 100 )
         {
             bestm_crc=best_match->crc;
             if(best_match && match_val<=MAX_MATCH_VAL)
             {
-
                 clock_t t = clock();
                 rectangle rect;
                 int hshift, vshift;
+
                 if(find_common_regions(best_match, frame, &diff, &rect, &hshift, &vshift))
                 {
                     haveMultplyRegions=TRUE;
                     if(!diff)
                     {
+//                        EPHYR_DBG("SOURCE: %x %d:%d - %dx%d- shift %d, %d",bestm_crc,
+//                                  rect.lt_corner.x, rect.lt_corner.y,
+//                                  rect.size.width, rect.size.height, hshift, vshift);
 
-/*                        EPHYR_DBG("SOURCE: %x %d:%d - %dx%d- shift %d, %d",bestm_crc,
-                                  rect.lt_corner.x, rect.lt_corner.y,
-                                  rect.size.width, rect.size.height, hshift, vshift);
-*/
                         rectangle* base=&(regions[8].rect);
                         base->size.width=rect.size.width;
                         base->size.height=rect.size.height;
@@ -2684,7 +2681,7 @@ void initFrameRegions(struct cache_elem* frame)
                         base->lt_corner.x=0;
                         base->lt_corner.y=0;
 
-                        //regions[0] represents common with bestmatch region
+                        /* regions[0] represents common with bestmatch region */
                         regions[0].source_coordinates.x=0;
                         regions[0].source_coordinates.y=0;
                         regions[0].source_crc=bestm_crc;
@@ -2694,11 +2691,11 @@ void initFrameRegions(struct cache_elem* frame)
                 }
             }
         }
-        //if we didn't find any common regions and have best match element, mark it as not busy
+        /* if we didn't find any common regions and have best match element, mark it as not busy */
         pthread_mutex_lock(&remoteVars.sendqueue_mutex);
         if(best_match && frame->source != best_match)
         {
-//             EPHYR_DBG("Have best mutch but not common region");
+//            EPHYR_DBG("Have best mutch but not common region");
             best_match->busy-=1;
         }
         pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
@@ -2707,7 +2704,7 @@ void initFrameRegions(struct cache_elem* frame)
 
     if(!haveMultplyRegions)
     {
-        //EPHYR_DBG("HAVE SINGLE REGION");
+//        EPHYR_DBG("HAVE SINGLE REGION");
 
         regions[0].compressed_data=image_compress(frame->width, frame->height,
                                                  frame->data, &(regions[0].size), CACHEBPP, 0);
@@ -2725,12 +2722,10 @@ void initFrameRegions(struct cache_elem* frame)
                 if(regions[i].rect.size.width && regions[i].rect.size.height)
                 {
 
-                    /*
-                    uint32_t send_data=regions[i].rect.size.width*regions[i].rect.size.height;
-                    uint32_t total_data=frame->width*frame->height;
-                    EPHYR_DBG("saved space: %d%% %d %d %dx%d %dx%d", 100 - (int)((send_data*1./total_data)*100), total_data, send_data,frame->width, frame->height,
-                              regions[i].rect.size.width,regions[i].rect.size.height);
-                    */
+//                    uint32_t send_data=regions[i].rect.size.width*regions[i].rect.size.height;
+//                    uint32_t total_data=frame->width*frame->height;
+//                    EPHYR_DBG("saved space: %d%% %d %d %dx%d %dx%d", 100 - (int)((send_data*1./total_data)*100), total_data, send_data,frame->width, frame->height,
+//                              regions[i].rect.size.width,regions[i].rect.size.height);
 
 //                    #warning check this
                     uint8_t *data=malloc(regions[i].rect.size.width*regions[i].rect.size.height*CACHEBPP);
@@ -2782,18 +2777,17 @@ void add_frame(uint32_t width, uint32_t height, int32_t x, int32_t y, uint32_t c
     pthread_mutex_lock(&remoteVars.sendqueue_mutex);
     if(! (remoteVars.client_connected && remoteVars.client_initialized))
     {
-        //don't have any clients connected, return
+        /* don't have any clients connected, return */
         pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
         return;
     }
-
 
     Bool isNewElement=FALSE;
 
     struct cache_elem* frame=0;
     if(crc==0)
     {
-        //sending main image
+        /* sending main image */
         pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
     }
     else
@@ -2802,28 +2796,28 @@ void add_frame(uint32_t width, uint32_t height, int32_t x, int32_t y, uint32_t c
         frame=find_cache_element(crc);
         if(!frame)
         {
-//             EPHYR_DBG("ADD NEW FRAME %x",crc);
+//            EPHYR_DBG("ADD NEW FRAME %x",crc);
             frame=add_cache_element(crc, x, y, size, width, height);
             isNewElement=TRUE;
         }
         else
         {
-            //         EPHYR_DBG("ADD EXISTING FRAME %x",crc);
+//            EPHYR_DBG("ADD EXISTING FRAME %x",crc);
         }
         frame->busy+=1;
 
         pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
 
-        //if element is new find common regions and compress the data
+        /* if element is new find common regions and compress the data */
         if(isNewElement)
         {
-            //find bestmatch and lock it
+            /* find bestmatch and lock it */
             initFrameRegions(frame);
         }
     }
 
     pthread_mutex_lock(&remoteVars.sendqueue_mutex);
-    //add element in the queue for sending
+    /* add element in the queue for sending */
     struct sendqueue_element* element=malloc(sizeof(struct sendqueue_element));
     element->frame=frame;
     element->next=NULL;
@@ -2843,7 +2837,7 @@ void add_frame(uint32_t width, uint32_t height, int32_t x, int32_t y, uint32_t c
     pthread_cond_signal(&remoteVars.have_sendqueue_cond);
     pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
 
-    //on this point will be sent wakeup single to send mutex
+    /* on this point will be sent wakeup single to send mutex */
 }
 
 
@@ -2857,30 +2851,30 @@ remote_paint_rect(KdScreenInfo *screen,
                   int sx, int sy, int dx, int dy, int width, int height)
 {
 
-    //     EphyrScrPriv *scrpriv = screen->driver;
+//    EphyrScrPriv *scrpriv = screen->driver;
 
 
     uint32_t size=width*height*XSERVERBPP;
 
     if(size)
     {
-        //EPHYR_DBG("REPAINT %dx%d sx %d, sy %d, dx %d, dy %d", width, height, sx, sy, dx, dy);
+//        EPHYR_DBG("REPAINT %dx%d sx %d, sy %d, dx %d, dy %d", width, height, sx, sy, dx, dy);
         int32_t dirtyx_max=dx-1;
         int32_t dirtyy_max=dy-1;
 
         int32_t dirtyx_min=dx+width;
         int32_t dirtyy_min=dy+height;
 
-        //OK, here we assuming that XSERVERBPP is 4. If not, we'll have troubles
-        //but it should work faster like this
-
+        /*
+         * OK, here we assuming that XSERVERBPP is 4. If not, we'll have troubles
+         * but it should work faster like this
+         */
         pthread_mutex_lock(&remoteVars.mainimg_mutex);
+
         char maxdiff=2;
         char mindiff=-2;
 
-
-
-        // check if updated rec really is as big
+        /* check if updated rec really is as big */
         for(int32_t y=dy; y< dy+height;++y)
         {
             uint32_t ind=(y*remoteVars.main_img_width+dx)*XSERVERBPP;
@@ -2889,10 +2883,11 @@ remote_paint_rect(KdScreenInfo *screen,
                 BOOL pixIsDirty=FALSE;
                 //CHECK R-COMPONENT
                 int16_t diff=remoteVars.main_img[ind]-remoteVars.second_buffer[ind];
-                /*if(x > 250 && x<255 && y >5 && y< 7)
-                 *                {
-                 *                    EPHYR_DBG("rdiff %d - %u %u ", diff, remoteVars.main_img[ind],remoteVars.second_buffer[ind]);
-            }*/
+
+//              if(x > 250 && x<255 && y >5 && y< 7)
+//              {
+//                  EPHYR_DBG("rdiff %d - %u %u ", diff, remoteVars.main_img[ind],remoteVars.second_buffer[ind]);
+//              }
                 if(diff>maxdiff || diff< mindiff)
                 {
                     pixIsDirty=TRUE;
@@ -2942,28 +2937,25 @@ remote_paint_rect(KdScreenInfo *screen,
         pthread_mutex_unlock(&remoteVars.mainimg_mutex);
 
 
-        //         EPHYR_DBG("DIRTY %d,%d - %d,%d", dirtyx_min, dirtyy_min, dirtyx_max, dirtyy_max);
+//        EPHYR_DBG("DIRTY %d,%d - %d,%d", dirtyx_min, dirtyy_min, dirtyx_max, dirtyy_max);
 
 
         width=dirtyx_max-dirtyx_min+1;
         height=dirtyy_max-dirtyy_min+1;
-        /*
-         * int oldsize=size;
-         */
+//        int oldsize=size;
         size=width*height*XSERVERBPP;
         if(width<=0 || height<=0||size<=0)
         {
-            // EPHYR_DBG("NO CHANGES DETECTED, NOT UPDATING");
+//            EPHYR_DBG("NO CHANGES DETECTED, NOT UPDATING");
             return;
         }
         dx=sx=dirtyx_min;
         dy=sy=dirtyy_min;
-        /*
-         *        if(size!=oldsize)
-         *        {
-         *            EPHYR_DBG("new update rect demensions: %dx%d", width, height);
-         *        }
-         */
+
+//        if(size!=oldsize)
+//        {
+//            EPHYR_DBG("new update rect demensions: %dx%d", width, height);
+//        }
 
         add_frame(width, height, dx, dy, calculate_crc(width, height,dx,dy), size);
     }

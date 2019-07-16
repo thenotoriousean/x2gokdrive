@@ -68,7 +68,7 @@ void ddxInputThreadInit(void);
 int
 main(int argc, char *argv[], char *envp[])
 {
-//     hostx_use_resname(basename(argv[0]), 0);
+//    hostx_use_resname(basename(argv[0]), 0);
     return dix_main(argc, argv, envp);
 }
 
@@ -224,14 +224,13 @@ processOutputArg(const char *output, char *parent_id)
 int
 ddxProcessArgument(int argc, char **argv, int i)
 {
-    static char *parent = NULL;
     EPHYR_DBG("mark argv[%d]='%s'", i, argv[i]);
 
     if (!strcmp(argv[i], "-geometry"))
     {
         if ((i + 1) < argc)
         {
-            //compat with nxagent
+            /* compat with nxagent */
             return 2;
         }
 
@@ -242,7 +241,7 @@ ddxProcessArgument(int argc, char **argv, int i)
     {
         if ((i + 1) < argc)
         {
-            //compat with nxagent
+            /* compat with nxagent */
             return 2;
         }
 
@@ -250,11 +249,11 @@ ddxProcessArgument(int argc, char **argv, int i)
         exit(1);
     }
     else if (!strcmp(argv[i], "-D")) {
-        //compat with nxagent
+        /* compat with nxagent */
         return 1;
     }
     else if (!strcmp(argv[i], "-K")) {
-        //compat with nxagent
+        /* compat with nxagent */
         return 1;
     }
 
@@ -268,12 +267,16 @@ OsVendorInit(void)
 
     restartTimerOnInit();
 
-/*     if (SeatId)
-         hostx_use_sw_cursor();
-*/
+//     if (SeatId)
+//         hostx_use_sw_cursor();
+//
 
 //     if (hostx_want_host_cursor())
-        ephyrFuncs.initCursor = &ephyrCursorInit;
+//     {
+
+    ephyrFuncs.initCursor = &ephyrCursorInit;
+
+//       }
 
 #if XORG_VERSION_CURRENT < 11999901
     KdOsInit(&EphyrOsFuncs);
