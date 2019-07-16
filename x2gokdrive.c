@@ -517,9 +517,6 @@ ephyrRandRSetConfig(ScreenPtr pScreen,
     if (!ephyrMapFramebuffer(screen))
         goto bail4;
 
-
-
-
     /* FIXME below should go in own call */
 
     if (oldshadow)
@@ -535,12 +532,14 @@ ephyrRandRSetConfig(ScreenPtr pScreen,
             goto bail4;
     }
     else {
+
         /* Without shadow fb ( non rotated ) we need
          * to use damage to efficiently update display
          * via signal regions what to copy from 'fb'.
          */
         if (!ephyrSetInternalDamage(screen->pScreen))
             goto bail4;
+
     }
 
     /*
@@ -583,7 +582,6 @@ ephyrRandRSetConfig(ScreenPtr pScreen,
 //                           screen->height_mm);
 //
 //    EPHYR_DBG("new size registered");
-
 
     randr = KdSubRotation(scrpriv->randr, screen->randr);
 
@@ -634,13 +632,10 @@ ephyrRandRSetConfig(ScreenPtr pScreen,
         }
     }
 
-
-
 //    RRSetCurrentConfig(pScreen, randr, 0, pSize);
     RRScreenSetSizeRange(pScreen, screen->width, screen->height, screen->width, screen->height);
     RRScreenSizeNotify(pScreen);
     RRSendConfigNotify(pScreen);
-
 
 //    EPHYR_DBG("OUTPUTS: %d, CRTCS: %d, SIZES: %d, MODES %d" , pScrPriv->numOutputs,
 //              pScrPriv->numCrtcs, pScrPriv->nSizes, pScrPriv->outputs[0]->numModes);
@@ -652,7 +647,7 @@ ephyrRandRSetConfig(ScreenPtr pScreen,
 
     return TRUE;
 
- bail4:
+bail4:
     EPHYR_LOG("bailed");
 
     ephyrUnmapFramebuffer(screen);
@@ -699,7 +694,6 @@ void setOutput(ScreenPtr pScreen, RROutputPtr output, RRCrtcPtr crtc, int width,
     modeInfo.nameLength = strlen(modename);
     mode = RRModeGet(&modeInfo, modename);
 
-
     if (!mode)
     {
         EPHYR_DBG("can't create mode %s",modename);
@@ -723,8 +717,6 @@ void setOutput(ScreenPtr pScreen, RROutputPtr output, RRCrtcPtr crtc, int width,
     pScrPriv->configChanged = TRUE;
 
 //    output->numPreferred=0;
-
-
 
     RROutputSetPhysicalSize(output, width*pScreen->mmWidth/pScreen->width, height*pScreen->mmHeight/pScreen->height);
 
@@ -765,7 +757,6 @@ void updateOutput(ScreenPtr pScreen, RROutputPtr output, int width, int height, 
         terminateServer(-1);
     }
 
-
     setOutput(pScreen, output, output->crtcs[0], width, height, x, y, primary, connected);
 
 }
@@ -798,8 +789,6 @@ void addOutput(ScreenPtr pScreen, char* name, int width, int height, int x, int 
 
     setOutput(pScreen, output, crtc, width, height, x, y, primary, connected);
 }
-
-
 
 Bool
 ephyrRandRInit(ScreenPtr pScreen)
@@ -876,7 +865,6 @@ ephyrResizeScreen (ScreenPtr           pScreen,
 
     size.width = newwidth;
     size.height = newheight;
-
 
     scrpriv->localRandrCall=TRUE;
     ret = ephyrRandRSetConfig (pScreen, screen->randr, 0, &size );
