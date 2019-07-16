@@ -1275,9 +1275,7 @@ BOOL find_common_regions(struct cache_elem* source, struct cache_elem* dest, BOO
 static
 void sendMainImageFromSendThread(uint32_t width, uint32_t height, int32_t dx ,int32_t dy)
 {
-    uint32_t length = 0;
-    char fname[255] = {0};
-    char* f = NULL;
+    _X_UNUSED uint32_t length = 0;
     struct frame_region regions[9] = {0};
 
     uint32_t isize = 0;
@@ -1372,8 +1370,6 @@ void *send_frame_thread (void *threadid)
         {
             struct addrinfo hints, *res;
             int errcode;
-            char addrstr[100];
-            void *ptr;
 
             memset (&hints, 0, sizeof (hints));
             hints.ai_family = AF_INET;
@@ -1567,7 +1563,6 @@ void *send_frame_thread (void *threadid)
                     uint32_t crc = frame->crc;
                     uint32_t width=frame->width;
                     uint32_t height=frame->height;
-                    BOOL show_time=FALSE;
 
                     /* unlock sendqueue for main thread */
                     pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
@@ -1982,7 +1977,6 @@ clientReadNotify(int fd, int ready, void *data)
                 {
                     uint16_t width=*((uint16_t*)buff+2);
                     uint16_t height=*((uint16_t*)buff+3);
-                    uint8_t primaryInd=*((uint8_t*)buff+8);
                     struct VirtScreen screens[4] = {0};
 
                     remoteVars.client_initialized=TRUE;
@@ -2118,7 +2112,6 @@ unsigned int checkSocketConnection(OsTimerPtr timer, CARD32 time, void* args)
 
 void open_socket(void)
 {
-    ssize_t size;
     const int y = 1;
     int ret = -1;
 

@@ -96,8 +96,6 @@ Bool
 ephyrScreenInitialize(KdScreenInfo *screen)
 {
     EphyrScrPriv *scrpriv = screen->driver;
-    int x = 0, y = 0;
-    int width = 640, height = 480;
     CARD32 redMask, greenMask, blueMask;
 
     EPHYR_DBG("Init screen");
@@ -683,7 +681,7 @@ void setOutput(ScreenPtr pScreen, RROutputPtr output, RRCrtcPtr crtc, int width,
     else
         RROutputSetConnection(output, RR_Disconnected);
 
-    RRModePtr mode, newMode = NULL;
+    RRModePtr mode = NULL;
 
     xRRModeInfo modeInfo;
     RRModePtr *modes;
@@ -779,7 +777,6 @@ void addOutput(ScreenPtr pScreen, char* name, int width, int height, int x, int 
 {
 
     RROutputPtr output;
-    int n = 0;
 
     /* add new Output */
     EPHYR_DBG("CREATE OUTPUT %s",name);
@@ -904,7 +901,6 @@ Bool
 ephyrInitScreen(ScreenPtr pScreen)
 {
     KdScreenPriv(pScreen);
-    KdScreenInfo *screen = pScreenPriv->screen;
 
     EPHYR_LOG("pScreen->myNum:%d\n", pScreen->myNum);
     pScreen->CreateColormap = ephyrCreateColormap;
@@ -1442,10 +1438,6 @@ KdPointerDriver EphyrMouseDriver = {
 static Status
 EphyrKeyboardInit(KdKeyboardInfo * ki)
 {
-    KeySymsRec keySyms;
-    CARD8 modmap[MAP_LENGTH];
-    XkbControlsRec controls;
-
     ki->driverPrivate = (EphyrKbdPrivate *)
         calloc(sizeof(EphyrKbdPrivate), 1);
 
