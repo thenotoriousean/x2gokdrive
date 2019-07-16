@@ -848,7 +848,7 @@ ephyrResizeScreen (ScreenPtr           pScreen,
                   struct VirtScreen* virtualScreens)
 {
 
-    EPHYR_DBG("EPHYR RESIZE SCREEN!!! %x %d %d",pScreen, newwidth, newheight);
+    EPHYR_DBG("EPHYR RESIZE SCREEN!!! %p %d %d",pScreen, newwidth, newheight);
 
     KdScreenPriv(pScreen);
     EPHYR_DBG("EPHYR RESIZE SCREEN 2");

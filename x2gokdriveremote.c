@@ -1379,7 +1379,7 @@ void *send_frame_thread (void *threadid)
             errcode = getaddrinfo (remoteVars.acceptAddr, NULL, &hints, &res);
             if (errcode != 0 || !res)
             {
-                EPHYR_DBG ("ERROR LOOKUP %d", remoteVars.acceptAddr);
+                EPHYR_DBG ("ERROR LOOKUP %s", remoteVars.acceptAddr);
                 terminateServer(-1);
             }
             if(  ((struct sockaddr_in *) (res->ai_addr))->sin_addr.s_addr != remoteVars.address.sin_addr.s_addr)
