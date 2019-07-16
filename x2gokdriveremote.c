@@ -301,7 +301,8 @@ void remote_sendCursor(CursorPtr cursor)
 static
 int32_t send_cursor(struct cursorFrame* cursor)
 {
-    int ln, l = 0;
+    _X_UNUSED int ln = 0;
+    int l = 0;
     int sent=0;
     unsigned char buffer[64] = {0};
 
@@ -349,7 +350,8 @@ int32_t send_frame(u_int32_t width, uint32_t height, uint32_t x, uint32_t y, uin
 {
 
     uint32_t numofregions=0;
-    int ln, l = 0;
+    _X_UNUSED int ln = 0;
+    int l = 0;
     uint32_t total=0;
     int sent = 0;
     unsigned char buffer[64] = {0};
@@ -431,7 +433,8 @@ int send_deleted_elements(void)
     unsigned char buffer[56] = {0};
     unsigned char* list = NULL;
 
-    int ln, l = 0;
+    _X_UNUSED int ln = 0;
+    int l = 0;
     int length, sent=0;
 
     unsigned int i = 0;
@@ -479,7 +482,8 @@ int send_deleted_cursors(void)
 {
     unsigned char buffer[56] = {0};
     unsigned char* list = NULL;
-    int ln, l = 0;
+    _X_UNUSED int ln = 0;
+    int l = 0;
     int length, sent = 0;
     unsigned int i=0;
     struct deletedCursor* elem = NULL;
@@ -524,7 +528,8 @@ int send_deleted_cursors(void)
 int send_selection(int sel, char* data, uint32_t length, uint32_t format)
 {
     unsigned char buffer[56] = {0};
-    int ln, l = 0;
+    _X_UNUSED int ln = 0;
+    int l = 0;
     int sent = 0;
 
     *((uint32_t*)buffer)=SELECTION;
