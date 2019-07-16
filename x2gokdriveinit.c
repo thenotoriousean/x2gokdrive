@@ -57,6 +57,14 @@ void processScreenOrOutputArg(const char *screen_size, const char *output, char 
 void processOutputArg(const char *output, char *parent_id);
 void processScreenArg(const char *screen_size, char *parent_id);
 
+#if XORG_VERSION_CURRENT < 11999901
+int ephyrInitFake(void);
+#endif /* XORG_VERSION_CURRENT */
+
+#if INPUTTHREAD
+void ddxInputThreadInit(void);
+#endif /* INPUTTHREAD */
+
 int
 main(int argc, char *argv[], char *envp[])
 {
