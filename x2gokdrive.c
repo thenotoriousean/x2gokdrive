@@ -100,21 +100,21 @@ ephyrScreenInitialize(KdScreenInfo *screen)
 
     EPHYR_DBG("Init screen");
 
-/*
-    if (EphyrWantGrayScale)
-        screen->fb.depth = 8;
 
-    if (screen->fb.depth && screen->fb.depth != 0) {
-        if (screen->fb.depth < 0
-            && (screen->fb.depth == 24 || screen->fb.depth == 16
-                || screen->fb.depth == 8)) {
-            scrpriv->server_depth = screen->fb.depth;
-        }
-        else
-            ErrorF
-                ("\nXephyr: requested screen depth not supported, setting to match hosts.\n");
-    }
-*/
+//    if (EphyrWantGrayScale)
+//        screen->fb.depth = 8;
+//
+//    if (screen->fb.depth && screen->fb.depth != 0) {
+//        if (screen->fb.depth < 0
+//            && (screen->fb.depth == 24 || screen->fb.depth == 16
+//                || screen->fb.depth == 8)) {
+//            scrpriv->server_depth = screen->fb.depth;
+//        }
+//        else
+//            ErrorF
+//                ("\nXephyr: requested screen depth not supported, setting to match hosts.\n");
+//    }
+
     screen->fb.depth = 24;
     screen->rate = 72;
 
@@ -563,8 +563,8 @@ ephyrRandRSetConfig(ScreenPtr pScreen,
     pScrPriv = rrGetScrPriv(pScreen);
 
     EPHYR_DBG("RANDR SET CONFIG, LET'S CHECK OUR RANDR SETTINGS");
-    /*EPHYR_DBG("OUTPUTS: %d, CRTCS: %d, SIZES: %d, MODES %d" , pScrPriv->numOutputs,
-              pScrPriv->numCrtcs, pScrPriv->nSizes, pScrPriv->outputs[0]->numModes);*/
+//    EPHYR_DBG("OUTPUTS: %d, CRTCS: %d, SIZES: %d, MODES %d" , pScrPriv->numOutputs,
+//              pScrPriv->numCrtcs, pScrPriv->nSizes, pScrPriv->outputs[0]->numModes);
 
     if (pScrPriv->nSizes)
     {

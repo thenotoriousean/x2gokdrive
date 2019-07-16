@@ -273,17 +273,16 @@ static BOOL find_image_atom(const Atom list[], size_t size)
 
 }
 
-/*
-static void listAtoms(const Atom list[], size_t size)
-{
-    size_t i;
+//static void listAtoms(const Atom list[], size_t size)
+//{
+//    size_t i;
+//
+//    for (i = 0;i < size;i++)
+//    {
+//        EPHYR_DBG("%d:%s", list[i], NameForAtom( list[i]));
+//    }
+//}
 
-    for (i = 0;i < size;i++)
-    {
-        EPHYR_DBG("%d:%s", list[i], NameForAtom( list[i]));
-    }
-}
-*/
 static Bool prop_has_atom(Atom atom, const Atom list[], size_t size)
 {
     size_t i;
