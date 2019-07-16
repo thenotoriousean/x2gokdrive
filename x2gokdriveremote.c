@@ -2828,7 +2828,7 @@ void initFrameRegions(struct cache_elem* frame)
                        regions[1].rect.size.width*CACHEBPP);
 
             }
-            sprintf(fname,"/tmp/ephyrdbg/%x-rect_inv.jpg",frame->crc);
+            sprintf(fname,"/tmp/.x2go/x2gokdrive_dbg/%x-rect_inv.jpg",frame->crc);
             regions[1].compressed_data=image_compress(regions[1].rect.size.width,
                                                      regions[1].rect.size.height,
                                                      data, &regions[1].size, CACHEBPP, fname);
