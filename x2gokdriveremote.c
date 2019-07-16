@@ -1744,7 +1744,7 @@ void clear_cache_data(uint32_t maxsize)
 }
 
 static
-char* getAgentStateAsString(int state)
+const char* getAgentStateAsString(int state)
 {
     switch(state)
     {
