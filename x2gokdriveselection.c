@@ -52,6 +52,8 @@ static int (*proc_send_event_orig)(ClientPtr);
 static int (*proc_convert_selection_orig)(ClientPtr);
 static int (*proc_change_property_orig)(ClientPtr);
 
+static int create_selection_window(void);
+
 int own_selection(int target)
 {
     Selection *pSel = NULL;
