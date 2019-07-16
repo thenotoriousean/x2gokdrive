@@ -892,8 +892,6 @@ ephyrCreateColormap(ColormapPtr pmap)
 Bool
 ephyrInitScreen(ScreenPtr pScreen)
 {
-    KdScreenPriv(pScreen);
-
     EPHYR_LOG("pScreen->myNum:%d\n", pScreen->myNum);
     pScreen->CreateColormap = ephyrCreateColormap;
 
