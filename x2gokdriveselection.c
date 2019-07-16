@@ -54,6 +54,10 @@ static int (*proc_change_property_orig)(ClientPtr);
 
 int own_selection(int target)
 {
+    Selection *pSel = NULL;
+    SelectionInfoRec info = {0};
+    Atom selection=atomPrimary;
+    int rc;
 
     if(remoteVars->selstruct.selectionMode == CLIP_SERVER || remoteVars->selstruct.selectionMode == CLIP_NONE)
     {
@@ -61,12 +65,6 @@ int own_selection(int target)
         return Success;
     }
 
-    Selection *pSel;
-    int rc;
-
-    SelectionInfoRec info;
-
-    Atom selection=atomPrimary;
     if(target==CLIPBOARD)
         selection=atomClipboard;
 

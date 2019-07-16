@@ -171,14 +171,18 @@ void addCursorToQueue(struct cursorFrame* cframe)
 
 void freeCursors(void)
 {
-    struct sentCursor* cur=remoteVars.sentCursorsHead;
+    struct sentCursor* cur = NULL;
+    struct cursorFrame* curf = NULL;
+
+    cur=remoteVars.sentCursorsHead;
     while(cur)
     {
         struct sentCursor* next=cur->next;
         free(cur);
         cur=next;
     }
-    struct cursorFrame* curf=remoteVars.firstCursor;
+
+    curf=remoteVars.firstCursor;
     while(curf)
     {
         struct cursorFrame* next=curf->next;
@@ -193,9 +197,13 @@ void freeCursors(void)
 
 void remote_removeCursor(uint32_t serialNumber)
 {
+    struct sentCursor* cur = NULL;
+    struct sentCursor* prev = NULL;
+    struct deletedCursor* dcur = NULL;
+
     pthread_mutex_lock(&remoteVars.sendqueue_mutex);
-    struct sentCursor* cur=remoteVars.sentCursorsHead;
-    struct sentCursor* prev=0;
+    cur=remoteVars.sentCursorsHead;
+
     while(cur)
     {
         if(cur->serialNumber==serialNumber)
@@ -212,7 +220,7 @@ void remote_removeCursor(uint32_t serialNumber)
         prev=cur;
         cur=cur->next;
     }
-    struct deletedCursor* dcur=malloc(sizeof(struct deletedCursor));
+    dcur=malloc(sizeof(struct deletedCursor));
     dcur->serialNumber=serialNumber;
     dcur->next=0;
     if(remoteVars.last_deleted_cursor)
@@ -230,14 +238,14 @@ void remote_removeCursor(uint32_t serialNumber)
 
 void remote_sendCursor(CursorPtr cursor)
 {
+    BOOL cursorSent=FALSE;
 //    #warning check memory
     struct cursorFrame* cframe=malloc(sizeof(struct cursorFrame));
+
     cframe->serialNumber=cursor->serialNumber;
     cframe->size=0;
     cframe->data=0;
     cframe->next=0;
-
-    BOOL cursorSent=FALSE;
 
     pthread_mutex_lock(&remoteVars.sendqueue_mutex);
     cursorSent=isCursorSent(cursor->serialNumber);
@@ -287,8 +295,10 @@ void remote_sendCursor(CursorPtr cursor)
 
 int32_t send_cursor(struct cursorFrame* cursor)
 {
+    int ln, l = 0;
+    int sent=0;
+    unsigned char buffer[64] = {0};
 
-    unsigned char buffer[64]={};
     *((uint32_t*)buffer)=CURSOR; //4B
 
     *((uint8_t*)buffer+4)=cursor->forR;
@@ -310,13 +320,11 @@ int32_t send_cursor(struct cursorFrame* cursor)
 //     EPHYR_DBG("SENDING CURSOR %d with size %d", cursor->serialNumber, cursor->size);
 
 //    #warning check this
-    int ln=write(remoteVars.clientsock,buffer,56);
-
-    int sent=0;
+    ln=write(remoteVars.clientsock,buffer,56);
 
     while(sent<cursor->size)
     {
-        int l=write(remoteVars.clientsock, cursor->data+sent,((cursor->size-sent)<MAXMSGSIZE)?(cursor->size-sent):MAXMSGSIZE);
+        l=write(remoteVars.clientsock, cursor->data+sent,((cursor->size-sent)<MAXMSGSIZE)?(cursor->size-sent):MAXMSGSIZE);
         if(l<0)
         {
             EPHYR_DBG("Error sending cursor!!!!!");
@@ -335,14 +343,16 @@ int32_t send_frame(u_int32_t width, uint32_t height, uint32_t x, uint32_t y, uin
 {
 
     uint32_t numofregions=0;
-
+    int ln, l = 0;
+    uint32_t total=0;
+    int sent = 0;
+    unsigned char buffer[64] = {0};
 
     for(int i=0;i<9;++i)
     {
         if(regions[i].rect.size.width && regions[i].rect.size.height)
             ++numofregions;
     }
-    unsigned char buffer[64]={};
     *((uint32_t*)buffer)=FRAME;
     *((uint32_t*)buffer+1)=width;
     *((uint32_t*)buffer+2)=height;
@@ -357,8 +367,7 @@ int32_t send_frame(u_int32_t width, uint32_t height, uint32_t x, uint32_t y, uin
 //        EPHYR_DBG("SENDING REFERENCE %x", crc);
 
 //    #warning check this
-    int ln=write(remoteVars.clientsock, buffer,56);
-    uint32_t total=0;
+    ln=write(remoteVars.clientsock, buffer,56);
     for(int i=0;i<9;++i)
     {
         if(!(regions[i].rect.size.width && regions[i].rect.size.height))
@@ -381,15 +390,12 @@ int32_t send_frame(u_int32_t width, uint32_t height, uint32_t x, uint32_t y, uin
         *((uint32_t*)buffer+7)=regions[i].size;
 
 //        #warning check this
-        int ln=write(remoteVars.clientsock, buffer, 64);
-
-        int sent=0;
-
+        ln=write(remoteVars.clientsock, buffer, 64);
 
         while(sent<regions[i].size)
         {
-            int l=write(remoteVars.clientsock,regions[i].compressed_data+sent,
-                        ((regions[i].size-sent)<MAXMSGSIZE)?(regions[i].size-sent):MAXMSGSIZE);
+            l=write(remoteVars.clientsock,regions[i].compressed_data+sent,
+                    ((regions[i].size-sent)<MAXMSGSIZE)?(regions[i].size-sent):MAXMSGSIZE);
             if(l<0)
             {
                 EPHYR_DBG("Error sending file!!!!!");
@@ -415,24 +421,29 @@ int32_t send_frame(u_int32_t width, uint32_t height, uint32_t x, uint32_t y, uin
 
 int send_deleted_elements(void)
 {
-    unsigned char buffer[56];
+    unsigned char buffer[56] = {0};
+    unsigned char* list = NULL;
+
+    int ln, l = 0;
+    int length, sent=0;
+
+    unsigned int i = 0;
+    struct deleted_elem* elem = NULL;
+
     *((uint32_t*)buffer)=DELETED;
     *((uint32_t*)buffer+1)=remoteVars.deleted_list_size;
 
+    list=malloc(sizeof(uint32_t)*remoteVars.deleted_list_size);
+
 //    #warning check this
-    int ln=write(remoteVars.clientsock,buffer,56);
+    ln=write(remoteVars.clientsock,buffer,56);
 //     data_sent+=48;
-    int sent=0;
-
-    unsigned char* list=malloc(sizeof(uint32_t)*remoteVars.deleted_list_size);
-
-    unsigned int i=0;
     while(remoteVars.first_deleted_elements)
     {
 //        EPHYR_DBG("To DELETE FRAME %x", remoteVars.first_deleted_elements->crc);
 
         *((uint32_t*)list+i)=remoteVars.first_deleted_elements->crc;
-        struct deleted_elem* elem=remoteVars.first_deleted_elements;
+        elem=remoteVars.first_deleted_elements;
         remoteVars.first_deleted_elements=elem->next;
         free(elem);
         ++i;
@@ -441,10 +452,10 @@ int send_deleted_elements(void)
     remoteVars.last_deleted_elements=0l;
 
 //    EPHYR_DBG("SENDING IMG length - %d, number - %d\n",length,framenum_sent++);
-    int length=remoteVars.deleted_list_size*sizeof(uint32_t);
+    length=remoteVars.deleted_list_size*sizeof(uint32_t);
     while(sent<length)
     {
-        int l=write(remoteVars.clientsock,list+sent,((length-sent)<MAXMSGSIZE)?(length-sent):MAXMSGSIZE);
+        l=write(remoteVars.clientsock,list+sent,((length-sent)<MAXMSGSIZE)?(length-sent):MAXMSGSIZE);
         if(l<0)
         {
             EPHYR_DBG("Error sending list of deleted elements!!!!!");
@@ -458,23 +469,27 @@ int send_deleted_elements(void)
 
 int send_deleted_cursors(void)
 {
-    unsigned char buffer[56];
+    unsigned char buffer[56] = {0};
+    unsigned char* list = NULL;
+    int ln, l = 0;
+    int length, sent = 0;
+    unsigned int i=0;
+    struct deletedCursor* elem = NULL;
+
     *((uint32_t*)buffer)=DELETEDCURSOR;
     *((uint32_t*)buffer+1)=remoteVars.deletedcursor_list_size;
 
 //    #warning check this
-    int ln=write(remoteVars.clientsock,buffer,56);
-    int sent=0;
+    ln=write(remoteVars.clientsock,buffer,56);
 
-    unsigned char* list=malloc(sizeof(uint32_t)*remoteVars.deletedcursor_list_size);
+    list=malloc(sizeof(uint32_t)*remoteVars.deletedcursor_list_size);
 
-    unsigned int i=0;
     while(remoteVars.first_deleted_cursor)
     {
         *((uint32_t*)list+i)=remoteVars.first_deleted_cursor->serialNumber;
 
 //        EPHYR_DBG("delete cursord %d",first_deleted_cursor->serialNumber);
-        struct deletedCursor* elem=remoteVars.first_deleted_cursor;
+        elem=remoteVars.first_deleted_cursor;
         remoteVars.first_deleted_cursor=elem->next;
         free(elem);
         ++i;
@@ -483,10 +498,10 @@ int send_deleted_cursors(void)
     remoteVars.last_deleted_cursor=0l;
 
 //    EPHYR_DBG("Sending list from %d elements", deletedcursor_list_size);
-    int length=remoteVars.deletedcursor_list_size*sizeof(uint32_t);
+    length=remoteVars.deletedcursor_list_size*sizeof(uint32_t);
     while(sent<length)
     {
-        int l=write(remoteVars.clientsock,list+sent,((length-sent)<MAXMSGSIZE)?(length-sent):MAXMSGSIZE);
+        l=write(remoteVars.clientsock,list+sent,((length-sent)<MAXMSGSIZE)?(length-sent):MAXMSGSIZE);
         if(l<0)
         {
             EPHYR_DBG("Error sending list of deleted cursors!!!!!");
@@ -500,19 +515,21 @@ int send_deleted_cursors(void)
 
 int send_selection(int sel, char* data, uint32_t length, uint32_t format)
 {
-    unsigned char buffer[56];
+    unsigned char buffer[56] = {0};
+    int ln, l = 0;
+    int sent = 0;
+
     *((uint32_t*)buffer)=SELECTION;
     *((uint32_t*)buffer+1)=sel;
     *((uint32_t*)buffer+2)=format;
     *((uint32_t*)buffer+3)=length;
 
 //    #warning check this
-    int ln=write(remoteVars.clientsock,buffer,56);
-    int sent=0;
+    ln=write(remoteVars.clientsock,buffer,56);
 
     while(sent<length)
     {
-        int l=write(remoteVars.clientsock,data+sent,((length-sent)<MAXMSGSIZE)?(length-sent):MAXMSGSIZE);
+        l=write(remoteVars.clientsock,data+sent,((length-sent)<MAXMSGSIZE)?(length-sent):MAXMSGSIZE);
         if(l<0)
         {
             EPHYR_DBG("Error sending selection!!!!!");
@@ -530,12 +547,16 @@ int send_selection(int sel, char* data, uint32_t length, uint32_t format)
  */
 struct cache_elem* find_best_match(struct cache_elem* frame, unsigned int* match_val)
 {
-    struct cache_elem* current=frame->prev;
-    struct cache_elem* best_match_frame=0;
+    struct cache_elem* current = NULL;
+    struct cache_elem* best_match_frame = NULL;
     unsigned int distance=0;
     unsigned int best_match_value=99999;
+
+    current =frame->prev;
     while(current)
     {
+        unsigned int matchVal=0;
+
         if((best_match_frame&& best_match_value<=distance) || distance > MAX_MATCH_VAL)
         {
             break;
@@ -546,7 +567,6 @@ struct cache_elem* find_best_match(struct cache_elem* frame, unsigned int* match
             continue;
         }
 
-        unsigned int matchVal=0;
         matchVal+=abs(current->width-frame->width)/10;
         matchVal+=abs(current->height-frame->height)/10;
         matchVal+=abs(current->rval-frame->rval);
@@ -574,6 +594,9 @@ BOOL checkShiftedRegion( struct cache_elem* src, struct cache_elem* dst,  int32_
 //    EPHYR_DBG("FENTER %d %d %d %d %d",x,y,width,height,shift);
     int32_t vert_point=20;
     int32_t hor_point=20;
+    int32_t vert_inc = 0;
+    int32_t hor_inc = 0;
+    uint32_t i=0;
 
     if(vert_point>height)
     {
@@ -584,8 +607,8 @@ BOOL checkShiftedRegion( struct cache_elem* src, struct cache_elem* dst,  int32_
         hor_point=width;
     }
 
-    int32_t vert_inc=height/vert_point;
-    int32_t hor_inc=width/hor_point;
+    vert_inc=height/vert_point;
+    hor_inc=width/hor_point;
 
     if(vert_inc<1)
     {
@@ -598,15 +621,12 @@ BOOL checkShiftedRegion( struct cache_elem* src, struct cache_elem* dst,  int32_
     }
 
 
-    uint32_t i=0;
-
     for(int32_t ry=y;ry<height+y ;ry+=vert_inc)
     {
         for(int32_t rx=x+(i++)%vert_inc; rx<width+x; rx+=hor_inc)
         {
             int32_t src_ind=(ry*src->width+rx)*CACHEBPP;
             int32_t dst_ind=((ry+vert_shift)*dst->width+rx+horiz_shift)*CACHEBPP;
-
 
             if (src_ind<0 || src_ind +2 > src->size || dst_ind <0 || dst_ind > dst->size )
             {
@@ -640,11 +660,14 @@ BOOL checkShiftedRegion( struct cache_elem* src, struct cache_elem* dst,  int32_
 int32_t checkScrollUp(struct cache_elem* source, struct cache_elem* dest)
 {
 //    EPHYR_DBG("checking for up scroll %u, %u, %u, %u", source->width, source->height, dest->width, dest->height);
+
     int32_t max_shift=source->height/3;
+
     int32_t x=source->width/10;
     int32_t y=source->height/10;
 
-    int32_t width=source->width/2-source->width/5;
+    int32_t width = source->width/2-source->width/5;
+    int32_t height=source->height/2-source->height/10;
 
     if(x+width >= dest->width)
     {
@@ -655,8 +678,6 @@ int32_t checkScrollUp(struct cache_elem* source, struct cache_elem* dest)
 //        EPHYR_DBG("DST too small(w), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
         return -1;
     }
-
-    int32_t height=source->height/2-source->height/10;
 
     if(y+height+max_shift >=dest->height)
     {
@@ -688,6 +709,7 @@ int32_t checkScrollDown(struct cache_elem* source, struct cache_elem* dest)
 {
 //    EPHYR_DBG("checking for down scroll %u, %u, %u, %u", source->width, source->height, dest->width, dest->height);
     int32_t max_shift=source->height/3*-1;
+
     int32_t x=source->width/10;
     int32_t y=source->height/2;
 
@@ -706,7 +728,6 @@ int32_t checkScrollDown(struct cache_elem* source, struct cache_elem* dest)
         return 1;
     }
 
-
     if(y+height+abs(max_shift) >=dest->height)
     {
         height=dest->height-abs(max_shift)-y;
@@ -716,7 +737,6 @@ int32_t checkScrollDown(struct cache_elem* source, struct cache_elem* dest)
 //        EPHYR_DBG("DST too small(h), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
         return 1;
     }
-
 
     for(int32_t shift=0;shift>max_shift;--shift)
     {
@@ -733,9 +753,11 @@ int32_t checkScrollRight(struct cache_elem* source, struct cache_elem* dest)
 {
 //    EPHYR_DBG("checking for up scroll %u, %u, %u, %u", source->width, source->height, dest->width, dest->height);
     int32_t max_shift=source->width/3;
+
     int32_t x=source->width/10;
     int32_t y=source->height/10;
 
+    int32_t width=source->width/2-source->width/10;
     int32_t height=source->height/2-source->height/5;
 
     if(y+height >= dest->height)
@@ -747,8 +769,6 @@ int32_t checkScrollRight(struct cache_elem* source, struct cache_elem* dest)
 //        EPHYR_DBG("DST too small(d), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
         return -1;
     }
-
-    int32_t width=source->width/2-source->width/10;
 
     if(x+width+max_shift >=dest->width)
     {
@@ -780,9 +800,11 @@ int32_t checkScrollLeft(struct cache_elem* source, struct cache_elem* dest)
 {
 //    EPHYR_DBG("checking for up scroll %u, %u, %u, %u", source->width, source->height, dest->width, dest->height);
     int32_t max_shift=source->width/3*-1;
+
     int32_t x=source->width/2;
     int32_t y=source->height/10;
 
+    int32_t width=source->width/2-source->width/10;
     int32_t height=source->height/2-source->height/5;
 
     if(y+height >= dest->height)
@@ -795,8 +817,6 @@ int32_t checkScrollLeft(struct cache_elem* source, struct cache_elem* dest)
         return 1;
     }
 
-    int32_t width=source->width/2-source->width/10;
-
     if(x+width+abs(max_shift) >=dest->width)
     {
         width=dest->width-abs(max_shift)-x;
@@ -808,7 +828,6 @@ int32_t checkScrollLeft(struct cache_elem* source, struct cache_elem* dest)
     }
 
 //    EPHYR_DBG(" %d %d %d %d %d",x,y,width, height, max_shift);
-
 
     for(int32_t shift=0;shift>max_shift;--shift)
     {
@@ -833,20 +852,20 @@ BOOL checkEquality(struct cache_elem* src, struct cache_elem* dst,
     int32_t x, y=center_y;
 
     int32_t right_x=src->width;
-    --right_x;
 
     int32_t down_y=src->height;
-    --down_y;
 
     int32_t left_x=0;
     int32_t top_y=0;
+
+    --right_x;
+    --down_y;
 
     if(center_x+shift_horiz >= dst->width  || center_y+shift_vert >=dst->height)
     {
         /* dst is too small for shift */
         return FALSE;
     }
-
 
     if(left_x+shift_horiz<0)
     {
@@ -868,11 +887,7 @@ BOOL checkEquality(struct cache_elem* src, struct cache_elem* dst,
         down_y=dst->height-shift_vert-1;
     }
 
-
 //    EPHYR_DBG("Center: %dx%d", center_x, center_y);
-
-
-
 //    EPHYR_DBG("initial down_right %dx%d",right_x,down_y);
 
     for(y=center_y;y<=down_y;++y)
@@ -1058,17 +1073,17 @@ BOOL checkMovedContent(struct cache_elem* source, struct cache_elem* dest, int32
 //    EPHYR_DBG("checking for moved content %u, %u, %u, %u", source->width, source->height, dest->width, dest->height);
     int32_t max_shift=source->width/8;
 
+    int32_t x=source->width/2;
+    int32_t y=source->height/2;
+
+    int32_t width=source->width/4;
+    int32_t height=source->height/4;
+
     if(max_shift>source->height/8)
         max_shift=source->height/8;
 
     if(max_shift>20)
         max_shift=20;
-
-
-    int32_t x=source->width/2;
-    int32_t y=source->height/2;
-
-    int32_t height=source->height/4;
 
     if(y+height+max_shift >= dest->height)
     {
@@ -1079,8 +1094,6 @@ BOOL checkMovedContent(struct cache_elem* source, struct cache_elem* dest, int32
 //        EPHYR_DBG("DST too small(d), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
         return FALSE;
     }
-
-    int32_t width=source->width/4;
 
     if(x+width+max_shift >=dest->width)
     {
@@ -1098,7 +1111,6 @@ BOOL checkMovedContent(struct cache_elem* source, struct cache_elem* dest, int32
     {
         for(int32_t vshift=0;vshift<max_shift;vshift++)
         {
-
             if(checkShiftedRegion( source, dest, x, y, width, height, hshift, vshift ))
             {
                 *horiz_shift=hshift;
@@ -1131,6 +1143,8 @@ BOOL checkMovedContent(struct cache_elem* source, struct cache_elem* dest, int32
 BOOL findDiff(struct cache_elem* source, struct cache_elem* dest, rectangle* diff_rect)
 {
     int32_t left_x=source->width-1, top_y=source->height-1, right_x=0, bot_y=0;
+    float eff = 0;
+
     for(int32_t y=0;y<source->height;++y)
     {
         for(int32_t x=0;x<source->width;++x)
@@ -1157,7 +1171,7 @@ BOOL findDiff(struct cache_elem* source, struct cache_elem* dest, rectangle* dif
     diff_rect->lt_corner.x=left_x;
     diff_rect->lt_corner.y=top_y;
 
-    float eff= (float)(diff_rect->size.width*diff_rect->size.height)/ (float)(source->width*source->height);
+    eff= (float)(diff_rect->size.width*diff_rect->size.height)/ (float)(source->width*source->height);
 
     if(eff>0.8)
         return FALSE;
@@ -1171,9 +1185,6 @@ BOOL find_common_regions(struct cache_elem* source, struct cache_elem* dest, BOO
                          int32_t* hshift, int32_t* vshift)
 {
 //    EPHYR_DBG("checking for common regions");
-
-
-
 
     *diff=FALSE;
 
@@ -1197,7 +1208,6 @@ BOOL find_common_regions(struct cache_elem* source, struct cache_elem* dest, BOO
 #warning stop here for the moment, let's see later if we'll use it'
     return FALSE;
 
-
     *vshift=0;
     *hshift=checkScrollRight(source, dest);
     if(*hshift>0)
@@ -1215,9 +1225,10 @@ BOOL find_common_regions(struct cache_elem* source, struct cache_elem* dest, BOO
 
     if((source->width != dest->width) && (source->height!=dest->height))
     {
+        int32_t h_shift, v_shift;
+
         *vshift=0;
         *hshift=0;
-        int32_t h_shift, v_shift;
         if(checkMovedContent(source, dest, &h_shift, &v_shift))
         {
             *hshift=h_shift;
@@ -1226,7 +1237,6 @@ BOOL find_common_regions(struct cache_elem* source, struct cache_elem* dest, BOO
             return checkEquality(source, dest, *hshift, *vshift, common_rect);
         }
     }
-
 
     if((source->width == dest->width) && (source->height==dest->height))
     {
@@ -1242,6 +1252,18 @@ BOOL find_common_regions(struct cache_elem* source, struct cache_elem* dest, BOO
 /* use only from send thread */
 void sendMainImageFromSendThread(uint32_t width, uint32_t height, int32_t dx ,int32_t dy)
 {
+    uint32_t length = 0;
+    char fname[255] = {0};
+    char* f = NULL;
+    struct frame_region regions[9] = {0};
+
+    uint32_t isize = 0;
+    unsigned char* data = NULL;
+
+    uint32_t i = 0;
+    uint32_t ind = 0;
+
+    BOOL mainImage=FALSE;
 
     if(width!=0)
     {
@@ -1253,13 +1275,7 @@ void sendMainImageFromSendThread(uint32_t width, uint32_t height, int32_t dx ,in
     }
 
     pthread_mutex_lock(&remoteVars.mainimg_mutex);
-    uint32_t length=0;
 
-
-    char fname[255];
-    char* f;
-
-    struct frame_region regions[9];
     for(int i=0;i<9;++i)
     {
         regions[i].rect.size.width=0;
@@ -1268,7 +1284,6 @@ void sendMainImageFromSendThread(uint32_t width, uint32_t height, int32_t dx ,in
         regions[i].size=0;
     }
 
-    BOOL mainImage=FALSE;
     if(!width || (dx==0 && dy==0 && width==remoteVars.main_img_width && height==remoteVars.main_img_height))
     {
         mainImage=TRUE;
@@ -1277,16 +1292,14 @@ void sendMainImageFromSendThread(uint32_t width, uint32_t height, int32_t dx ,in
         height=remoteVars.main_img_height;
     }
 
-    uint32_t isize=width*height*CACHEBPP;
-    unsigned char* data=malloc(isize);
-
-    u_int32_t i=0;
+    isize=width*height*CACHEBPP;
+    data=malloc(isize);
 
     for(int32_t y=0;y<height;++y)
     {
         for(int32_t x=0; x< width; ++x)
         {
-            uint32_t ind=((y+dy)*remoteVars.main_img_width+dx+x)*XSERVERBPP;
+            ind=((y+dy)*remoteVars.main_img_width+dx+x)*XSERVERBPP;
             memcpy(data+i*CACHEBPP, remoteVars.main_img+ind, CACHEBPP);
             ++i;
         }
@@ -1317,6 +1330,7 @@ void *send_frame_thread (void *threadid)
 {
     long tid;
     tid = (long)threadid;
+
     EPHYR_DBG("Started sending thread: #%ld!\n", tid);
 
     while (1)
@@ -1332,7 +1346,6 @@ void *send_frame_thread (void *threadid)
 
         if(strlen(remoteVars.acceptAddr))
         {
-
             struct addrinfo hints, *res;
             int errcode;
             char addrstr[100];
@@ -1359,13 +1372,16 @@ void *send_frame_thread (void *threadid)
         }
         if(strlen(remoteVars.cookie))
         {
-//            EPHYR_DBG("Checking cookie: %s",remoteVars.cookie);
             char msg[33];
             int length=32;
             int ready=0;
+
+//            EPHYR_DBG("Checking cookie: %s",remoteVars.cookie);
+
             while(ready<length)
             {
                 int chunk=read(remoteVars.clientsock, msg+ready, 32-ready);
+
                 if(chunk<=0)
                 {
                     EPHYR_DBG("READ COOKIE ERROR");
@@ -1374,6 +1390,7 @@ void *send_frame_thread (void *threadid)
                     continue;
                 }
                 ready+=chunk;
+
                 EPHYR_DBG("got %d COOKIE BYTES from client", ready);
             }
             if(strncmp(msg,remoteVars.cookie,32))
@@ -1460,9 +1477,11 @@ void *send_frame_thread (void *threadid)
             {
                 size_t sz=remoteVars.selstruct.clipboard.size;
                 char* data=malloc(sz);
+                int format = 0;
+
                 memcpy(data, remoteVars.selstruct.clipboard.data, sz);
                 remoteVars.selstruct.clipboard.changed=FALSE;
-                int format=remoteVars.selstruct.clipboard.mimeData;
+                format=remoteVars.selstruct.clipboard.mimeData;
                 pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
                 send_selection(CLIPBOARD,data,sz, format);
                 free(data);
@@ -1475,9 +1494,11 @@ void *send_frame_thread (void *threadid)
             {
                 size_t sz=remoteVars.selstruct.selection.size;
                 char* data=malloc(sz);
+                int format = 0;
+
                 memcpy(data, remoteVars.selstruct.selection.data, sz);
                 remoteVars.selstruct.selection.changed=FALSE;
-                int format=remoteVars.selstruct.selection.mimeData;
+                format=remoteVars.selstruct.selection.mimeData;
                 pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
                 send_selection(PRIMARY, data, sz, format);
                 free(data);
@@ -1489,15 +1510,20 @@ void *send_frame_thread (void *threadid)
             if(remoteVars.first_sendqueue_element)
             {
                 int elems=queue_elements();
+                struct cache_elem* frame = NULL;
+                struct sendqueue_element* current = NULL;
+                uint32_t  x, y = 0;
+                int32_t width, height = 0;
+
                 if(remoteVars.maxfr<elems)
                 {
                     remoteVars.maxfr=elems;
                 }
 //                EPHYR_DBG("have %d max frames in queue, current %d", remoteVars.,elems);
-                struct cache_elem* frame=remoteVars.first_sendqueue_element->frame;
+                frame=remoteVars.first_sendqueue_element->frame;
 
                 /* delete first element from frame queue */
-                struct sendqueue_element* current=remoteVars.first_sendqueue_element;
+                current=remoteVars.first_sendqueue_element;
                 if(remoteVars.first_sendqueue_element->next)
                 {
                     remoteVars.first_sendqueue_element=remoteVars.first_sendqueue_element->next;
@@ -1506,10 +1532,8 @@ void *send_frame_thread (void *threadid)
                 {
                     remoteVars.first_sendqueue_element=remoteVars.last_sendqueue_element=NULL;
                 }
-                uint32_t  x, y;
                 x=current->x;
                 y=current->y;
-                int32_t width, height;
                 width=current->width;
                 height=current->height;
                 free(current);
@@ -1590,7 +1614,10 @@ void *send_frame_thread (void *threadid)
 /* warning! sendqueue_mutex should be locked by thread calling this function! */
 void clear_send_queue(void)
 {
-    struct sendqueue_element* current=remoteVars.first_sendqueue_element;
+    struct sendqueue_element* current = NULL;
+    struct sendqueue_element* next = NULL;
+
+    current=remoteVars.first_sendqueue_element;
     while(current)
     {
         if(current->frame)
@@ -1600,7 +1627,7 @@ void clear_send_queue(void)
                 current->frame->source->busy--;
             current->frame->source=0;
         }
-        struct sendqueue_element* next=current->next;
+        next=current->next;
         free(current);
         current=next;
     }
@@ -1616,13 +1643,15 @@ void clear_frame_cache(uint32_t max_elements)
 //    EPHYR_DBG("cache elements %d, cache size %lu\n",cache_elements, cache_size);
     while(remoteVars.first_cache_element && remoteVars.cache_elements > max_elements)
     {
+        struct cache_elem* next = NULL;
+
         /* don't delete it now, return to it later */
         if(remoteVars.first_cache_element->busy)
         {
             EPHYR_DBG("%x - is busy (%d), not deleting", remoteVars.first_cache_element->crc, remoteVars.first_cache_element->busy);
             return;
         }
-        struct cache_elem* next=remoteVars.first_cache_element->next;
+        next = remoteVars.first_cache_element->next;
         if(remoteVars.first_cache_element->size)
         {
             free(remoteVars.first_cache_element->data);
@@ -1633,6 +1662,7 @@ void clear_frame_cache(uint32_t max_elements)
         {
             /* add deleted element to the list for sending */
             struct deleted_elem* delem=malloc(sizeof(struct deleted_elem));
+
             ++remoteVars.deleted_list_size;
             delem->next=0l;
             delem->crc=remoteVars.first_cache_element->crc;
@@ -1672,13 +1702,15 @@ void clear_cache_data(uint32_t maxsize)
     struct cache_elem* cur=remoteVars.first_cache_element;
     while(cur && remoteVars.cache_size>maxsize)
     {
+        struct cache_elem* next = NULL;
+
         /* don't delete it now, return to it later */
         if(cur->busy)
         {
             EPHYR_DBG("%x - busy (%d)", cur->crc, cur->busy);
             return;
         }
-        struct cache_elem* next=cur->next;
+        next=cur->next;
         if(cur->size)
         {
             free(cur->data);
@@ -1745,6 +1777,10 @@ void
 clientReadNotify(int fd, int ready, void *data)
 {
     BOOL con;
+    int length = 0;
+    int iterations = 0;
+    int restDataLength, restDataPos = 0;
+
     pthread_mutex_lock(&remoteVars.sendqueue_mutex);
     con=remoteVars.client_connected;
     pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
@@ -1752,8 +1788,7 @@ clientReadNotify(int fd, int ready, void *data)
         return;
 
     /* read max 99 events */
-    int length=read(remoteVars.clientsock,remoteVars.eventBuffer + remoteVars.evBufferOffset, EVLENGTH*99);
-
+    length=read(remoteVars.clientsock,remoteVars.eventBuffer + remoteVars.evBufferOffset, EVLENGTH*99);
 
     if(length<0)
     {
@@ -1770,8 +1805,7 @@ clientReadNotify(int fd, int ready, void *data)
 
 
     length+=remoteVars.evBufferOffset;
-    int iterations=length/EVLENGTH;
-
+    iterations=length/EVLENGTH;
 
     for(int i=0;i<iterations;++i)
     {
@@ -1781,6 +1815,7 @@ clientReadNotify(int fd, int ready, void *data)
         {
             int leftToRead=remoteVars.selstruct.inBuffer.size - remoteVars.selstruct.inBuffer.position;
             int chunk=(leftToRead < EVLENGTH)?leftToRead:EVLENGTH;
+
             memcpy(remoteVars.selstruct.inBuffer.data+remoteVars.selstruct.inBuffer.position, buff, chunk);
             remoteVars.selstruct.inBuffer.position+=chunk;
             if(! (remoteVars.selstruct.inBuffer.position < remoteVars.selstruct.inBuffer.size))
@@ -1812,12 +1847,14 @@ clientReadNotify(int fd, int ready, void *data)
         else
         {
             uint32_t event_type=*((uint32_t*)buff);
+
             switch(event_type)
             {
                 case MotionNotify:
                 {
                     uint32_t x=*((uint32_t*)buff+1);
                     uint32_t y=*((uint32_t*)buff+2);
+
 //                    EPHYR_DBG("HAVE MOTION EVENT %d, %d from client\n",x,y);
                     ephyrClientMouseMotion(x,y);
                     break;
@@ -1827,6 +1864,7 @@ clientReadNotify(int fd, int ready, void *data)
                 {
                     uint32_t state=*((uint32_t*)buff+1);
                     uint32_t button=*((uint32_t*)buff+2);
+
 //                    EPHYR_DBG("HAVE BUTTON PRESS/RELEASE EVENT %d, %d from client\n",state,button);
                     ephyrClientButton(event_type,state, button);
                     break;
@@ -1835,6 +1873,7 @@ clientReadNotify(int fd, int ready, void *data)
                 {
                     uint32_t state=*((uint32_t*)buff+1);
                     uint32_t key=*((uint32_t*)buff+2);
+
 //                    EPHYR_DBG("HAVE KEY PRESS EVENT state: %d(%x), key: %d(%x) from client\n",state,state, key, key);
 //                    if (state & ShiftMask)
 //                    {
@@ -1876,6 +1915,7 @@ clientReadNotify(int fd, int ready, void *data)
                 {
                     uint32_t state=*((uint32_t*)buff+1);
                     uint32_t key=*((uint32_t*)buff+2);
+
 //                    EPHYR_DBG("HAVE KEY RELEASE EVENT state: %d(%x), key: %d(%x) from client\n",state,state, key, key);
 //                    if (state & ShiftMask)
 //                    {
@@ -1914,14 +1954,14 @@ clientReadNotify(int fd, int ready, void *data)
                 }
                 case GEOMETRY:
                 {
-                    remoteVars.client_initialized=TRUE;
                     uint16_t width=*((uint16_t*)buff+2);
                     uint16_t height=*((uint16_t*)buff+3);
                     uint8_t primaryInd=*((uint8_t*)buff+8);
+                    struct VirtScreen screens[4] = {0};
 
+                    remoteVars.client_initialized=TRUE;
                     EPHYR_DBG("Client want resize to %dx%d",width,height);
 
-                    struct VirtScreen screens[4];
                     memset(screens,0, sizeof(struct VirtScreen)*4);
                     for(int i=0;i<4;++i)
                     {
@@ -1969,11 +2009,14 @@ clientReadNotify(int fd, int ready, void *data)
                 {
                     uint32_t size;
                     uint8_t destination, mime;
+                    inputBuffer* selbuff = NULL;
+
                     size=*((uint32_t*)buff+1);
                     destination=*((uint8_t*)buff+8);
                     mime=*((uint8_t*)buff+9);
+
                     EPHYR_DBG("HAVE NEW INCOMING SELECTION: %d %d %d",size, destination, mime);
-                    inputBuffer* selbuff;
+
                     if(destination==CLIPBOARD)
                         selbuff=&(remoteVars.selstruct.inClipboard);
                     else
@@ -2019,8 +2062,8 @@ clientReadNotify(int fd, int ready, void *data)
         }
 //        EPHYR_DBG("Processed event - %d %d\n",eventnum++, eventbytes);
     }
-    int restDataLength=length%EVLENGTH;
-    int restDataPos=length-restDataLength;
+    restDataLength=length%EVLENGTH;
+    restDataPos=length-restDataLength;
 
     if(restDataLength)
        memcpy(remoteVars.eventBuffer, remoteVars.eventBuffer+restDataPos, restDataLength);
@@ -2051,6 +2094,8 @@ void open_socket(void)
 {
     ssize_t size;
     const int y = 1;
+    int ret = -1;
+
     remoteVars.serversock=socket (AF_INET, SOCK_STREAM, 0);
     setsockopt( remoteVars.serversock, SOL_SOCKET, SO_REUSEADDR, &y, sizeof(int));
     remoteVars.address.sin_family = AF_INET;
@@ -2083,7 +2128,7 @@ void open_socket(void)
 
     remoteVars.checkConnectionTimer=TimerSet(0,0,ACCEPT_TIMEOUT, checkSocketConnection, NULL);
 
-    int ret = pthread_create(&remoteVars.send_thread_id, NULL, send_frame_thread, (void *)remoteVars.send_thread_id);
+    ret = pthread_create(&remoteVars.send_thread_id, NULL, send_frame_thread, (void *)remoteVars.send_thread_id);
     if (ret)
     {
         EPHYR_DBG("ERROR; return code from pthread_create() is %d\n", ret);
@@ -2266,6 +2311,8 @@ int
 remote_init(void)
 {
 
+    char* displayVar = NULL;
+
     /*int it in os init*/
 
     fclose(stdout);
@@ -2276,23 +2323,21 @@ remote_init(void)
     remoteVars.jpegQuality=JPG_QUALITY;
     remoteVars.compression=DEFAULT_COMPRESSION;
 
-
     pthread_mutex_init(&remoteVars.mainimg_mutex, NULL);
     pthread_mutex_init(&remoteVars.sendqueue_mutex,NULL);
     pthread_cond_init(&remoteVars.have_sendqueue_cond,NULL);
 
-
-    char *displayVar=secure_getenv("DISPLAY");
-
+    displayVar=secure_getenv("DISPLAY");
 
     if(displayVar)
     {
         if(!strncmp(displayVar,"nx/nx,options=",strlen("nx/nx,options=")))
         {
-            EPHYR_DBG("running in NXAGENT MODE");
-            remoteVars.nxagentMode=TRUE;
             int i=strlen("nx/nx,options=");
             int j=0;
+
+            EPHYR_DBG("running in NXAGENT MODE");
+            remoteVars.nxagentMode=TRUE;
             while(displayVar[i]!=':' && i<strlen(displayVar) && j<254)
             {
                 remoteVars.optionsFile[j++]=displayVar[i++];
@@ -2327,6 +2372,13 @@ static void PngWriteCallback(png_structp  png_ptr, png_bytep data, png_size_t le
 unsigned char* png_compress( uint32_t image_width, uint32_t image_height,
                             unsigned char* RGBA_buffer, uint32_t* png_size)
 {
+    unsigned char** rows=calloc(sizeof(unsigned char*),image_height);
+    struct
+    {
+        uint32_t* size;
+        unsigned char *out;
+    }outdata;
+
     png_structp p = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
 
     png_infop info_ptr = png_create_info_struct(p);
@@ -2337,21 +2389,11 @@ unsigned char* png_compress( uint32_t image_width, uint32_t image_height,
                          PNG_COMPRESSION_TYPE_DEFAULT,
                          PNG_FILTER_TYPE_DEFAULT);
 
-
-
     *png_size=0;
-
-
-    struct
-    {
-        uint32_t* size;
-        unsigned char *out;
-    }outdata;
 
     outdata.size=png_size;
     outdata.out=0;
 
-    unsigned char** rows=calloc(sizeof(unsigned char*),image_height);
     for (uint32_t y = 0; y < image_height; ++y)
         rows[y] = (unsigned char*)RGBA_buffer + y * image_width * CACHEBPP;
 
@@ -2466,7 +2508,11 @@ struct cache_elem* add_cache_element(uint32_t crc, int32_t dx, int32_t dy, uint3
 //    }
 //    else
     {
+
+        uint32_t i=0;
+        uint32_t numOfPix=size/4;
         uint32_t isize=size/4*3;
+
         el->size=isize;
 //        EPHYR_DBG("SIZE %d %d %d, %d, %d",isize, dx, dy, width, height);
         el->data=malloc(isize);
@@ -2478,8 +2524,6 @@ struct cache_elem* add_cache_element(uint32_t crc, int32_t dx, int32_t dy, uint3
         remoteVars.cache_size+=isize;
 
         /* copy RGB channels of every pixel and ignore A channel */
-        uint32_t numOfPix=size/4;
-        uint32_t i=0;
 
         pthread_mutex_lock(&remoteVars.mainimg_mutex);
 
@@ -2568,7 +2612,6 @@ void initFrameRegions(struct cache_elem* frame)
     struct frame_region* regions=frame->regions;
     BOOL diff;
 
-
     if(frame->width>4 && frame->height>4 && frame->width * frame->height > 100 )
     {
         unsigned int match_val = 0;
@@ -2589,15 +2632,17 @@ void initFrameRegions(struct cache_elem* frame)
             bestm_crc=best_match->crc;
             if(best_match && match_val<=MAX_MATCH_VAL)
             {
-                clock_t t = clock();
-                rectangle rect;
-                int hshift, vshift;
+
+                rectangle rect = {0};
+                int hshift, vshift = 0;
 
                 if(find_common_regions(best_match, frame, &diff, &rect, &hshift, &vshift))
                 {
                     haveMultplyRegions=TRUE;
                     if(!diff)
                     {
+                        int prev = -1;
+
 //                        EPHYR_DBG("SOURCE: %x %d:%d - %dx%d- shift %d, %d",bestm_crc,
 //                                  rect.lt_corner.x, rect.lt_corner.y,
 //                                  rect.size.width, rect.size.height, hshift, vshift);
@@ -2651,7 +2696,6 @@ void initFrameRegions(struct cache_elem* frame)
                         regions[3].rect.size.height=regions[4].rect.size.height=base->size.height;
 
 
-                        int prev=-1;
                         for(int i=0;i<8;++i)
                         {
                             if(regions[i].rect.size.width && regions[i].rect.size.height)
@@ -2748,6 +2792,8 @@ void initFrameRegions(struct cache_elem* frame)
         }
         else
         {
+
+            char fname[255];
 //            #warning check this
             uint8_t *data=malloc(regions[1].rect.size.width*regions[1].rect.size.height*CACHEBPP);
 
@@ -2759,7 +2805,6 @@ void initFrameRegions(struct cache_elem* frame)
                        regions[1].rect.size.width*CACHEBPP);
 
             }
-            char fname[255];
             sprintf(fname,"/tmp/ephyrdbg/%x-rect_inv.jpg",frame->crc);
             regions[1].compressed_data=image_compress(regions[1].rect.size.width,
                                                      regions[1].rect.size.height,
@@ -2773,6 +2818,9 @@ void initFrameRegions(struct cache_elem* frame)
 
 void add_frame(uint32_t width, uint32_t height, int32_t x, int32_t y, uint32_t crc, uint32_t size)
 {
+    Bool isNewElement = FALSE;
+    struct cache_elem* frame = 0;
+    struct sendqueue_element* element = NULL;
 
     pthread_mutex_lock(&remoteVars.sendqueue_mutex);
     if(! (remoteVars.client_connected && remoteVars.client_initialized))
@@ -2782,9 +2830,6 @@ void add_frame(uint32_t width, uint32_t height, int32_t x, int32_t y, uint32_t c
         return;
     }
 
-    Bool isNewElement=FALSE;
-
-    struct cache_elem* frame=0;
     if(crc==0)
     {
         /* sending main image */
@@ -2818,7 +2863,7 @@ void add_frame(uint32_t width, uint32_t height, int32_t x, int32_t y, uint32_t c
 
     pthread_mutex_lock(&remoteVars.sendqueue_mutex);
     /* add element in the queue for sending */
-    struct sendqueue_element* element=malloc(sizeof(struct sendqueue_element));
+    element=malloc(sizeof(struct sendqueue_element));
     element->frame=frame;
     element->next=NULL;
     element->x=x;
@@ -2858,21 +2903,31 @@ remote_paint_rect(KdScreenInfo *screen,
 
     if(size)
     {
-//        EPHYR_DBG("REPAINT %dx%d sx %d, sy %d, dx %d, dy %d", width, height, sx, sy, dx, dy);
-        int32_t dirtyx_max=dx-1;
-        int32_t dirtyy_max=dy-1;
+        int32_t dirtyx_max = 0;
+        int32_t dirtyy_max = 0;
 
-        int32_t dirtyx_min=dx+width;
-        int32_t dirtyy_min=dy+height;
+        int32_t dirtyx_min = 0;
+        int32_t dirtyy_min = 0;
+
+        char maxdiff = 0;
+        char mindiff = 0;
+
+//        EPHYR_DBG("REPAINT %dx%d sx %d, sy %d, dx %d, dy %d", width, height, sx, sy, dx, dy);
+
+        dirtyx_max=dx-1;
+        dirtyy_max=dy-1;
+
+        dirtyx_min=dx+width;
+        dirtyy_min=dy+height;
+
+        maxdiff=2;
+        mindiff=-2;
 
         /*
          * OK, here we assuming that XSERVERBPP is 4. If not, we'll have troubles
          * but it should work faster like this
          */
         pthread_mutex_lock(&remoteVars.mainimg_mutex);
-
-        char maxdiff=2;
-        char mindiff=-2;
 
         /* check if updated rec really is as big */
         for(int32_t y=dy; y< dy+height;++y)
@@ -2982,6 +3037,7 @@ remote_screen_init(KdScreenInfo *screen,
                   int width, int height, int buffer_height,
                   int *bytes_per_line, int *bits_per_pixel)
 {
+    EphyrScrPriv *scrpriv = screen->driver;
 
     //We should not install callback at first screen init, it was installed by selection_init
     //but we need to reinstall it by the next screen init.
@@ -2998,7 +3054,6 @@ remote_screen_init(KdScreenInfo *screen,
         install_selection_callbacks();
     }
 
-    EphyrScrPriv *scrpriv = screen->driver;
     EPHYR_DBG("host_screen=%p x=%d, y=%d, wxh=%dx%d, buffer_height=%d",
               screen, x, y, width, height, buffer_height);
 
