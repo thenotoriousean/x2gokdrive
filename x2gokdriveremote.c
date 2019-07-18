@@ -398,6 +398,7 @@ int32_t send_frame(u_int32_t width, uint32_t height, uint32_t x, uint32_t y, uin
         *((uint32_t*)buffer+6)=regions[i].rect.size.height;
         *((uint32_t*)buffer+7)=regions[i].size;
 
+        sent = 0;
 //        #warning check this
         ln=write(remoteVars.clientsock, buffer, 64);
 
