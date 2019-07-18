@@ -302,10 +302,10 @@ void remote_sendCursor(CursorPtr cursor)
 static
 int32_t send_cursor(struct cursorFrame* cursor)
 {
+    unsigned char buffer[64] = {0};
     _X_UNUSED int ln = 0;
     int l = 0;
-    int sent=0;
-    unsigned char buffer[64] = {0};
+    int sent = 0;
 
     *((uint32_t*)buffer)=CURSOR; //4B
 
@@ -349,13 +349,13 @@ int32_t send_cursor(struct cursorFrame* cursor)
 static
 int32_t send_frame(u_int32_t width, uint32_t height, uint32_t x, uint32_t y, uint32_t crc, struct frame_region* regions)
 {
-
-    uint32_t numofregions=0;
+    unsigned char buffer[64] = {0};
     _X_UNUSED int ln = 0;
     int l = 0;
-    uint32_t total=0;
     int sent = 0;
-    unsigned char buffer[64] = {0};
+
+    uint32_t total=0;
+    uint32_t numofregions=0;
 
     for(int i=0;i<9;++i)
     {
@@ -437,7 +437,7 @@ int send_deleted_elements(void)
 
     _X_UNUSED int ln = 0;
     int l = 0;
-    int length, sent=0;
+    int length, sent = 0;
 
     unsigned int i = 0;
     struct deleted_elem* elem = NULL;
@@ -487,6 +487,7 @@ int send_deleted_cursors(void)
     _X_UNUSED int ln = 0;
     int l = 0;
     int length, sent = 0;
+
     unsigned int i=0;
     struct deletedCursor* elem = NULL;
 
@@ -2395,12 +2396,12 @@ static void PngWriteCallback(png_structp  png_ptr, png_bytep data, png_size_t le
 unsigned char* png_compress( uint32_t image_width, uint32_t image_height,
                             unsigned char* RGBA_buffer, uint32_t* png_size)
 {
-    unsigned char** rows=calloc(sizeof(unsigned char*),image_height);
     struct
     {
         uint32_t* size;
         unsigned char *out;
-    }outdata;
+    } outdata;
+    unsigned char** rows = NULL;
 
     png_structp p = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
 
@@ -2413,6 +2414,8 @@ unsigned char* png_compress( uint32_t image_width, uint32_t image_height,
                          PNG_FILTER_TYPE_DEFAULT);
 
     *png_size=0;
+
+    rows = calloc(sizeof(unsigned char*), image_height);
 
     outdata.size=png_size;
     outdata.out=0;
@@ -2945,14 +2948,14 @@ remote_paint_rect(KdScreenInfo *screen,
         dirtyx_min=dx+width;
         dirtyy_min=dy+height;
 
-        maxdiff=2;
-        mindiff=-2;
-
         /*
          * OK, here we assuming that XSERVERBPP is 4. If not, we'll have troubles
          * but it should work faster like this
          */
         pthread_mutex_lock(&remoteVars.mainimg_mutex);
+
+        maxdiff=2;
+        mindiff=-2;
 
         /* check if updated rec really is as big */
         for(int32_t y=dy; y< dy+height;++y)
