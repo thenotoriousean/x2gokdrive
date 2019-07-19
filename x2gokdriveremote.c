@@ -653,7 +653,7 @@ BOOL checkShiftedRegion( struct cache_elem* src, struct cache_elem* dst,  int32_
 
             }
 
-//            EPHYR_DBG("Indexes %d, %d, %d, %d %d", src_ind, dst_ind, src->size, dst->size, i);
+//            EPHYR_DBG("Indices %d, %d, %d, %d %d", src_ind, dst_ind, src->size, dst->size, i);
             if(src->data[src_ind]!=dst->data[dst_ind])
             {
 //                EPHYR_DBG("FEXIT");
@@ -694,7 +694,7 @@ int32_t checkScrollUp(struct cache_elem* source, struct cache_elem* dest)
     }
     if(width<2)
     {
-//        EPHYR_DBG("DST too small(w), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
+//        EPHYR_DBG("DST too small(w), keep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
         return -1;
     }
 
@@ -704,7 +704,7 @@ int32_t checkScrollUp(struct cache_elem* source, struct cache_elem* dest)
     }
     if(height<2)
     {
-//        EPHYR_DBG("DST too small(h), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
+//        EPHYR_DBG("DST too small(h), keep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
         return -1;
     }
 
@@ -744,7 +744,7 @@ int32_t checkScrollDown(struct cache_elem* source, struct cache_elem* dest)
     }
     if(width<2)
     {
-//        EPHYR_DBG("DST too small(w), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
+//        EPHYR_DBG("DST too small(w), keep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
         return 1;
     }
 
@@ -754,7 +754,7 @@ int32_t checkScrollDown(struct cache_elem* source, struct cache_elem* dest)
     }
     if(height<2)
     {
-//        EPHYR_DBG("DST too small(h), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
+//        EPHYR_DBG("DST too small(h), keep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
         return 1;
     }
 
@@ -787,7 +787,7 @@ int32_t checkScrollRight(struct cache_elem* source, struct cache_elem* dest)
     }
     if(height<2)
     {
-//        EPHYR_DBG("DST too small(d), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
+//        EPHYR_DBG("DST too small(d), keep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
         return -1;
     }
 
@@ -797,7 +797,7 @@ int32_t checkScrollRight(struct cache_elem* source, struct cache_elem* dest)
     }
     if(width<2)
     {
-//        EPHYR_DBG("DST too small(w), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
+//        EPHYR_DBG("DST too small(w), keep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
         return -1;
     }
 
@@ -835,7 +835,7 @@ int32_t checkScrollLeft(struct cache_elem* source, struct cache_elem* dest)
     }
     if(height<2)
     {
-//        EPHYR_DBG("DST too small(d), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
+//        EPHYR_DBG("DST too small(d), keep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
         return 1;
     }
 
@@ -845,7 +845,7 @@ int32_t checkScrollLeft(struct cache_elem* source, struct cache_elem* dest)
     }
     if(width<2)
     {
-//        EPHYR_DBG("DST too small(w), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
+//        EPHYR_DBG("DST too small(w), keep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
         return 1;
     }
 
@@ -1115,7 +1115,7 @@ BOOL checkMovedContent(struct cache_elem* source, struct cache_elem* dest, int32
     }
     if(height<2)
     {
-//        EPHYR_DBG("DST too small(d), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
+//        EPHYR_DBG("DST too small(d), keep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
         return FALSE;
     }
 
@@ -1125,7 +1125,7 @@ BOOL checkMovedContent(struct cache_elem* source, struct cache_elem* dest, int32
     }
     if(width<2)
     {
-//        EPHYR_DBG("DST too small(w), skeep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
+//        EPHYR_DBG("DST too small(w), keep checking %d %d %d %d", source->width, source->height, dest->width, dest->height);
         return FALSE;
     }
 
@@ -2337,7 +2337,7 @@ remote_init(void)
 
     char* displayVar = NULL;
 
-    /*int it in os init*/
+    /*init it in OsInit*/
 
     fclose(stdout);
     fclose(stdin);
@@ -3037,7 +3037,7 @@ remote_paint_rect(KdScreenInfo *screen,
 
 //        if(size!=oldsize)
 //        {
-//            EPHYR_DBG("new update rect demensions: %dx%d", width, height);
+//            EPHYR_DBG("new update rect dimensions: %dx%d", width, height);
 //        }
 
         add_frame(width, height, dx, dy, calculate_crc(width, height,dx,dy), size);
@@ -3070,7 +3070,7 @@ remote_screen_init(KdScreenInfo *screen,
     //We should not install callback at first screen init, it was installed by selection_init
     //but we need to reinstall it by the next screen init.
 
-    EPHYR_DBG("REMOTE SCREN INIT!!!!!!!!!!!!!!!!!!");
+    EPHYR_DBG("REMOTE SCREEN INIT!!!!!!!!!!!!!!!!!!");
     if(remoteVars.selstruct.callBackInstalled)
     {
         EPHYR_DBG("SKIPPING CALLBACK INSTALL");
