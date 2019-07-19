@@ -30,7 +30,7 @@
 +
 +    ### XEPHYR
 +
-     AC_DEFINE(KDRIVESERVER,1,[Build Kdrive X server])
+     AC_DEFINE(KDRIVESERVER,1,[Build KDrive X server])
      AC_DEFINE(KDRIVEDDXACTIONS,,[Build kdrive ddx])
  
 @@ -2483,6 +2490,43 @@

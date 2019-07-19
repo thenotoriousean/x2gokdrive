@@ -1,5 +1,5 @@
 /*
- * X2GoKdrive - A kdrive X server for X2Go (based on Xephyr)
+ * X2GoKDrive - A kdrive X server for X2Go (based on Xephyr)
  *          Authored by Matthew Allum <mallum@openedhand.com>
  *
  * Copyright © 2007 OpenedHand Ltd
@@ -617,8 +617,8 @@ ephyrRandRSetConfig(ScreenPtr pScreen,
             }
             else
             {
-                char name[]="X2GoKdrive-x";
-                sprintf(name, "X2GoKdrive-%d",i);
+                char name[]="X2GoKDrive-x";
+                sprintf(name, "X2GoKDrive-%d",i);
                 addOutput(pScreen, name,virtualScreens[i].width,
                           virtualScreens[i].height, virtualScreens[i].x, virtualScreens[i].y, virtualScreens[i].isPrimary, TRUE);
 
@@ -800,7 +800,7 @@ ephyrRandRInit(ScreenPtr pScreen)
     KdScreenInfo *screen = pScreenPriv->screen;
     Rotation randr;
     EphyrScrPriv *scrpriv = screen->driver;
-    char output_name[]="X2GoKdrive-0";
+    char output_name[]="X2GoKDrive-0";
 
     scrpriv->virtualScreens=NULL;
     scrpriv->localRandrCall=FALSE;

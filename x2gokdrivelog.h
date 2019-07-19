@@ -1,5 +1,5 @@
 /*
- * X2GoKdrive - A kdrive X server for X2Go (based on Xephyr)
+ * X2GoKDrive - A kdrive X server for X2Go (based on Xephyr)
  *          Authored by Matthew Allum <mallum@openedhand.com>
  *
  * Copyright © 2007 OpenedHand Ltd

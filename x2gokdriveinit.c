@@ -1,5 +1,5 @@
 /*
- * X2GoKdrive - A kdrive X server for X2Go (based on Xephyr)
+ * X2GoKDrive - A kdrive X server for X2Go (based on Xephyr)
  *             Author Oleksandr Shneyder <o.shneyder@phoca-gmbh.de>
  *
  * Copyright © 2018 phoca-GmbH
