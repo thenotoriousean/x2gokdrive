@@ -1537,7 +1537,6 @@ void *send_frame_thread (void *threadid)
                 struct sendqueue_element* current = NULL;
                 uint32_t  x, y = 0;
                 int32_t width, height = 0;
-                uint32_t crc = 0;
 
                 if(remoteVars.maxfr<elems)
                 {
@@ -1564,13 +1563,13 @@ void *send_frame_thread (void *threadid)
 
                 if(frame)
                 {
-                    crc = frame->crc;
-                    width=frame->width;
-                    height=frame->height;
+                    uint32_t crc = frame->crc;
+                    uint32_t frame_width=frame->width;
+                    uint32_t frame_height=frame->height;
 
                     /* unlock sendqueue for main thread */
                     pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
-                    send_frame(width, height, x, y, crc, frame->regions);
+                    send_frame(frame_width, frame_height, x, y, crc, frame->regions);
                 }
                 else
                 {
