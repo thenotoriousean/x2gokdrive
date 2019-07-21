@@ -1989,7 +1989,7 @@ clientReadNotify(int fd, int ready, void *data)
                     memset(screens,0, sizeof(struct VirtScreen)*4);
                     for(int j=0;j<4;++j)
                     {
-                        char* record=buff+9+i*8;
+                        char* record=buff+9+j*8;
                         screens[j].width=*((uint16_t*)record);
                         screens[j].height=*((uint16_t*)record+1);
                         screens[j].x=*((int16_t*)record+2);
@@ -1999,7 +1999,7 @@ clientReadNotify(int fd, int ready, void *data)
                         {
                             break;
                         }
-                        EPHYR_DBG("SCREEN %d - (%dx%d) - %d,%d", i, screens[j].width, screens[j].height, screens[j].x, screens[j].y);
+                        EPHYR_DBG("SCREEN %d - (%dx%d) - %d,%d", j, screens[j].width, screens[j].height, screens[j].x, screens[j].y);
                     }
                     ephyrResizeScreen (remoteVars.ephyrScreen->pScreen,width,height, screens);
                     break;
