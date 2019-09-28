@@ -1,0 +1,27 @@
+diff --git a/hw/kdrive/Makefile.am b/hw/kdrive/Makefile.am
+index dc71dbd..0f83fc9 100644
+--- a/hw/kdrive/Makefile.am
++++ b/hw/kdrive/Makefile.am
+@@ -1,15 +1,20 @@
++if X2GOKDRIVE
++X2GOKDRIVE_SUBDIRS = x2gokdrive
++endif
++
+ if XEPHYR
+ XEPHYR_SUBDIRS = ephyr
+ endif
+ 
+ SERVER_SUBDIRS = 		\
+-	$(XEPHYR_SUBDIRS)
++	$(XEPHYR_SUBDIRS)	\
++	$(X2GOKDRIVE_SUBDIRS)
+ 
+ SUBDIRS =			\
+ 	src			\
+ 	$(SERVER_SUBDIRS)
+ 
+-DIST_SUBDIRS = ephyr src
++DIST_SUBDIRS = ephyr x2gokdrive src
+ 
+ relink:
+ 	$(AM_V_at)for i in $(SERVER_SUBDIRS) ; do $(MAKE) -C $$i relink || exit 1 ; done
