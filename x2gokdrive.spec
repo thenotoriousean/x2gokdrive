@@ -1,0 +1,171 @@
+# %%exclude %%{_prefix}lib/debug/usr/bin/x2gokdrive*
+# gets created, but we cannot exlude it under %%files
+# without rpmlint throwing an error.
+%define _debugsource_packages 0
+
+Name:           x2gokdrive
+Version:        0.0.0.1
+Release:        0.0x2go1%{?dist}
+Summary:        X2GoKDrive - KDrive X-Server for X2Go
+
+%if 0%{?fedora} || 0%{?rhel}
+Group:          Applications/Communications
+# Per debian/copyright, only the testscripts folder is GPLv2
+License:        GPLv2+ and GPLv2
+%else
+Group:          Productivity/Networking/Remote Desktop
+License:        GPL-2.0+
+%endif
+
+URL:            https://www.x2go.org
+Source0:        https://code.x2go.org/releases/source/%{name}/%{name}-%{version}.tar.gz
+
+# Required specifically for x2gokdrive
+BuildRequires:  libpng-devel
+# x2gokdrive provides patch dirs for xorg-x11-server-source in quilt format
+BuildRequires:  quilt
+
+# XCB bits for Xephyr
+# Copied and pasted block from:
+# https://src.fedoraproject.org/rpms/xorg-x11-server/blob/master/f/xorg-x11-server.spec
+
+BuildRequires: pkgconfig(xcb-aux) pkgconfig(xcb-image) pkgconfig(xcb-icccm)
+BuildRequires: pkgconfig(xcb-keysyms) pkgconfig(xcb-renderutil)
+# Copied and pasted block from:
+# https://src.fedoraproject.org/rpms/tigervnc/blob/master/f/tigervnc.spec
+# Copied because almost all of them are required for xorg-x11-server-source
+#
+# Note that TigerVNC upstream does not provide distro-neutral packaging for us
+# to use as a reference, just el6 and el7 specific .spec files.
+# https://github.com/TigerVNC/tigervnc/tree/master/contrib/packages/rpm
+BuildRequires:  gcc-c++
+BuildRequires:  libX11-devel, automake, autoconf, libtool, gettext, gettext-autopoint
+BuildRequires:  libXext-devel, xorg-x11-server-source, libXi-devel
+BuildRequires:  xorg-x11-xtrans-devel, xorg-x11-util-macros, libXtst-devel
+BuildRequires:  libxkbfile-devel, openssl-devel, libpciaccess-devel
+BuildRequires:  mesa-libGL-devel, libXinerama-devel,
+BuildRequires:  freetype-devel, libXdmcp-devel, libxshmfence-devel
+BuildRequires:  desktop-file-utils, java-devel, jpackage-utils
+BuildRequires:  libjpeg-turbo-devel, gnutls-devel, pam-devel
+BuildRequires:  libdrm-devel, libXt-devel, pixman-devel
+BuildRequires:  systemd, cmake
+%if 0%{?fedora} > 24 || 0%{?rhel} >= 7
+BuildRequires:  libXfont2-devel
+%else
+BuildRequires:  libXfont-devel
+%endif
+BuildRequires:  xorg-x11-server-devel
+
+# Copied and pasted "server" subpackage block from:
+# https://github.com/TigerVNC/tigervnc/blob/master/contrib/packages/rpm/el7/SPECS/tigervnc.spec
+# (With TigerVNC speciifc stuff removed, such as Perl for their launch scripts.)
+Requires:       xorg-x11-xauth
+Requires:       xorg-x11-xinit
+
+# Copied and pasted "server-minimal" subpackage block from above
+Requires:       xkeyboard-config, xorg-x11-xkb-utils
+
+%if 0%{?rhel} <= 7
+Requires: mesa-dri-drivers
+Requires: x2goserver >= 4.2.0.0
+%else
+Recommends: mesa-dri-drivers
+Recommends: x2goserver >= 4.2.0.0
+%endif
+
+%description
+KDrive graphical server backend for X2Go Server
+ X2Go is a server based computing environment with
+    - session resuming
+    - low bandwidth support
+    - session brokerage support
+    - client-side mass storage mounting support
+    - client-side printing support
+    - audio support
+    - authentication by smartcard and USB stick
+ .
+ This package is built from the X.org xserver module. X2Go KDrive is a
+ KDrive based Xserver for X2Go. It provides support for running modern
+ desktop environments like GNOME, KDE Plasma, Cinnamon, etc. in X2Go
+ Sessions.
+ .
+ The X2Go KDrive graphical backend is not suitable for low bandwidth WAN
+ connections between X2Go Client and X2Go Server. It is supposed for X2Go
+ being used on the local area network.
+ .
+ More information about X.Org can be found at:
+ <URL:https://www.x.org>
+ .
+ More information about X2Go can be found at:
+ <URL:https://wiki.x2go.org>
+
+
+%prep
+# %%autosetup creates BUILD subdir
+%autosetup
+
+# prepare xorg-server build tree
+cp -r /usr/share/xorg-x11-server-source/* BUILD
+# Precaution from:
+# https://src.fedoraproject.org/rpms/tigervnc/blob/master/f/tigervnc.spec
+for all in `find BUILD/ -type f -perm -001`; do
+        chmod -x "$all"
+done
+mkdir BUILD/hw/kdrive/x2gokdrive/ -p
+
+# inject x2gokdrive into xorg-server build tree
+cp Makefile.am *.c *.h BUILD/hw/kdrive/x2gokdrive/
+cp -r man/ BUILD/hw/kdrive/x2gokdrive/
+
+# patch xorg-server build tree, so that it will build x2gokdrive
+set -x; export XORG_UPSTREAM_VERSION=`cat BUILD/configure.ac | grep AC_INIT | sed -r 's/^AC_INIT[^,]*, ([^,]+),.*/\\1/'` \
+        && cd BUILD \
+        && test -d ../patches.xorg/$XORG_UPSTREAM_VERSION && QUILT_PATCHES=../patches.xorg/$XORG_UPSTREAM_VERSION/ quilt push -a \
+        || ( set +x; echo "\n##################################################\nERROR: This X2Go KDrive version does not support\nbuilding against X.Org version $XORG_UPSTREAM_VERSION.\n##################################################\n"; exit 1);
+
+%build
+%ifarch sparcv9 sparc64 s390 s390x
+export CFLAGS="$RPM_OPT_FLAGS -fPIC"
+%else
+export CFLAGS="$RPM_OPT_FLAGS -fpic"
+%endif
+export CXXFLAGS="$CFLAGS"
+
+pushd BUILD
+autoreconf -fiv
+# Another block from tigervnc.spec, except for the 1st option line.
+%configure \
+        --enable-kdrive --enable-x2gokdrive \
+        --disable-xorg --disable-xnest --disable-xvfb --disable-dmx \
+        --disable-xwin --disable-xephyr --disable-xwayland \
+        --with-pic --disable-static \
+        --with-default-font-path="catalogue:%{_sysconfdir}/X11/fontpath.d,built-ins" \
+        --with-fontdir=%{_datadir}/X11/fonts \
+        --with-xkb-output=%{_localstatedir}/lib/xkb \
+        --enable-install-libxf86config \
+        --enable-glx --disable-dri --enable-dri2 --disable-dri3 \
+        --disable-unit-tests \
+        --disable-config-hal \
+        --disable-config-udev \
+        --with-dri-driver-path=%{_libdir}/dri \
+        --without-dtrace \
+        --disable-devel-docs \
+        --disable-selective-werror
+make %{?_smp_mflags} 
+popd
+
+%install
+pushd BUILD
+make install DESTDIR=%{buildroot}
+popd
+
+%files
+%defattr(-,root,root)
+%{_bindir}/x2gokdrive
+%exclude %{_libdir}/xorg/protocol.txt
+%exclude %{_mandir}/man1/Xserver.1.gz
+%exclude %{_var}/lib/xkb/
+%doc %{_mandir}/man1/x2gokdrive.1.gz
+
+%changelog
+
