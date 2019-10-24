@@ -190,6 +190,7 @@ popd
 pushd 'BUILD'
 make install DESTDIR='%{buildroot}'
 popd
+find '%{buildroot}/usr/lib/xorg' -type 'f' -name '*.la' -exec rm -fv '{}' ';'
 
 %files
 %defattr(-,root,root)
