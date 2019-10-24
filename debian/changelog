@@ -16,6 +16,7 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     + Copy summary from Debian's short description.
     + Spell out each (build) dependency on one line.
     + Whitespace-only fixes.
+    + Backport changes from debian/rules.
   * debian/rules:
     + Remove weird empty variable reference construct.
     + Whitespace-only fixes.

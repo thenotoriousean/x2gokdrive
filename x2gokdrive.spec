@@ -129,23 +129,31 @@ More information about X2Go can be found at:
 %autosetup
 
 # prepare xorg-server build tree
-cp -r /usr/share/xorg-x11-server-source/* BUILD
+cp -r '/usr/share/xorg-x11-server-source/'* 'BUILD/'
 # Precaution from:
 # https://src.fedoraproject.org/rpms/tigervnc/blob/master/f/tigervnc.spec
-for all in `find BUILD/ -type f -perm -001`; do
-        chmod -x "$all"
+find 'BUILD/' -type 'f' -perm '-001' -print0 | while read -r -d '' file; do
+  chmod -x "${file}"
 done
-mkdir BUILD/hw/kdrive/x2gokdrive/ -p
+mkdir -p 'BUILD/hw/kdrive/x2gokdrive/'
 
 # inject x2gokdrive into xorg-server build tree
-cp Makefile.am *.c *.h BUILD/hw/kdrive/x2gokdrive/
-cp -r man/ BUILD/hw/kdrive/x2gokdrive/
+cp 'Makefile.am' *'.c' *'.h' 'BUILD/hw/kdrive/x2gokdrive/'
+cp -r 'man/' 'BUILD/hw/kdrive/x2gokdrive/'
 
 # patch xorg-server build tree, so that it will build x2gokdrive
-set -x; export XORG_UPSTREAM_VERSION=`cat BUILD/configure.ac | grep AC_INIT | sed -r 's/^AC_INIT[^,]*, ([^,]+),.*/\\1/'` \
-        && cd BUILD \
-        && test -d ../patches.xorg/$XORG_UPSTREAM_VERSION && QUILT_PATCHES=../patches.xorg/$XORG_UPSTREAM_VERSION/ quilt push -a \
-        || ( set +x; echo "\n##################################################\nERROR: This X2Go KDrive version does not support\nbuilding against X.Org version $XORG_UPSTREAM_VERSION.\n##################################################\n"; exit 1);
+set -x
+export XORG_UPSTREAM_VERSION="$(grep 'AC_INIT' 'BUILD/configure.ac' | sed -r 's/^AC_INIT[^,]*, ([^,]+),.*/\\1/')"
+cd 'BUILD'
+if [ -d "../patches.xorg/${XORG_UPSTREAM_VERSION}" ]; then
+  QUILT_PATCHES="../patches.xorg/${XORG_UPSTREAM_VERSION}/" quilt push -a
+else
+  (
+    set +x
+    printf '\n##################################################\nERROR: This X2Go KDrive version does not support\nbuilding against X.Org version %s.\n##################################################\n' "${XORG_UPSTREAM_VERSION}"
+    exit '1'
+  )
+fi
 
 %build
 %ifarch sparcv9 sparc64 s390 s390x
@@ -155,8 +163,8 @@ export CFLAGS="$RPM_OPT_FLAGS -fpic"
 %endif
 export CXXFLAGS="$CFLAGS"
 
-pushd BUILD
-autoreconf -fiv
+pushd 'BUILD'
+autoreconf -fvi
 # Another block from tigervnc.spec, except for the 1st option line.
 %configure \
         --enable-kdrive --enable-x2gokdrive \
@@ -179,8 +187,8 @@ make %{?_smp_mflags}
 popd
 
 %install
-pushd BUILD
-make install DESTDIR=%{buildroot}
+pushd 'BUILD'
+make install DESTDIR='%{buildroot}'
 popd
 
 %files
