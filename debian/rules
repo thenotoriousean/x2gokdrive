@@ -16,9 +16,9 @@ include debian/rules.flags
 
 override_dh_auto_configure:
 	# prepare xorg-server build tree
-	mkdir $(CURDIR)/BUILD -p
+	mkdir -p $(CURDIR)/BUILD
 	cd $(CURDIR)/BUILD && tar -xvf /usr/src/xorg-server.tar.xz
-	mkdir $(CURDIR)/BUILD/xorg-server/hw/kdrive/x2gokdrive/ -p
+	mkdir -p $(CURDIR)/BUILD/xorg-server/hw/kdrive/x2gokdrive/
 
 	# inject x2gokdrive into xorg-server build tree
 	cp Makefile.am *.c *.h $(CURDIR)/BUILD/xorg-server/hw/kdrive/x2gokdrive/
