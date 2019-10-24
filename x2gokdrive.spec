@@ -6,7 +6,7 @@
 Name:           x2gokdrive
 Version:        0.0.0.1
 Release:        0.0x2go1%{?dist}
-Summary:        X2GoKDrive - KDrive X-Server for X2Go
+Summary:        KDrive graphical server backend for X2GoServer
 
 %if 0%{?fedora} || 0%{?rhel}
 Group:          Applications/Communications

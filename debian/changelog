@@ -13,5 +13,6 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     + Drop Debian-style formatting in description.
     + Typo fixes.
     + Remove empty line at EOF.
+    + Copy summary from Debian's short description.
 
  -- Mike Gabriel <mike.gabriel@das-netzwerkteam.de>  Tue, 04 Jun 2019 14:10:43 +0200
