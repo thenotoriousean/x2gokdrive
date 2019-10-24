@@ -22,5 +22,8 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     + Move options to the front of commands.
     + Drop useless use of cat.
     + Avoid backticks, use $() instead.
+    + "a && b || c" doesn't really mean "if a then b else c", but something...
+      more difficult: "c" does also run if "a" is false. Switch to a proper
+      if-else construct.
 
  -- Mike Gabriel <mike.gabriel@das-netzwerkteam.de>  Tue, 04 Jun 2019 14:10:43 +0200

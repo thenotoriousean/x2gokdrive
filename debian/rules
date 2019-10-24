@@ -27,8 +27,11 @@ override_dh_auto_configure:
 	# patch xorg-server build tree, so that it will build x2gokdrive
 	set -x; export XORG_UPSTREAM_VERSION=$$(grep AC_INIT $(CURDIR)/BUILD/xorg-server/configure.ac | sed -r 's/^AC_INIT[^,]*, ([^,]+),.*/\\1/') \
 	        && cd $(CURDIR)/BUILD/xorg-server \
-	        && test -d ../../patches.xorg/$$XORG_UPSTREAM_VERSION && QUILT_PATCHES=../../patches.xorg/$$XORG_UPSTREAM_VERSION/ quilt push -a \
-		|| ( set +x; echo "\n##################################################\nERROR: This X2Go KDrive version does not support\nbuilding against X.Org version $$XORG_UPSTREAM_VERSION.\n##################################################\n"; exit 1)
+		if [ -d  ../../patches.xorg/$$XORG_UPSTREAM_VERSION ]; then \
+			QUILT_PATCHES=../../patches.xorg/$${XORG_UPSTREAM_VERSION}/ quilt push -a; \
+		else \
+			( set +x; echo "\n##################################################\nERROR: This X2Go KDrive version does not support\nbuilding against X.Org version $$XORG_UPSTREAM_VERSION.\n##################################################\n"; exit 1); \
+		fi
 
 	# run autoreconf
 	cd $(CURDIR)/BUILD/xorg-server && autoreconf -vfi
