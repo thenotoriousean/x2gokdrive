@@ -25,5 +25,7 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     + "a && b || c" doesn't really mean "if a then b else c", but something...
       more difficult: "c" does also run if "a" is false. Switch to a proper
       if-else construct.
+    + Split up subshell content onto unique lines and fix bash syntax error
+      near "exit 1".
 
  -- Mike Gabriel <mike.gabriel@das-netzwerkteam.de>  Tue, 04 Jun 2019 14:10:43 +0200
