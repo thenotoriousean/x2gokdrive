@@ -167,4 +167,3 @@ popd
 %doc %{_mandir}/man1/x2gokdrive.1.gz
 
 %changelog
-
