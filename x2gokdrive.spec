@@ -1,7 +1,7 @@
 # %%exclude %%{_prefix}lib/debug/usr/bin/x2gokdrive*
 # gets created, but we cannot exclude it under %%files
 # without rpmlint throwing an error.
-%define _debugsource_packages 0
+#%%define _debugsource_packages 0
 
 %global _hardened_build 1
 

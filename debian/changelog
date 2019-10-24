@@ -21,6 +21,7 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     + Pull in lsb-release on *SuSE systems and redhat-lsb otherwise for
       lsb_release, needed at package configuration time.
     + Enable hardening in a low-effort way.
+    + Disable debugsource... disabling. Debug packages are actually useful!
   * debian/rules:
     + Remove weird empty variable reference construct.
     + Whitespace-only fixes.
