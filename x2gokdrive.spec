@@ -172,24 +172,79 @@ export CXXFLAGS="$CFLAGS"
 
 pushd 'BUILD'
 autoreconf -fvi
-# Another block from tigervnc.spec, except for the 1st option line.
+# The RPM macro for the linker flags does not exist on EPEL
+%{!?__global_ldflags: %global __global_ldflags -Wl,-z,relro}
+# disable-static is so we don't get libfoo.a for modules.  now if only we could
+# kill the .las.
 %configure \
-        --enable-kdrive --enable-x2gokdrive \
-        --disable-xorg --disable-xnest --disable-xvfb --disable-dmx \
-        --disable-xwin --disable-xephyr --disable-xwayland \
-        --with-pic --disable-static \
-        --with-default-font-path="catalogue:%{_sysconfdir}/X11/fontpath.d,built-ins" \
-        --with-fontdir=%{_datadir}/X11/fonts \
-        --with-xkb-output=%{_localstatedir}/lib/xkb \
-        --enable-install-libxf86config \
-        --enable-glx --disable-dri --enable-dri2 --disable-dri3 \
-        --disable-unit-tests \
-        --disable-config-hal \
-        --disable-config-udev \
-        --with-dri-driver-path=%{_libdir}/dri \
-        --without-dtrace \
-        --disable-devel-docs \
-        --disable-selective-werror
+	--libexecdir='%{_prefix}/lib/xorg' \
+	--with-module-dir='%{_prefix}/lib/xorg/modules' \
+	--with-serverconfig-path='%{_libexecdir}' \
+	--disable-static \
+	--without-dtrace \
+	--disable-strict-compilation \
+	--disable-debug \
+	--with-int10=x86emu \
+	--with-os-vendor="$(lsb_release -i -s)" \
+	--with-builderstring="%{name} %{version} (https://wiki.x2go.org)" \
+	--with-xkb-path=%{_datadir}/X11/xkb \
+	--with-xkb-output=%{_localstatedir}/lib/xkb \
+	--with-shared-memory-dir=/dev/shm \
+	--enable-mitshm \
+	--enable-xres \
+	--disable-xcsecurity \
+	--disable-tslib \
+	--enable-dbe \
+	--disable-xf86bigfont \
+	--enable-dpms \
+	--enable-xorg \
+	--disable-linux-acpi \
+	--disable-linux-apm \
+	--disable-xquartz \
+	--disable-xwin \
+	--disable-xnest \
+	--disable-xfake \
+	--disable-xfbdev \
+	--disable-install-setuid \
+	--disable-xshmfence \
+	--disable-config-hal \
+	--disable-config-udev \
+	--with-default-font-path="catalogue:%{_sysconfdir}/X11/fontpath.d,built-ins" \
+	--enable-composite \
+	--enable-record \
+	--enable-xv \
+	--disable-xvmc \
+	--disable-dga \
+	--enable-screensaver \
+	--disable-xdmcp \
+	--disable-xdm-auth-1 \
+	--enable-glx \
+	--enable-present \
+	--enable-xinerama \
+	--enable-xf86vidmode \
+	--enable-xace \
+	--disable-xfree86-utils \
+	--disable-suid-wrapper \
+	--disable-dmx \
+	--disable-xvfb \
+	--enable-kdrive \
+	--enable-x2gokdrive \
+	--disable-xephyr \
+	--disable-wayland \
+	--with-sha1=libgcrypt \
+	--enable-xcsecurity \
+	--disable-dri3 \
+	--disable-xselinux \
+	--disable-systemd-logind \
+	--without-systemd-daemon \
+	--disable-dri \
+	--disable-dri2 \
+	--disable-glamor \
+	--enable-libunwind \
+	--disable-libdrm \
+	--enable-unit-tests \
+	CPPFLAGS="${CPPFLAGS} %{?__global_cppflags} -DPRE_RELEASE=0" \
+	LDFLAGS='%{__global_ldflags}'
 make %{?_smp_mflags}
 popd
 
