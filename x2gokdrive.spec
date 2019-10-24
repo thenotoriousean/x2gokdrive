@@ -74,30 +74,29 @@ Recommends: x2goserver >= 4.2.0.0
 %endif
 
 %description
-KDrive graphical server backend for X2Go Server
- X2Go is a server based computing environment with
-    - session resuming
-    - low bandwidth support
-    - session brokerage support
-    - client-side mass storage mounting support
-    - client-side printing support
-    - audio support
-    - authentication by smartcard and USB stick
- .
- This package is built from the X.org xserver module. X2Go KDrive is a
- KDrive based Xserver for X2Go. It provides support for running modern
- desktop environments like GNOME, KDE Plasma, Cinnamon, etc. in X2Go
- Sessions.
- .
- The X2Go KDrive graphical backend is not suitable for low bandwidth WAN
- connections between X2Go Client and X2Go Server. It is supposed for X2Go
- being used on the local area network.
- .
- More information about X.Org can be found at:
- <URL:https://www.x.org>
- .
- More information about X2Go can be found at:
- <URL:https://wiki.x2go.org>
+X2Go is a server based computing environment with
+   - session resuming
+   - low bandwidth support
+   - session brokerage support
+   - client-side mass storage mounting support
+   - client-side printing support
+   - audio support
+   - authentication by smartcard and USB stick
+
+This package is built from the X.org xserver module. X2Go KDrive is a
+KDrive-based Xserver for X2Go. It provides support for running modern
+desktop environments like GNOME, KDE Plasma, Cinnamon, etc. in X2Go
+Sessions.
+
+The X2Go KDrive graphical backend is not suitable for low bandwidth WAN
+connections between X2Go Client and X2Go Server. It is supposed for X2Go
+being used on the local area network.
+
+More information about X.Org can be found at:
+<URL:https://www.x.org>
+
+More information about X2Go can be found at:
+<URL:https://wiki.x2go.org>
 
 
 %prep
