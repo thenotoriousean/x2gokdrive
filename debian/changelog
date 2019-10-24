@@ -21,5 +21,6 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     + Whitespace-only fixes.
     + Move options to the front of commands.
     + Drop useless use of cat.
+    + Avoid backticks, use $() instead.
 
  -- Mike Gabriel <mike.gabriel@das-netzwerkteam.de>  Tue, 04 Jun 2019 14:10:43 +0200
