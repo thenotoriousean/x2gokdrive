@@ -1,5 +1,5 @@
 # %%exclude %%{_prefix}lib/debug/usr/bin/x2gokdrive*
-# gets created, but we cannot exlude it under %%files
+# gets created, but we cannot exclude it under %%files
 # without rpmlint throwing an error.
 %define _debugsource_packages 0
 
@@ -58,7 +58,7 @@ BuildRequires:  xorg-x11-server-devel
 
 # Copied and pasted "server" subpackage block from:
 # https://github.com/TigerVNC/tigervnc/blob/master/contrib/packages/rpm/el7/SPECS/tigervnc.spec
-# (With TigerVNC speciifc stuff removed, such as Perl for their launch scripts.)
+# (With TigerVNC specific stuff removed, such as Perl for their launch scripts.)
 Requires:       xorg-x11-xauth
 Requires:       xorg-x11-xinit
 

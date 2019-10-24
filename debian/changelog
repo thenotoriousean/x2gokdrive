@@ -11,5 +11,6 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     + Grammar fix.
   * x2gokdrive.spec:
     + Drop Debian-style formatting in description.
+    + Typo fixes.
 
  -- Mike Gabriel <mike.gabriel@das-netzwerkteam.de>  Tue, 04 Jun 2019 14:10:43 +0200
