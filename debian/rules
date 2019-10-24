@@ -16,51 +16,52 @@ include debian/rules.flags
 
 override_dh_auto_configure:
 	# prepare xorg-server build tree
-	mkdir -p $(CURDIR)/BUILD
-	cd $(CURDIR)/BUILD && tar -xvf /usr/src/xorg-server.tar.xz
-	mkdir -p $(CURDIR)/BUILD/xorg-server/hw/kdrive/x2gokdrive/
+	mkdir -p '$(CURDIR)/BUILD'
+	cd '$(CURDIR)/BUILD' && tar -xvf '/usr/src/xorg-server.tar.xz'
+	mkdir -p '$(CURDIR)/BUILD/xorg-server/hw/kdrive/x2gokdrive/'
 
 	# inject x2gokdrive into xorg-server build tree
-	cp Makefile.am *.c *.h $(CURDIR)/BUILD/xorg-server/hw/kdrive/x2gokdrive/
-	cp -r $(CURDIR)/man/ BUILD/xorg-server/hw/kdrive/x2gokdrive/
+	cp 'Makefile.am' *'.c' *'.h' '$(CURDIR)/BUILD/xorg-server/hw/kdrive/x2gokdrive/'
+	cp -r '$(CURDIR)/man/ BUILD/xorg-server/hw/kdrive/x2gokdrive/'
 
 	# patch xorg-server build tree, so that it will build x2gokdrive
-	set -x; export XORG_UPSTREAM_VERSION=$$(grep AC_INIT $(CURDIR)/BUILD/xorg-server/configure.ac | sed -r 's/^AC_INIT[^,]*, ([^,]+),.*/\\1/') \
-	        && cd $(CURDIR)/BUILD/xorg-server \
-		if [ -d  ../../patches.xorg/$$XORG_UPSTREAM_VERSION ]; then \
-			QUILT_PATCHES=../../patches.xorg/$${XORG_UPSTREAM_VERSION}/ quilt push -a; \
+	set -x; \
+		export XORG_UPSTREAM_VERSION="$$(grep AC_INIT '$(CURDIR)/BUILD/xorg-server/configure.ac' | sed -r 's/^AC_INIT[^,]*, ([^,]+),.*/\\1/')" && \
+		cd '$(CURDIR)/BUILD/xorg-server' && \
+		if [ -d  "../../patches.xorg/$${XORG_UPSTREAM_VERSION}" ]; then \
+			QUILT_PATCHES="../../patches.xorg/$${XORG_UPSTREAM_VERSION}/" quilt push -a; \
 		else \
 			( \
 				set +x; \
 				printf '\n##################################################\nERROR: This X2Go KDrive version does not support\nbuilding against X.Org version %s.\n##################################################\n' "$${XORG_UPSTREAM_VERSION}"; \
-				exit 1; \
+				exit '1'; \
 			); \
 		fi
 
 	# run autoreconf
-	cd $(CURDIR)/BUILD/xorg-server && autoreconf -vfi
+	cd '$(CURDIR)/BUILD/xorg-server' && autoreconf -fvi
 
 	# run configure
-	dh_auto_configure --builddirectory=BUILD/xorg-server/ --sourcedirectory=BUILD/xorg-server/ -- \
+	dh_auto_configure --builddirectory='BUILD/xorg-server/' --sourcedirectory='BUILD/xorg-server/' -- \
 	    $(confflags) \
 	    $(confflags_main) \
 	    $(vars)
 
 override_dh_auto_build:
-	dh_auto_build --builddirectory=BUILD/xorg-server/ --sourcedirectory=BUILD/xorg-server/ 
+	dh_auto_build --builddirectory='BUILD/xorg-server/' --sourcedirectory='BUILD/xorg-server/'
 
 override_dh_auto_test:
 	# disabled, nothing to test for x2gokdrive...
 
 override_dh_auto_install:
-	dh_auto_install --builddirectory=BUILD/xorg-server/ --destdir=debian/tmp/
+	dh_auto_install --builddirectory='BUILD/xorg-server/' --destdir='debian/tmp/'
 
 	# oh, yuck.
-	find $(CURDIR)/debian/tmp/usr/lib/xorg -type f -name '*.la' -exec rm -f '{}' ';'
+	find '$(CURDIR)/debian/tmp/usr/lib/xorg' -type 'f' -name '*.la' -exec rm -f '{}' ';'
 
 override_dh_auto_clean:
 	-dh_auto_clean
 
 override_dh_clean:
 	-dh_clean
-	rm -Rf $(CURDIR)/BUILD/
+	rm -Rf '$(CURDIR)/BUILD/'
