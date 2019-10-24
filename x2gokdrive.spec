@@ -22,6 +22,11 @@ Source0:        https://code.x2go.org/releases/source/%{name}/%{name}-%{version}
 
 # Required specifically for x2gokdrive
 BuildRequires:  libpng-devel
+%if 0%{?suse_version}
+BuildRequires:  lsb-release
+%else
+BuildRequires:  redhat-lsb
+%endif
 # x2gokdrive provides patch dirs for xorg-x11-server-source in quilt format
 BuildRequires:  quilt
 
