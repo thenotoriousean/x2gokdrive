@@ -114,7 +114,7 @@ Description: KDrive graphical server backend for X2Go Server
     - authentication by smartcard and USB stick
  .
  This package is built from the X.org xserver module. X2Go KDrive is a
- KDrive based Xserver for X2Go. It provides support for running modern
+ KDrive-based Xserver for X2Go. It provides support for running modern
  desktop environments like GNOME, KDE Plasma, Cinnamon, etc. in X2Go
  Sessions.
  .
