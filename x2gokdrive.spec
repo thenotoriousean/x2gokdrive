@@ -3,6 +3,8 @@
 # without rpmlint throwing an error.
 %define _debugsource_packages 0
 
+%global _hardened_build 1
+
 Name:           x2gokdrive
 Version:        0.0.0.1
 Release:        0.0x2go1%{?dist}
