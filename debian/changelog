@@ -33,5 +33,6 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
       non-portable.
     + Avoid xargs, use find's -exec feature.
     + More and better quoting.
+    + Verbosely remove *.la files.
 
  -- Mike Gabriel <mike.gabriel@das-netzwerkteam.de>  Tue, 04 Jun 2019 14:10:43 +0200
