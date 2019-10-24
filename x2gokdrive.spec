@@ -91,11 +91,11 @@ Requires:       xkeyboard-config
 Requires:       xorg-x11-xkb-utils
 
 %if 0%{?rhel} <= 7
-Requires: mesa-dri-drivers
-Requires: x2goserver >= 4.2.0.0
+Requires:       mesa-dri-drivers
+Requires:       x2goserver >= 4.2.0.0
 %else
-Recommends: mesa-dri-drivers
-Recommends: x2goserver >= 4.2.0.0
+Recommends:     mesa-dri-drivers
+Recommends:     x2goserver >= 4.2.0.0
 %endif
 
 %description
@@ -175,7 +175,7 @@ autoreconf -fiv
         --without-dtrace \
         --disable-devel-docs \
         --disable-selective-werror
-make %{?_smp_mflags} 
+make %{?_smp_mflags}
 popd
 
 %install
