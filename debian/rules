@@ -32,7 +32,7 @@ override_dh_auto_configure:
 		else \
 			( \
 				set +x; \
-				echo "\n##################################################\nERROR: This X2Go KDrive version does not support\nbuilding against X.Org version $$XORG_UPSTREAM_VERSION.\n##################################################\n"; \
+				printf '\n##################################################\nERROR: This X2Go KDrive version does not support\nbuilding against X.Org version %s.\n##################################################\n' "$${XORG_UPSTREAM_VERSION}"; \
 				exit 1; \
 			); \
 		fi
