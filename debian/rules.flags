@@ -1,3 +1,5 @@
+NULL =
+
 DEB_HOST_ARCH_OS ?= $(shell dpkg-architecture -qDEB_HOST_ARCH_OS)
 
 VENDOR = $(shell lsb_release -i -s)
@@ -37,7 +39,8 @@ confflags += \
 	--disable-xnest \
 	--disable-xfake \
 	--disable-xfbdev \
-	--disable-install-setuid
+	--disable-install-setuid \
+	$(NULL)
 
 confflags_main = \
 	--with-default-font-path="/usr/share/fonts/X11/misc,/usr/share/fonts/X11/cyrillic,/usr/share/fonts/X11/100dpi/:unscaled,/usr/share/fonts/X11/75dpi/:unscaled,/usr/share/fonts/X11/Type1,/usr/share/fonts/X11/100dpi,/usr/share/fonts/X11/75dpi,built-ins" \
@@ -64,20 +67,22 @@ confflags_main = \
 	--disable-wayland \
 	--with-sha1=libgcrypt \
 	--enable-xcsecurity \
-	$(void)
+	$(NULL)
 
 ifeq ($(DEB_HOST_ARCH_OS), linux)
 	confflags_main += \
 		--disable-dri3 \
 		--disable-xselinux \
 		--disable-systemd-logind \
-		--without-systemd-daemon
+		--without-systemd-daemon \
+		$(NULL)
 else
 	confflags_main += \
 		--disable-dri3 \
 		--disable-xselinux \
 		--disable-systemd-logind \
-		--without-systemd-daemon
+		--without-systemd-daemon \
+		$(NULL)
 endif
 
 ifeq ($(DEB_HOST_ARCH_OS), hurd)
