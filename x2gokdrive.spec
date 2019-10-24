@@ -29,8 +29,11 @@ BuildRequires:  quilt
 # Copied and pasted block from:
 # https://src.fedoraproject.org/rpms/xorg-x11-server/blob/master/f/xorg-x11-server.spec
 
-BuildRequires: pkgconfig(xcb-aux) pkgconfig(xcb-image) pkgconfig(xcb-icccm)
-BuildRequires: pkgconfig(xcb-keysyms) pkgconfig(xcb-renderutil)
+BuildRequires:  pkgconfig(xcb-aux)
+BuildRequires:  pkgconfig(xcb-image)
+BuildRequires:  pkgconfig(xcb-icccm)
+BuildRequires:  pkgconfig(xcb-keysyms)
+BuildRequires:  pkgconfig(xcb-renderutil)
 # Copied and pasted block from:
 # https://src.fedoraproject.org/rpms/tigervnc/blob/master/f/tigervnc.spec
 # Copied because almost all of them are required for xorg-x11-server-source
@@ -39,16 +42,37 @@ BuildRequires: pkgconfig(xcb-keysyms) pkgconfig(xcb-renderutil)
 # to use as a reference, just el6 and el7 specific .spec files.
 # https://github.com/TigerVNC/tigervnc/tree/master/contrib/packages/rpm
 BuildRequires:  gcc-c++
-BuildRequires:  libX11-devel, automake, autoconf, libtool, gettext, gettext-autopoint
-BuildRequires:  libXext-devel, xorg-x11-server-source, libXi-devel
-BuildRequires:  xorg-x11-xtrans-devel, xorg-x11-util-macros, libXtst-devel
-BuildRequires:  libxkbfile-devel, openssl-devel, libpciaccess-devel
-BuildRequires:  mesa-libGL-devel, libXinerama-devel,
-BuildRequires:  freetype-devel, libXdmcp-devel, libxshmfence-devel
-BuildRequires:  desktop-file-utils, java-devel, jpackage-utils
-BuildRequires:  libjpeg-turbo-devel, gnutls-devel, pam-devel
-BuildRequires:  libdrm-devel, libXt-devel, pixman-devel
-BuildRequires:  systemd, cmake
+BuildRequires:  libX11-devel
+BuildRequires:  automake
+BuildRequires:  autoconf
+BuildRequires:  libtool
+BuildRequires:  gettext
+BuildRequires:  gettext-autopoint
+BuildRequires:  libXext-devel
+BuildRequires:  xorg-x11-server-source
+BuildRequires:  libXi-devel
+BuildRequires:  xorg-x11-xtrans-devel
+BuildRequires:  xorg-x11-util-macros
+BuildRequires:  libXtst-devel
+BuildRequires:  libxkbfile-devel
+BuildRequires:  openssl-devel
+BuildRequires:  libpciaccess-devel
+BuildRequires:  mesa-libGL-devel
+BuildRequires:  libXinerama-devel
+BuildRequires:  freetype-devel
+BuildRequires:  libXdmcp-devel
+BuildRequires:  libxshmfence-devel
+BuildRequires:  desktop-file-utils
+BuildRequires:  java-devel
+BuildRequires:  jpackage-utils
+BuildRequires:  libjpeg-turbo-devel
+BuildRequires:  gnutls-devel
+BuildRequires:  pam-devel
+BuildRequires:  libdrm-devel
+BuildRequires:  libXt-devel
+BuildRequires:  pixman-devel
+BuildRequires:  systemd
+BuildRequires:  cmake
 %if 0%{?fedora} > 24 || 0%{?rhel} >= 7
 BuildRequires:  libXfont2-devel
 %else
@@ -63,7 +87,8 @@ Requires:       xorg-x11-xauth
 Requires:       xorg-x11-xinit
 
 # Copied and pasted "server-minimal" subpackage block from above
-Requires:       xkeyboard-config, xorg-x11-xkb-utils
+Requires:       xkeyboard-config
+Requires:       xorg-x11-xkb-utils
 
 %if 0%{?rhel} <= 7
 Requires: mesa-dri-drivers
