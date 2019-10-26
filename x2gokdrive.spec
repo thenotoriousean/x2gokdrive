@@ -122,6 +122,31 @@ BuildRequires:  pkgconfig(xorg-macros)
 BuildRequires:  pkgconfig(openssl)
 BuildRequires:  pkgconfig(xshmfence)
 
+%description
+X2Go is a server based computing environment with
+   - session resuming
+   - low bandwidth support
+   - session brokerage support
+   - client-side mass storage mounting support
+   - client-side printing support
+   - audio support
+   - authentication by smartcard and USB stick
+
+X2Go KDrive is a KDrive-based Xserver for X2Go. It provides support for
+running modern desktop environments like GNOME, KDE Plasma, Cinnamon, etc.
+in X2Go Sessions.
+
+The X2Go KDrive graphical backend is not suitable for low bandwidth WAN
+connections between X2Go Client and X2Go Server. It is supposed for X2Go
+being used on the local area network.
+
+More information about X.Org can be found at:
+<URL:https://www.x.org>
+
+More information about X2Go can be found at:
+<URL:https://wiki.x2go.org>
+
+
 %package -n xorg-x11-server-x2gokdrive
 Summary:        KDrive graphical server backend for X2GoServer
 Requires:       xorg-x11-server-common >= 1.20.3

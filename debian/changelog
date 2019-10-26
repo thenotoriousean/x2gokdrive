@@ -36,6 +36,8 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     + Let description be the description of xorg-x11-server-x2gokdrive, not
       the x2gokdrive source package.
     + Add/copy Summary tag to xorg-x11-server-x2gokdrive binary package.
+    + Add description for x2gokdrive (source) package. It's a slightly
+      modified version of the binary package description.
   * debian/rules:
     + Remove weird empty variable reference construct.
     + Whitespace-only fixes.
