@@ -89,7 +89,7 @@ BuildRequires:  pkgconfig(xdmcp)
 BuildRequires:  pkgconfig(xfont2)
 %else
 BuildRequires:  pkgconfig(xfont)
-%fi
+%endif
 BuildRequires:  pkgconfig(xkbfile)
 BuildRequires:  pkgconfig(pixman-1)
 BuildRequires:  pkgconfig(pciaccess)

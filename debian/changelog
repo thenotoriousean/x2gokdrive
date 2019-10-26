@@ -32,6 +32,7 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     + Sync dependency lists with debian/control.
     + Rename binary package to xorg-x11-server-x2gokdrive to be consistent
       with Fedora/*SuSE package naming.
+    + It's still %endif, not %fi.
   * debian/rules:
     + Remove weird empty variable reference construct.
     + Whitespace-only fixes.
