@@ -123,6 +123,7 @@ BuildRequires:  pkgconfig(openssl)
 BuildRequires:  pkgconfig(xshmfence)
 
 %package -n xorg-x11-server-x2gokdrive
+Summary:        KDrive graphical server backend for X2GoServer
 Requires:       xorg-x11-server-common >= 1.20.3
 %if 0%{?rhel} > 8 || 0%{?suse_version}
 Recommends:     mesa-dri-drivers
