@@ -23,86 +23,112 @@ URL:            https://www.x2go.org
 Source0:        https://code.x2go.org/releases/source/%{name}/%{name}-%{version}.tar.gz
 
 # Required specifically for x2gokdrive
+BuildRequires:  xorg-x11-server-source
+BuildRequires:  libjpeg-turbo-devel
 BuildRequires:  libpng-devel
+BuildRequires:  quilt
 %if 0%{?suse_version}
 BuildRequires:  lsb-release
 %else
 BuildRequires:  redhat-lsb
 %endif
 # x2gokdrive provides patch dirs for xorg-x11-server-source in quilt format
-BuildRequires:  quilt
 
 # XCB bits for Xephyr
-# Copied and pasted block from:
-# https://src.fedoraproject.org/rpms/xorg-x11-server/blob/master/f/xorg-x11-server.spec
-
-BuildRequires:  pkgconfig(xcb-aux)
+# Copied/synced with debian/control.
+BuildRequires:  pkgconfig(xcb) >= 1
+BuildRequires:  pkgconfig(xcb-xkb)
+BuildRequires:  pkgconfig(xcb-shape)
+BuildRequires:  pkgconfig(xcb-render)
+BuildRequires:  pkgconfig(xcb-renderutil)
+BuildRequires:  pkgconfig(xcb-util)
 BuildRequires:  pkgconfig(xcb-image)
 BuildRequires:  pkgconfig(xcb-icccm)
+BuildRequires:  pkgconfig(xcb-shm)
 BuildRequires:  pkgconfig(xcb-keysyms)
-BuildRequires:  pkgconfig(xcb-renderutil)
-# Copied and pasted block from:
-# https://src.fedoraproject.org/rpms/tigervnc/blob/master/f/tigervnc.spec
-# Copied because almost all of them are required for xorg-x11-server-source
-#
-# Note that TigerVNC upstream does not provide distro-neutral packaging for us
-# to use as a reference, just el6 and el7 specific .spec files.
-# https://github.com/TigerVNC/tigervnc/tree/master/contrib/packages/rpm
+BuildRequires:  pkgconfig(xcb-randr)
+BuildRequires:  pkgconfig(xcb-xv)
+BuildRequires:  pkgconfig(xcb-glx)
+BuildRequires:  pkgconfig(xcb-xf86dri)
+
+# Dependencies for xorg-x11-server.
 BuildRequires:  gcc-c++
-BuildRequires:  libX11-devel
 BuildRequires:  automake
 BuildRequires:  autoconf
 BuildRequires:  libtool
 BuildRequires:  gettext
 BuildRequires:  gettext-autopoint
-BuildRequires:  libXext-devel
-BuildRequires:  xorg-x11-server-source
-BuildRequires:  libXi-devel
-BuildRequires:  xorg-x11-xtrans-devel
-BuildRequires:  xorg-x11-util-macros
-BuildRequires:  libXtst-devel
-BuildRequires:  libxkbfile-devel
-BuildRequires:  openssl-devel
-BuildRequires:  libpciaccess-devel
-BuildRequires:  mesa-libGL-devel
-BuildRequires:  libXinerama-devel
-BuildRequires:  freetype-devel
-BuildRequires:  libXdmcp-devel
-BuildRequires:  libxshmfence-devel
-BuildRequires:  desktop-file-utils
-BuildRequires:  java-devel
-BuildRequires:  jpackage-utils
-BuildRequires:  libjpeg-turbo-devel
-BuildRequires:  gnutls-devel
-BuildRequires:  pam-devel
-BuildRequires:  libdrm-devel
-BuildRequires:  libXt-devel
-BuildRequires:  pixman-devel
-BuildRequires:  systemd
-BuildRequires:  cmake
-%if 0%{?fedora} > 24 || 0%{?rhel} >= 7
-BuildRequires:  libXfont2-devel
+BuildRequires:  bison
+BuildRequires:  flex
+BuildRequires:  imake
+BuildRequires:  pkgconfig(fontutil)
+BuildRequires:  pkgconfig(xproto)
+BuildRequires:  pkgconfig(damageproto)
+BuildRequires:  pkgconfig(fixesproto)
+BuildRequires:  pkgconfig(fontsproto)
+BuildRequires:  pkgconfig(kbproto)
+BuildRequires:  pkgconfig(xineramaproto)
+BuildRequires:  pkgconfig(randrproto)
+BuildRequires:  pkgconfig(recordproto)
+BuildRequires:  pkgconfig(renderproto)
+BuildRequires:  pkgconfig(resourceproto)
+BuildRequires:  pkgconfig(scrnsaverproto)
+BuildRequires:  pkgconfig(videoproto)
+BuildRequires:  pkgconfig(xcmiscproto)
+BuildRequires:  pkgconfig(xextproto)
+BuildRequires:  pkgconfig(xf86bigfontproto)
+BuildRequires:  pkgconfig(xf86dgaproto)
+BuildRequires:  pkgconfig(xf86vidmodeproto)
+BuildRequires:  pkgconfig(presentproto)
+BuildRequires:  pkgconfig(bigreqsproto)
+BuildRequires:  pkgconfig(compositeproto)
+BuildRequires:  pkgconfig(xtrans)
+BuildRequires:  pkgconfig(Xau)
+BuildRequires:  pkgconfig(xdmcp)
+%if 0%{?fedora} > 24 || 0%{?rhel} >= 7 || 0%{?sle_version} >= 120300
+BuildRequires:  pkgconfig(xfont2)
 %else
-BuildRequires:  libXfont-devel
-%endif
-BuildRequires:  xorg-x11-server-devel
+BuildRequires:  pkgconfig(xfont)
+%fi
+BuildRequires:  pkgconfig(xkbfile)
+BuildRequires:  pkgconfig(pixman-1)
+BuildRequires:  pkgconfig(pciaccess)
+BuildRequires:  pkgconfig(libgcrypt)
+BuildRequires:  pkgconfig(nettle)
+# We probably won't need some libudev-devel equivalent because we disable that
+# feature anyway.
+# Same goes for pkgconfig(libselinux).
+BuildRequires:  pkgconfig(audit)
+BuildRequires:  pkgconfig(auparse)
+# Same goes for pkgconfig(libdrm).
+BuildRequires:  pkgconfig(gl)
+BuildRequires:  pkgconfig(libunwind)
+BuildRequires:  pkgconfig(xmuu)
+BuildRequires:  pkgconfig(xext)
+BuildRequires:  pkgconfig(x11)
+BuildRequires:  pkgconfig(xrender)
+BuildRequires:  pkgconfig(xi)
+BuildRequires:  pkgconfig(xpm)
+BuildRequires:  pkgconfig(xaw7)
+BuildRequires:  pkgconfig(xt)
+BuildRequires:  pkgconfig(xmu)
+BuildRequires:  pkgconfig(xtst)
+BuildRequires:  pkgconfig(xres)
+BuildRequires:  pkgconfig(xfixes)
+BuildRequires:  pkgconfig(xv)
+BuildRequires:  pkgconfig(xinerama)
+# RPM-specific... probably?
+BuildRequires:  pkgconfig(xorg-macros)
+BuildRequires:  pkgconfig(openssl)
+BuildRequires:  pkgconfig(xshmfence)
 
-# Copied and pasted "server" subpackage block from:
-# https://github.com/TigerVNC/tigervnc/blob/master/contrib/packages/rpm/el7/SPECS/tigervnc.spec
-# (With TigerVNC specific stuff removed, such as Perl for their launch scripts.)
-Requires:       xorg-x11-xauth
-Requires:       xorg-x11-xinit
-
-# Copied and pasted "server-minimal" subpackage block from above
-Requires:       xkeyboard-config
-Requires:       xorg-x11-xkb-utils
-
-%if 0%{?rhel} <= 7
-Requires:       mesa-dri-drivers
-Requires:       x2goserver >= 4.2.0.0
-%else
+Requires:       xorg-x11-server-common >= 1.20.3
+%if 0%{?rhel} > 8 || 0%{?suse_version}
 Recommends:     mesa-dri-drivers
 Recommends:     x2goserver >= 4.2.0.0
+%else
+Requires:       mesa-dri-drivers
+Requires:       x2goserver >= 4.2.0.0
 %endif
 
 %description

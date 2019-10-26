@@ -29,6 +29,7 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
       redhat-rpm-macros (or the *SuSE equivalent) and is hence passed-down
       manually. %{__global_ldflags} is empty and unknown on some systems, so
       copy workaround from nx-libs for that one.
+    + Sync dependency lists with debian/control.
   * debian/rules:
     + Remove weird empty variable reference construct.
     + Whitespace-only fixes.
