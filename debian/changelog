@@ -9,6 +9,7 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
   [ Mihai Moldovan ]
   * debian/control:
     + Grammar fix.
+    + Remove dependencies that refer to disabled features.
   * x2gokdrive.spec:
     + Drop Debian-style formatting in description.
     + Typo fixes.
