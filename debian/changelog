@@ -33,6 +33,8 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     + Rename binary package to xorg-x11-server-x2gokdrive to be consistent
       with Fedora/*SuSE package naming.
     + It's still %endif, not %fi.
+    + Let description be the description of xorg-x11-server-x2gokdrive, not
+      the x2gokdrive source package.
   * debian/rules:
     + Remove weird empty variable reference construct.
     + Whitespace-only fixes.

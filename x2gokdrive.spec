@@ -132,7 +132,7 @@ Requires:       mesa-dri-drivers
 Requires:       x2goserver >= 4.2.0.0
 %endif
 
-%description
+%description -n xorg-x11-server-x2gokdrive
 X2Go is a server based computing environment with
    - session resuming
    - low bandwidth support
