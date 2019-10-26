@@ -122,6 +122,7 @@ BuildRequires:  pkgconfig(xorg-macros)
 BuildRequires:  pkgconfig(openssl)
 BuildRequires:  pkgconfig(xshmfence)
 
+%package -n xorg-x11-server-x2gokdrive
 Requires:       xorg-x11-server-common >= 1.20.3
 %if 0%{?rhel} > 8 || 0%{?suse_version}
 Recommends:     mesa-dri-drivers
@@ -280,7 +281,7 @@ make install DESTDIR='%{buildroot}'
 popd
 find '%{buildroot}/usr/lib/xorg' -type 'f' -name '*.la' -exec rm -fv '{}' ';'
 
-%files
+%files -n xorg-x11-server-x2gokdrive
 %defattr(-,root,root)
 %{_bindir}/x2gokdrive
 %exclude %{_libdir}/xorg/protocol.txt
