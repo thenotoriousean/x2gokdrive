@@ -22,7 +22,7 @@ override_dh_auto_configure:
 
 	# inject x2gokdrive into xorg-server build tree
 	cp 'Makefile.am' *'.c' *'.h' '$(CURDIR)/BUILD/xorg-server/hw/kdrive/x2gokdrive/'
-	cp -r '$(CURDIR)/man/ BUILD/xorg-server/hw/kdrive/x2gokdrive/'
+	cp -r '$(CURDIR)/man/' 'BUILD/xorg-server/hw/kdrive/x2gokdrive/'
 
 	# patch xorg-server build tree, so that it will build x2gokdrive
 	set -x; \
