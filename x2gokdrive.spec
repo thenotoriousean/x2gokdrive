@@ -93,7 +93,13 @@ BuildRequires:  pkgconfig(xfont)
 BuildRequires:  pkgconfig(xkbfile)
 BuildRequires:  pkgconfig(pixman-1)
 BuildRequires:  pkgconfig(pciaccess)
+%if 0%{?fedora} > 28 || 0%{?rhel} > 7 || 0%{?suse_version} > 1500
 BuildRequires:  pkgconfig(libgcrypt)
+%else
+# Older libgcrypt-devel packages do not have a pkgconfig(libgcrypt) provides
+# line.
+BuildRequires:  libgcrypt-devel
+%endif
 BuildRequires:  pkgconfig(nettle)
 # We probably won't need some libudev-devel equivalent because we disable that
 # feature anyway.

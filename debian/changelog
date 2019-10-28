@@ -53,6 +53,10 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
       source tarball is extracted - but we also need a BUILD sub-directory.
       Create it.
     + Use pushd instead of cd. Minor change.
+    + Build-depend upon libgcrypt-devel for "older" distros that don't define
+      a libgcrypt pkgconfig() virtual provide. That means: Fedora < 29, EPEL <
+      8 and any *SuSE version that is not Tumbleweed. The most surprising part
+      is probably *SuSE.
   * debian/rules:
     + Remove weird empty variable reference construct.
     + Whitespace-only fixes.
