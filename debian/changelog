@@ -18,6 +18,8 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
   * debian/control:
     + Grammar fix.
     + Remove dependencies that refer to disabled features.
+    + Add build-dependency upon libpam-dev. It would really be libpam0g-dev
+      currently, but that looks like a moving target.
   * x2gokdrive.spec:
     + Drop Debian-style formatting in description.
     + Typo fixes.
