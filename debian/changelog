@@ -10,6 +10,11 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
   * Initial release:
     - patches.legacy/README.legacy-patches.md: whitespace-only fix.
     - patches.legacy/README.legacy-patches.md: fix markdown syntax.
+    - {./,patches.xorg/{common,1.18.4,1.19.{2,6},1.20.{1,4,5}}/}quilt.env: add
+      new quilt environment helper mechanism. Should make using quilt a lot
+      easier on the developer's machine. Requires SOURCING(!) the quilt.env
+      file within a specific versioned sub-directory OR SOURCING(!) the
+      top-level quilt.env file and exporting QUILT_PATCHES manually.
   * debian/control:
     + Grammar fix.
     + Remove dependencies that refer to disabled features.
