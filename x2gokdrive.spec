@@ -125,6 +125,7 @@ BuildRequires:  pkgconfig(libgcrypt)
 BuildRequires:  libgcrypt-devel
 %endif
 BuildRequires:  pkgconfig(nettle)
+BuildRequires:  pam-devel
 # We probably won't need some libudev-devel equivalent because we disable that
 # feature anyway.
 # Same goes for pkgconfig(libselinux).

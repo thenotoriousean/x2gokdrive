@@ -72,6 +72,7 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
       (which provides a virtual gettext-devel package), while RHEL-land has a
       "real" gettext-devel package that virtually provides a gettext-autopoint
       package.
+    + Also build-depend upon pam-devel.
   * debian/rules:
     + Remove weird empty variable reference construct.
     + Whitespace-only fixes.
