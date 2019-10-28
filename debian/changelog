@@ -17,6 +17,9 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
       top-level quilt.env file and exporting QUILT_PATCHES manually.
     - patches.xorg/common/quilt.env: add trailing slash to QUILT_PATCHES
       variable.
+    - patches.xorg/1.20.4/xorg-server-configure-ac.patch: backport
+      XORG_VERSION_CURRENT change from
+      e0dbca73f11e9aa7a066e748e6d08ba256be69cf / 1.20.5.
   * debian/control:
     + Grammar fix.
     + Remove dependencies that refer to disabled features.
