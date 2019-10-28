@@ -58,6 +58,10 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     + Verbosely remove *.la files.
     + Add missing single quotes - two strings were merged into one by
       accident.
+    + Drop additional escape layer in sed expression. This was previously only
+      needed due to the weird escaping/quoting rules for code in backticks.
+      The more modern and equally POSIX-compatible $() syntax makes quoting
+      and escaping within subshell calls a lot easier.
   * debian/rules.flags:
     + Define NULL variable and use it throughout the file.
 
