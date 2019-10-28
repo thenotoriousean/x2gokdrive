@@ -48,6 +48,7 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
       modified version of the binary package description.
     + Fix typo pkgconfig(Xau) => pkgconfig(xau).
     + Backport escaping layer change from debian/rules.
+    + Fix %autosetup usage - only use it when supported. RPM 4.11.x+.
   * debian/rules:
     + Remove weird empty variable reference construct.
     + Whitespace-only fixes.
