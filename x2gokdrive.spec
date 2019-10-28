@@ -83,7 +83,7 @@ BuildRequires:  pkgconfig(presentproto)
 BuildRequires:  pkgconfig(bigreqsproto)
 BuildRequires:  pkgconfig(compositeproto)
 BuildRequires:  pkgconfig(xtrans)
-BuildRequires:  pkgconfig(Xau)
+BuildRequires:  pkgconfig(xau)
 BuildRequires:  pkgconfig(xdmcp)
 %if 0%{?fedora} > 24 || 0%{?rhel} >= 7 || 0%{?sle_version} >= 120300
 BuildRequires:  pkgconfig(xfont2)
