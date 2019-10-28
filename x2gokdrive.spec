@@ -224,7 +224,7 @@ More information about X2Go can be found at:
 
 # prepare xorg-server build tree
 mkdir -p 'BUILD'
-cp -r '/usr/share/xorg-x11-server-source/'* 'BUILD/'
+cp -rv '/usr/share/xorg-x11-server-source/'* 'BUILD/'
 # Precaution from:
 # https://src.fedoraproject.org/rpms/tigervnc/blob/master/f/tigervnc.spec
 find 'BUILD/' -type 'f' -perm '-001' -print0 | while read -r -d '' file; do

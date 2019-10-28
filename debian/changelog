@@ -74,6 +74,8 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
       package.
     + Also build-depend upon pam-devel.
     + Build verbosely. We do want to see actual compilation steps.
+    + Copy xorg-server source verbosely. Matches debian/rules tar call more
+      closely.
   * debian/rules:
     + Remove weird empty variable reference construct.
     + Whitespace-only fixes.
