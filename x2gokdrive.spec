@@ -24,7 +24,22 @@ Source0:        https://code.x2go.org/releases/source/%{name}/%{name}-%{version}
 
 # Required specifically for x2gokdrive
 BuildRequires:  xorg-x11-server-source
-BuildRequires:  libjpeg-turbo-devel
+# Selecting libjpeg-turbo is quite difficult.
+%if 0%{?suse_version}
+%if 0%{?sle_version} >= 120200
+# Recent *SuSE versions call this "libturbojpeg".
+BuildRequireS:  pkgconfig(libturbojpeg)
+%else
+# Older ones have either libjpeg8-devel or libjpeg62-devel and don't define
+# any pkgconfig() virtual provide. Pick libjpeg62-devel since that's most
+# likely the turbo variant.
+BuildRequires:  libjpeg62-devel
+%endif
+%else
+# RHEL/CentOS 6+ and all supported Fedora versions ship libjpeg-turbo, but call
+# it libjpeg.
+BuildRequires:  pkgconfig(libjpeg)
+%endif
 BuildRequires:  libpng-devel
 BuildRequires:  quilt
 %if 0%{?suse_version}

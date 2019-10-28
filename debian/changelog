@@ -57,6 +57,15 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
       a libgcrypt pkgconfig() virtual provide. That means: Fedora < 29, EPEL <
       8 and any *SuSE version that is not Tumbleweed. The most surprising part
       is probably *SuSE.
+    + Untangle libjpeg-turbo-devel build-dependency. Recent *SuSE versions
+      define a pkgconfig(libturbojpeg) virtual provide, which is unheard of in
+      RHEL land. Older *SuSE versions sadly don't have any virtual provide for
+      this, and, worse, don't even have libjpeg-turbo-devel packages, so we'll
+      need to build-depend upon libjpeg62-devel instead and hope that this is
+      actually the turbo variant. RHEL-land (including Fedora) is more
+      forgiving and always ships the turbo variant, but sets the virtual
+      provide to pkgconfig(libjpeg) (yes, for all versions down to RHEL 6,
+      albit via the updates repository!) and do not mention "turbo" in there.
   * debian/rules:
     + Remove weird empty variable reference construct.
     + Whitespace-only fixes.
