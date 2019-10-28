@@ -52,6 +52,7 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     + %autosetup (or %setup) create a top-level BUILD directory into which the
       source tarball is extracted - but we also need a BUILD sub-directory.
       Create it.
+    + Use pushd instead of cd. Minor change.
   * debian/rules:
     + Remove weird empty variable reference construct.
     + Whitespace-only fixes.
