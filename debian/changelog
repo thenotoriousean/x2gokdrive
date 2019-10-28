@@ -15,6 +15,8 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
       easier on the developer's machine. Requires SOURCING(!) the quilt.env
       file within a specific versioned sub-directory OR SOURCING(!) the
       top-level quilt.env file and exporting QUILT_PATCHES manually.
+    - patches.xorg/common/quilt.env: add trailing slash to QUILT_PATCHES
+      variable.
   * debian/control:
     + Grammar fix.
     + Remove dependencies that refer to disabled features.
