@@ -72,7 +72,16 @@ BuildRequires:  automake
 BuildRequires:  autoconf
 BuildRequires:  libtool
 BuildRequires:  gettext
+%if 0%{?suse_version}
+BuildRequires:  gettext-tools
+%else
+# This is really just a virtual provides for gettext-devel.
+# We might want to spell it out directly and only once, also for *SuSE, but
+# then we would be pulling in a "real" package on non-*SuSE, but a virtual
+# one on *SuSE, since *SuSE only has gettext-{runtime,tools} as "real" packages
+# with gettext-tools providing the virtual gettext-devel package.
 BuildRequires:  gettext-autopoint
+%endif
 BuildRequires:  bison
 BuildRequires:  flex
 BuildRequires:  imake

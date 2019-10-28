@@ -66,6 +66,10 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
       forgiving and always ships the turbo variant, but sets the virtual
       provide to pkgconfig(libjpeg) (yes, for all versions down to RHEL 6,
       albit via the updates repository!) and do not mention "turbo" in there.
+    + Rework gettext-autopoint build dependency. *SuSE uses gettext-tools
+      (which provides a virtual gettext-devel package), while RHEL-land has a
+      "real" gettext-devel package that virtually provides a gettext-autopoint
+      package.
   * debian/rules:
     + Remove weird empty variable reference construct.
     + Whitespace-only fixes.
