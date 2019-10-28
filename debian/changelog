@@ -73,6 +73,7 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
       "real" gettext-devel package that virtually provides a gettext-autopoint
       package.
     + Also build-depend upon pam-devel.
+    + Build verbosely. We do want to see actual compilation steps.
   * debian/rules:
     + Remove weird empty variable reference construct.
     + Whitespace-only fixes.

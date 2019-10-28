@@ -268,6 +268,7 @@ autoreconf -fvi
 	--libexecdir='%{_prefix}/lib/xorg' \
 	--with-module-dir='%{_prefix}/lib/xorg/modules' \
 	--with-serverconfig-path='%{_libexecdir}' \
+	--disable-silent-rules \
 	--disable-static \
 	--without-dtrace \
 	--disable-strict-compilation \
