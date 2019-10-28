@@ -76,6 +76,8 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     + Build verbosely. We do want to see actual compilation steps.
     + Copy xorg-server source verbosely. Matches debian/rules tar call more
       closely.
+    + Use archive mode when copying xorg-server source. We probably want to
+      keep stuff like timestamps to not break the Makefile dependencies.
   * debian/rules:
     + Remove weird empty variable reference construct.
     + Whitespace-only fixes.
