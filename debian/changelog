@@ -49,6 +49,9 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     + Fix typo pkgconfig(Xau) => pkgconfig(xau).
     + Backport escaping layer change from debian/rules.
     + Fix %autosetup usage - only use it when supported. RPM 4.11.x+.
+    + %autosetup (or %setup) create a top-level BUILD directory into which the
+      source tarball is extracted - but we also need a BUILD sub-directory.
+      Create it.
   * debian/rules:
     + Remove weird empty variable reference construct.
     + Whitespace-only fixes.

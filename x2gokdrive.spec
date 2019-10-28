@@ -185,7 +185,6 @@ More information about X2Go can be found at:
 
 
 %prep
-# %%autosetup creates BUILD subdir
 %if 0%{?fedora} >= 19 || 0%{?suse_version} >= 1310 || 0%{?sle_version} >= 120400 || 0%{?rhel} >= 7
 %autosetup
 %else
@@ -193,6 +192,7 @@ More information about X2Go can be found at:
 %endif
 
 # prepare xorg-server build tree
+mkdir -p 'BUILD'
 cp -r '/usr/share/xorg-x11-server-source/'* 'BUILD/'
 # Precaution from:
 # https://src.fedoraproject.org/rpms/tigervnc/blob/master/f/tigervnc.spec
