@@ -203,7 +203,7 @@ cp -r 'man/' 'BUILD/hw/kdrive/x2gokdrive/'
 
 # patch xorg-server build tree, so that it will build x2gokdrive
 set -x
-export XORG_UPSTREAM_VERSION="$(grep 'AC_INIT' 'BUILD/configure.ac' | sed -r 's/^AC_INIT[^,]*, ([^,]+),.*/\\1/')"
+export XORG_UPSTREAM_VERSION="$(grep 'AC_INIT' 'BUILD/configure.ac' | sed -r 's/^AC_INIT[^,]*, ([^,]+),.*/\1/')"
 cd 'BUILD'
 if [ -d "../patches.xorg/${XORG_UPSTREAM_VERSION}" ]; then
   QUILT_PATCHES="../patches.xorg/${XORG_UPSTREAM_VERSION}/" quilt push -a

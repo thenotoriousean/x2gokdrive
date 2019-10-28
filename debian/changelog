@@ -39,6 +39,7 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     + Add description for x2gokdrive (source) package. It's a slightly
       modified version of the binary package description.
     + Fix typo pkgconfig(Xau) => pkgconfig(xau).
+    + Backport escaping layer change from debian/rules.
   * debian/rules:
     + Remove weird empty variable reference construct.
     + Whitespace-only fixes.
