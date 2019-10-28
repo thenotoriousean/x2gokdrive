@@ -12,7 +12,7 @@ patches apply to what Git revision of x2gokdrive upstream code.
 
 ## openSUSE 42.3
 
-Patch file: osuse_42.3.patch
+Patch file: osuse\_42.3.patch
 Git commit hash: 5f025a7de290ff03eef74d8c1b81a88b54b6342d
 X.org version: <FIXME:UNKNOWN>
 
