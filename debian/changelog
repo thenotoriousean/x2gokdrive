@@ -23,6 +23,8 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     - patches.xorg/1.20.4: add missing/hw/xfree86/common/modeline2c.awk file,
       working around a bug in CentOS 7 and Fedora 30 (possibly others as
       well).
+    - patches.xorg/1.20.5: likewise add missing modeline2c.awk file. Actually
+      needed for Fedora 30.
   * debian/control:
     + Grammar fix.
     + Remove dependencies that refer to disabled features.
