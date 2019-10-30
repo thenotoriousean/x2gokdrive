@@ -116,5 +116,9 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
       and escaping within subshell calls a lot easier.
   * debian/rules.flags:
     + Define NULL variable and use it throughout the file.
+    + Disable building Xorg DDX. We don't need it and it's only inflating
+      build times. Older X.Org patches will need to be modified to define the
+      version variable, but we can do that as we go and accept build failures
+      for the time being.
 
  -- Mike Gabriel <mike.gabriel@das-netzwerkteam.de>  Tue, 04 Jun 2019 14:10:43 +0200
