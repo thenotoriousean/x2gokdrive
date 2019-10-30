@@ -2,6 +2,8 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
 
   [ Mike Gabriel ]
   * Initial release.
+  * debian/control:
+    + Fix B-Ds for building against Ubuntu trusty.
 
   [ Oleksandr Shneyder ]
   * Calculate screen dimensions (in mm) according to dpi value.
