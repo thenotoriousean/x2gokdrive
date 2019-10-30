@@ -246,6 +246,12 @@ export XORG_UPSTREAM_VERSION="$(grep 'AC_INIT' 'BUILD/configure.ac' | sed -r 's/
 pushd 'BUILD'
 if [ -d "../patches.xorg/${XORG_UPSTREAM_VERSION}" ]; then
   QUILT_PATCHES="../patches.xorg/${XORG_UPSTREAM_VERSION}/" quilt push -a
+  if [ -d "../patches.xorg/${XORG_UPSTREAM_VERSION}/missing" ]; then
+    # Hack used to install missing files.
+    # This is actually working around problems in the upstream
+    # xorg-server-source packages, which will have to be reported upstream.
+    cp -av "../patches.xorg/${XORG_UPSTREAM_VERSION}/missing/"* 'BUILD/'
+  fi
 else
   (
     set +x
