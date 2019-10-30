@@ -1,6 +1,6 @@
 --- a/configure.ac
 +++ b/configure.ac
-@@ -31,7 +31,7 @@
+@@ -31,7 +31,7 @@ RELEASE_DATE="2017-03-02"
  RELEASE_NAME="Clam Chowder"
  AC_CONFIG_SRCDIR([Makefile.am])
  AC_CONFIG_MACRO_DIR([m4])
@@ -9,7 +9,7 @@
  AC_USE_SYSTEM_EXTENSIONS
  
  # Require xorg-macros minimum of 1.14 for XORG_COMPILER_BRAND in XORG_DEFAULT_OPTIONS
-@@ -659,6 +659,7 @@
+@@ -659,6 +659,7 @@ AC_ARG_ENABLE(glamor,         AS_HELP_ST
  dnl kdrive and its subsystems
  AC_ARG_ENABLE(kdrive,         AS_HELP_STRING([--enable-kdrive], [Build kdrive servers (default: no)]), [KDRIVE=$enableval], [KDRIVE=no])
  AC_ARG_ENABLE(xephyr,         AS_HELP_STRING([--enable-xephyr], [Build the kdrive Xephyr server (default: auto)]), [XEPHYR=$enableval], [XEPHYR=auto])
@@ -17,7 +17,24 @@
  AC_ARG_ENABLE(xfake,          AS_HELP_STRING([--enable-xfake], [Build the kdrive 'fake' server (default: auto)]), [XFAKE=$enableval], [XFAKE=auto])
  AC_ARG_ENABLE(xfbdev,         AS_HELP_STRING([--enable-xfbdev], [Build the kdrive framebuffer device server (default: auto)]), [XFBDEV=$enableval], [XFBDEV=auto])
  dnl kdrive options
-@@ -2370,9 +2371,15 @@
+@@ -1868,6 +1869,8 @@ if test "x$XORG" = xauto; then
+ fi
+ AC_MSG_RESULT([$XORG])
+ 
++AC_DEFINE_UNQUOTED(XORG_VERSION_CURRENT, [$VENDOR_RELEASE], [Current Xorg version])
++
+ if test "x$XORG" = xyes; then
+ 	XORG_DDXINCS='-I$(top_srcdir)/hw/xfree86 -I$(top_srcdir)/hw/xfree86/include -I$(top_srcdir)/hw/xfree86/common'
+ 	XORG_OSINCS='-I$(top_srcdir)/hw/xfree86/os-support -I$(top_srcdir)/hw/xfree86/os-support/bus -I$(top_srcdir)/os'
+@@ -2086,7 +2089,6 @@ if test "x$XORG" = xyes; then
+ 	AC_DEFINE(XORG_SERVER, 1, [Building Xorg server])
+ 	AC_DEFINE(XORGSERVER, 1, [Building Xorg server])
+ 	AC_DEFINE(XFree86Server, 1, [Building XFree86 server])
+-	AC_DEFINE_UNQUOTED(XORG_VERSION_CURRENT, [$VENDOR_RELEASE], [Current Xorg version])
+ 	AC_DEFINE(NEED_XF86_TYPES, 1, [Need XFree86 typedefs])
+ 	AC_DEFINE(NEED_XF86_PROTOTYPES, 1, [Need XFree86 helper functions])
+ 	AC_DEFINE(__XSERVERNAME__, "Xorg", [Name of X server])
+@@ -2370,9 +2372,15 @@ dnl kdrive DDX
  XEPHYR_LIBS=
  XEPHYR_INCS=
  
@@ -33,7 +50,7 @@
      AC_DEFINE(KDRIVESERVER,1,[Build Kdrive X server])
      AC_DEFINE(KDRIVEDDXACTIONS,,[Build kdrive ddx])
  
-@@ -2483,6 +2490,43 @@
+@@ -2483,6 +2491,43 @@ if test "$KDRIVE" = yes; then
  
      AC_SUBST([XEPHYR_LIBS])
      AC_SUBST([XEPHYR_INCS])
@@ -77,7 +94,7 @@
  fi
  AC_SUBST([KDRIVE_INCS])
  AC_SUBST([KDRIVE_PURE_INCS])
-@@ -2498,6 +2542,7 @@
+@@ -2498,6 +2543,7 @@ AM_CONDITIONAL(KDRIVE_MOUSE, [test "x$KD
  AM_CONDITIONAL(TSLIB, [test "x$HAVE_TSLIB" = xyes])
  AM_CONDITIONAL(KDRIVEFBDEV, [test "x$XFBDEV" = xyes])
  AM_CONDITIONAL(XEPHYR, [test "x$KDRIVE" = xyes && test "x$XEPHYR" = xyes])
@@ -85,7 +102,7 @@
  AM_CONDITIONAL(BUILD_KDRIVEFBDEVLIB, [test "x$KDRIVE" = xyes && test "x$KDRIVEFBDEVLIB" = xyes])
  AM_CONDITIONAL(XFAKESERVER, [test "x$KDRIVE" = xyes && test "x$XFAKE" = xyes])
  
-@@ -2680,6 +2725,8 @@
+@@ -2680,6 +2726,8 @@ hw/xquartz/xpr/Makefile
  hw/kdrive/Makefile
  hw/kdrive/ephyr/Makefile
  hw/kdrive/ephyr/man/Makefile
