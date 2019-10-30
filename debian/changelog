@@ -84,6 +84,7 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     + Use archive mode when copying xorg-server source. We probably want to
       keep stuff like timestamps to not break the Makefile dependencies.
     + *SuSE puts the xorg-server source code into /usr/src/xserver.
+    + Change /usr/share/xserver to /usr/src/xserver. For real this time.
   * debian/rules:
     + Remove weird empty variable reference construct.
     + Whitespace-only fixes.

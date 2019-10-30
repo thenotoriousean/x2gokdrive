@@ -225,7 +225,7 @@ More information about X2Go can be found at:
 # prepare xorg-server build tree
 mkdir -p 'BUILD'
 %if 0%{?suse_version}
-cp -av '/usr/share/xserver/'* 'BUILD/'
+cp -av '/usr/src/xserver/'* 'BUILD/'
 %else
 cp -av '/usr/share/xorg-x11-server-source/'* 'BUILD/'
 %endif
