@@ -91,6 +91,7 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     + *SuSE puts the xorg-server source code into /usr/src/xserver.
     + Change /usr/share/xserver to /usr/src/xserver. For real this time.
     + Add hack installing missing files into the xorg-server source tree.
+    + Port change from debian/rules.flags to disable Xorg DDX building.
   * debian/rules:
     + Remove weird empty variable reference construct.
     + Whitespace-only fixes.

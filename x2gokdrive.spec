@@ -296,7 +296,7 @@ autoreconf -fvi
 	--enable-dbe \
 	--disable-xf86bigfont \
 	--enable-dpms \
-	--enable-xorg \
+	--disable-xorg \
 	--disable-linux-acpi \
 	--disable-linux-apm \
 	--disable-xquartz \
