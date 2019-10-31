@@ -116,6 +116,8 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     + Delete old configure files that might have had the executable bit set.
       We want those to be re-generated with the correct permissions later on.
     + Port *.la file removal commenting from debian/rules.
+    + Pull in pkgconfig(glproto) BR. Needed for *SuSE, that doesn't seem to
+      pull it in by other means (while RHEL-land does).
   * debian/rules:
     + Remove weird empty variable reference construct.
     + Whitespace-only fixes.
