@@ -118,6 +118,8 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     + Port *.la file removal commenting from debian/rules.
     + Pull in pkgconfig(glproto) BR. Needed for *SuSE, that doesn't seem to
       pull it in by other means (while RHEL-land does).
+    + Fix %exclude entry for protocol.txt, the new configure flags changed its
+      path to %{_libexecdir}.
   * debian/rules:
     + Remove weird empty variable reference construct.
     + Whitespace-only fixes.

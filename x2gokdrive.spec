@@ -360,7 +360,9 @@ popd
 %files -n xorg-x11-server-x2gokdrive
 %defattr(-,root,root)
 %{_bindir}/x2gokdrive
-%exclude %{_libdir}/xorg/protocol.txt
+# Exclude protocol.txt, it's shipped by xorg-x11-server-common and we don't
+# want to conflict with that package.
+%exclude %{_libexecdir}/protocol.txt
 %exclude %{_mandir}/man1/Xserver.1.gz
 %exclude %{_var}/lib/xkb/
 %doc %{_mandir}/man1/x2gokdrive.1.gz
