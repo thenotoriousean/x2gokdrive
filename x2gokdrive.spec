@@ -354,7 +354,7 @@ popd
 pushd 'BUILD'
 make install DESTDIR='%{buildroot}'
 popd
-find '%{buildroot}/usr/lib/xorg' -type 'f' -name '*.la' -exec rm -fv '{}' ';'
+# find '%{buildroot}/usr/lib/xorg' -type 'f' -name '*.la' -exec rm -fv '{}' ';'
 
 %files -n xorg-x11-server-x2gokdrive
 %defattr(-,root,root)
