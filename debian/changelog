@@ -43,6 +43,8 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
       at least one plain-old-data type is initialized that way. Case in point,
       newer GCC versions removed that warning altogether and just blindly
       accepts the usual syntax.
+    - x2gokdriveselection.c: fix compile error, the xEvent struct (made up of
+      union of another struct) needs another layer of curly braces.
   * debian/control:
     + Grammar fix.
     + Remove dependencies that refer to disabled features.
