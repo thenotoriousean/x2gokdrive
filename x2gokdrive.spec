@@ -181,7 +181,7 @@ More information about X2Go can be found at:
 
 %package -n xorg-x11-server-x2gokdrive
 Summary:        KDrive graphical server backend for X2GoServer
-Requires:       xorg-x11-server-common >= 1.20.3
+Requires:       xorg-x11-server-common >= 1.18.4
 %if 0%{?rhel} > 8 || 0%{?suse_version}
 Recommends:     mesa-dri-drivers
 Recommends:     x2goserver >= 4.2.0.0

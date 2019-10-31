@@ -120,6 +120,11 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
       pull it in by other means (while RHEL-land does).
     + Fix %exclude entry for protocol.txt, the new configure flags changed its
       path to %{_libexecdir}.
+    + Downgrade dependency upon xorg-x11-server-common to 1.18.4. Strictly
+      speaking, we'd have to define a unique dependency for each
+      distro-version combination (e.g., Fedora 30 uses 1.20.5, EPEL 7
+      currently uses 1.20.4 etc.), but that's too complicated - let's depend
+      on at least the earliest supported version for now.
   * debian/rules:
     + Remove weird empty variable reference construct.
     + Whitespace-only fixes.
