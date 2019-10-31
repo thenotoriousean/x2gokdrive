@@ -32,6 +32,17 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     - patches.xorg/1.19.2/xorg-server-configure-ac.patch: backport
       XORG_VERSION_CURRENT change from
       e0dbca73f11e9aa7a066e748e6d08ba256be69cf / 1.20.5.
+    - x2gokdrive{remote,selection}.c: warp initializer into another set of
+      curly braces until the first POD is reached. Fixes compile errors on
+      EPEL 7 and generally systems with older GCC versions. That warning,
+      which is turned into an error later on, is generally overly strict,
+      since {0} is widely used as an "universal zero initializer" in C,
+      initializing all other elements that are not explicitly given in the
+      list implicitly with zero. For some reason, GCC decided that it is an
+      error to initialize a whole struct that way and explicitly requires that
+      at least one plain-old-data type is initialized that way. Case in point,
+      newer GCC versions removed that warning altogether and just blindly
+      accepts the usual syntax.
   * debian/control:
     + Grammar fix.
     + Remove dependencies that refer to disabled features.

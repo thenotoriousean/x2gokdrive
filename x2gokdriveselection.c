@@ -158,7 +158,7 @@ static int create_selection_window(void)
 
 static void request_selection(Atom selection, Atom rtype)
 {
-    xEvent ev = {0};
+    xEvent ev = {{0}};
     Selection *selPtr = NULL;
     int rc = -1;
 
@@ -444,7 +444,7 @@ static int convert_selection(ClientPtr client, Atom selection,
     int rc = -1;
 
     Atom realProperty = {0};
-    xEvent event = {0};
+    xEvent event = {{0}};
 
     inputBuffer* buff=&remoteVars->selstruct.inSelection;
     if(selection==atomClipboard)

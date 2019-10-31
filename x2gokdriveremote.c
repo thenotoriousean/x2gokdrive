@@ -1279,7 +1279,7 @@ static
 void sendMainImageFromSendThread(uint32_t width, uint32_t height, int32_t dx ,int32_t dy)
 {
     _X_UNUSED uint32_t length = 0;
-    struct frame_region regions[9] = {0};
+    struct frame_region regions[9] = {{0}};
 
     uint32_t isize = 0;
     unsigned char* data = NULL;
@@ -1980,7 +1980,7 @@ clientReadNotify(int fd, int ready, void *data)
                 {
                     uint16_t width=*((uint16_t*)buff+2);
                     uint16_t height=*((uint16_t*)buff+3);
-                    struct VirtScreen screens[4] = {0};
+                    struct VirtScreen screens[4] = {{0}};
 
                     remoteVars.client_initialized=TRUE;
                     EPHYR_DBG("Client want resize to %dx%d",width,height);
@@ -2660,7 +2660,7 @@ void initFrameRegions(struct cache_elem* frame)
             if(best_match && match_val<=MAX_MATCH_VAL)
             {
 
-                rectangle rect = {0};
+                rectangle rect = {{0}};
                 int hshift, vshift = 0;
 
                 if(find_common_regions(best_match, frame, &diff, &rect, &hshift, &vshift))
