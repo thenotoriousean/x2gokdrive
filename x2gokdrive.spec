@@ -269,6 +269,9 @@ export CFLAGS="$RPM_OPT_FLAGS -fpic"
 export CXXFLAGS="$CFLAGS"
 
 pushd 'BUILD'
+# Clean up old configure files that might have had the executable bit set.
+# Will be regenerated later on.
+rm -f 'configure' 'config.'{sub,guess} 'depcomp' 'install-sh' 'compile' 'ltmain.sh' 'missing' 'ylwrap'
 autoreconf -fvi
 # The RPM macro for the linker flags does not exist on EPEL
 %{!?__global_ldflags: %global __global_ldflags -Wl,-z,relro}
