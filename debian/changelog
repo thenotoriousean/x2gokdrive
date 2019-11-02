@@ -125,6 +125,8 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
       distro-version combination (e.g., Fedora 30 uses 1.20.5, EPEL 7
       currently uses 1.20.4 etc.), but that's too complicated - let's depend
       on at least the earliest supported version for now.
+    + Work around issue on *SuSE: for some reason, Mesa-libGL-devel doesn't
+      pull Mesa-devel in, leading to a compile failure. Do that manually.
   * debian/rules:
     + Remove weird empty variable reference construct.
     + Whitespace-only fixes.

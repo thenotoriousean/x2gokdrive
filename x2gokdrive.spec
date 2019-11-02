@@ -153,6 +153,10 @@ BuildRequires:  pkgconfig(xinerama)
 BuildRequires:  pkgconfig(xorg-macros)
 BuildRequires:  pkgconfig(openssl)
 BuildRequires:  pkgconfig(xshmfence)
+# *SuSE-specific
+%if 0%{?suse_version}
+BuildRequires:  Mesa-devel
+%endif
 
 %description
 X2Go is a server based computing environment with
