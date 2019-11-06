@@ -188,10 +188,10 @@ Summary:        KDrive graphical server backend for X2GoServer
 Requires:       xorg-x11-server-common >= 1.18.4
 %if 0%{?rhel} > 8 || 0%{?suse_version}
 Recommends:     mesa-dri-drivers
-Recommends:     x2goserver >= 4.2.0.0
+Recommends:     x2goserver >= 4.1.0.4
 %else
 Requires:       mesa-dri-drivers
-Requires:       x2goserver >= 4.2.0.0
+Requires:       x2goserver >= 4.1.0.4
 %endif
 
 %description -n xorg-x11-server-x2gokdrive
