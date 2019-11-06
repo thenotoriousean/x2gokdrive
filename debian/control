@@ -100,7 +100,7 @@ Depends:
  ${misc:Depends},
  ${shlibs:Depends},
 Recommends:
- x2goserver (>= 4.2.0.0~),
+ x2goserver (>= 4.1.0.4~),
  libgl1-mesa-dri (>= 7.1~rc1),
 Description: KDrive graphical server backend for X2Go Server
  X2Go is a server based computing environment with
