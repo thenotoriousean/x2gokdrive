@@ -136,6 +136,7 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     + Change libunwind build-dependency and usage: for ppc64(be), use it when
       not on RHEL/CentOS (this includes *SuSE and Fedora) and for ppc64le, use
       it on RHEL/CentOS 8+ or when not on RHEL/CentOS.
+    + Fix syntax error due to unclosed %if.
   * debian/rules:
     + Remove weird empty variable reference construct.
     + Whitespace-only fixes.

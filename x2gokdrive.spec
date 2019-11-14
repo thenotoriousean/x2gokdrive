@@ -149,6 +149,7 @@ BuildRequires:  pkgconfig(libunwind)
 # Let's assume that it's also available for *SuSE if supported.
 %if 0%{?rhel} > 7 || !0%{?rhel}
 BuildRequires:  pkgconfig(libunwind)
+%endif
 %else
 BuildRequires:  pkgconfig(libunwind)
 %endif
