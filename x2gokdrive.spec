@@ -134,7 +134,25 @@ BuildRequires:  pkgconfig(audit)
 BuildRequires:  pkgconfig(auparse)
 # Same goes for pkgconfig(libdrm).
 BuildRequires:  pkgconfig(gl)
+%ifarch ppc64
+# ppc64(be) doesn't have libunwind at all within CentOS/EPEL and this won't
+# change, because the architecture is deprecated.
+%if !0%{?rhel}
+# Older Fedora versions provided it, though, and we don't have to care for
+# *SuSE at all, fortunately.
 BuildRequires:  pkgconfig(libunwind)
+%endif
+%else
+%ifarch ppc64le
+# For ppc64le, libunwind is always provided by Fedora (if the architecture is
+# supported) and for CentOS 8+.
+# Let's assume that it's also available for *SuSE if supported.
+%if 0%{?rhel} > 7 || !0%{?rhel}
+BuildRequires:  pkgconfig(libunwind)
+%else
+BuildRequires:  pkgconfig(libunwind)
+%endif
+%endif
 BuildRequires:  pkgconfig(xmuu)
 BuildRequires:  pkgconfig(xext)
 BuildRequires:  pkgconfig(x11)
@@ -347,7 +365,23 @@ autoreconf -fvi
 	--disable-dri \
 	--disable-dri2 \
 	--disable-glamor \
+%ifarch ppc64
+%if !0%{?rhel}
 	--enable-libunwind \
+%else
+	--disable-libunwind \
+%endif
+%else
+%ifarch ppc64le
+%if 0%{?rhel} > 7 || !0%{?rhel}
+	--enable-libunwind \
+%else
+	--disable-libunwind \
+%endif
+%else
+	--enable-libunwind \
+%endif
+%endif
 	--disable-libdrm \
 	--enable-unit-tests \
 	CPPFLAGS="${CPPFLAGS} %{?__global_cppflags} -DPRE_RELEASE=0" \
