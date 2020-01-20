@@ -1,0 +1,113 @@
+--- a/configure.ac	2019-11-23 00:44:19.000000000 +0100
++++ b/configure.ac	2020-01-20 14:14:41.883851697 +0100
+@@ -31,7 +31,7 @@ RELEASE_DATE="2019-11-22"
+ RELEASE_NAME="Enchiladas de Queso"
+ AC_CONFIG_SRCDIR([Makefile.am])
+ AC_CONFIG_MACRO_DIR([m4])
+-AM_INIT_AUTOMAKE([foreign dist-bzip2])
++AM_INIT_AUTOMAKE([foreign dist-bzip2 subdir-objects])
+ AC_USE_SYSTEM_EXTENSIONS
+ 
+ # Require xorg-macros minimum of 1.14 for XORG_COMPILER_BRAND in XORG_DEFAULT_OPTIONS
+@@ -597,6 +597,7 @@ AC_ARG_ENABLE(glamor,         AS_HELP_ST
+ dnl kdrive and its subsystems
+ AC_ARG_ENABLE(kdrive,         AS_HELP_STRING([--enable-kdrive], [Build kdrive servers (default: no)]), [KDRIVE=$enableval], [KDRIVE=no])
+ AC_ARG_ENABLE(xephyr,         AS_HELP_STRING([--enable-xephyr], [Build the kdrive Xephyr server (default: auto)]), [XEPHYR=$enableval], [XEPHYR=auto])
++AC_ARG_ENABLE(x2gokdrive,     AS_HELP_STRING([--enable-x2gokdrive], [Build the kdrive x2gokdrive server (default: auto)]), [X2GOKDRIVE=$enableval], [X2GOKDRIVE=auto])
+ dnl kdrive options
+ AC_ARG_ENABLE(libunwind,      AS_HELP_STRING([--enable-libunwind], [Use libunwind for backtracing (default: auto)]), [LIBUNWIND="$enableval"], [LIBUNWIND="auto"])
+ AC_ARG_ENABLE(xshmfence,      AS_HELP_STRING([--disable-xshmfence], [Disable xshmfence (default: auto)]), [XSHMFENCE="$enableval"], [XSHMFENCE="auto"])
+@@ -1769,6 +1770,8 @@ if test "x$XORG" = xauto; then
+ fi
+ AC_MSG_RESULT([$XORG])
+ 
++AC_DEFINE_UNQUOTED(XORG_VERSION_CURRENT, [$VENDOR_RELEASE], [Current Xorg version])
++
+ if test "x$XORG" = xyes; then
+ 	XORG_DDXINCS='-I$(top_srcdir)/hw/xfree86 -I$(top_srcdir)/hw/xfree86/include -I$(top_srcdir)/hw/xfree86/common'
+ 	XORG_OSINCS='-I$(top_srcdir)/hw/xfree86/os-support -I$(top_srcdir)/hw/xfree86/os-support/bus -I$(top_srcdir)/os'
+@@ -1983,7 +1986,6 @@ if test "x$XORG" = xyes; then
+ 	AC_DEFINE(XORG_SERVER, 1, [Building Xorg server])
+ 	AC_DEFINE(XORGSERVER, 1, [Building Xorg server])
+ 	AC_DEFINE(XFree86Server, 1, [Building XFree86 server])
+-	AC_DEFINE_UNQUOTED(XORG_VERSION_CURRENT, [$VENDOR_RELEASE], [Current Xorg version])
+ 	AC_DEFINE(NEED_XF86_TYPES, 1, [Need XFree86 typedefs])
+ 	AC_DEFINE(NEED_XF86_PROTOTYPES, 1, [Need XFree86 helper functions])
+ 	AC_DEFINE(__XSERVERNAME__, "Xorg", [Name of X server])
+@@ -2263,9 +2265,15 @@ dnl kdrive DDX
+ XEPHYR_LIBS=
+ XEPHYR_INCS=
+ 
++X2GOKDRIVE_LIBS=
++X2GOKDRIVE_INCS=
++
+ AM_CONDITIONAL(KDRIVE, [test x$KDRIVE = xyes])
+ 
+ if test "$KDRIVE" = yes; then
++
++    ### XEPHYR
++
+     XEPHYR_REQUIRED_LIBS="xau xdmcp xcb xcb-shape xcb-render xcb-renderutil xcb-aux xcb-image xcb-icccm xcb-shm >= 1.9.3 xcb-keysyms xcb-randr xcb-xkb"
+     if test "x$XV" = xyes; then
+         XEPHYR_REQUIRED_LIBS="$XEPHYR_REQUIRED_LIBS xcb-xv"
+@@ -2305,6 +2313,43 @@ if test "$KDRIVE" = yes; then
+ 
+     AC_SUBST([XEPHYR_LIBS])
+     AC_SUBST([XEPHYR_INCS])
++
++    ### X2GOKDRIVE
++
++    X2GOKDRIVE_REQUIRED_LIBS="xau xdmcp xcb xcb-shape xcb-render xcb-renderutil xcb-aux xcb-image xcb-icccm xcb-shm >= 1.9.3 xcb-keysyms xcb-randr xcb-xkb zlib libjpeg libpng"
++    if test "x$DRI" = xyes && test "x$GLX" = xyes; then
++        X2GOKDRIVE_REQUIRED_LIBS="$X2GOKDRIVE_REQUIRED_LIBS $LIBDRM xcb-glx xcb-xf86dri > 1.6"
++    fi
++
++    if test "x$X2GOKDRIVE" = xauto; then
++        PKG_CHECK_MODULES(X2GOKDRIVE, $X2GOKDRIVE_REQUIRED_LIBS, [X2GOKDRIVE="yes"], [X2GOKDRIVE="no"])
++    elif test "x$X2GOKDRIVE" = xyes ; then
++        PKG_CHECK_MODULES(X2GOKDRIVE, $X2GOKDRIVE_REQUIRED_LIBS)
++    fi
++
++    # X2GOKDRIVE needs nanosleep() which is in librt on Solaris
++    AC_CHECK_FUNC([nanosleep], [],
++        AC_CHECK_LIB([rt], [nanosleep], X2GOKDRIVE_LIBS="$X2GOKDRIVE_LIBS -lrt"))
++    
++    # damage shadow extension glx (NOTYET) fb mi
++    KDRIVE_INC='-I$(top_srcdir)/hw/kdrive/src'
++    KDRIVE_PURE_INCS="$KDRIVE_INC $MIEXT_SYNC_INC $MIEXT_DAMAGE_INC $MIEXT_SHADOW_INC $XEXT_INC $FB_INC $MI_INC"
++    KDRIVE_OS_INC='-I$(top_srcdir)/hw/kdrive/linux'
++    KDRIVE_INCS="$KDRIVE_PURE_INCS $KDRIVE_OS_INC"
++    
++    KDRIVE_CFLAGS="$XSERVER_CFLAGS"
++
++    KDRIVE_PURE_LIBS="$FB_LIB $MI_LIB $FIXES_LIB $XEXT_LIB $DBE_LIB $RECORD_LIB $GLX_LIBS $RANDR_LIB $RENDER_LIB $DAMAGE_LIB $DRI3_LIB $PRESENT_LIB $MIEXT_SYNC_LIB $MIEXT_DAMAGE_LIB $MIEXT_SHADOW_LIB $XI_LIB $XKB_LIB $XKB_STUB_LIB $COMPOSITE_LIB $OS_LIB"
++    KDRIVE_LIB='$(top_builddir)/hw/kdrive/src/libkdrive.la'
++    KDRIVE_MAIN_LIB="$MAIN_LIB"
++    KDRIVE_LOCAL_LIBS="$DIX_LIB $KDRIVE_LIB"
++    KDRIVE_LOCAL_LIBS="$KDRIVE_LOCAL_LIBS $FB_LIB $MI_LIB $KDRIVE_PURE_LIBS"
++    KDRIVE_LOCAL_LIBS="$KDRIVE_LOCAL_LIBS $KDRIVE_OS_LIB"
++    KDRIVE_LIBS="$KDRIVE_LOCAL_LIBS $XSERVER_SYS_LIBS $GLX_SYS_LIBS $DLOPEN_LIBS"
++
++    AC_SUBST([X2GOKDRIVE_LIBS])
++    AC_SUBST([X2GOKDRIVE_INCS])
++
+ fi
+ AC_SUBST([KDRIVE_INCS])
+ AC_SUBST([KDRIVE_PURE_INCS])
+@@ -2314,6 +2359,7 @@ AC_SUBST([KDRIVE_MAIN_LIB])
+ AC_SUBST([KDRIVE_LOCAL_LIBS])
+ AC_SUBST([KDRIVE_LIBS])
+ AM_CONDITIONAL(XEPHYR, [test "x$KDRIVE" = xyes && test "x$XEPHYR" = xyes])
++AM_CONDITIONAL(X2GOKDRIVE, [test "x$KDRIVE" = xyes && test "x$X2GOKDRIVE" = xyes])
+ 
+ dnl Xwayland DDX
+ 
+@@ -2535,6 +2581,8 @@ hw/xquartz/xpr/Makefile
+ hw/kdrive/Makefile
+ hw/kdrive/ephyr/Makefile
+ hw/kdrive/ephyr/man/Makefile
++hw/kdrive/x2gokdrive/Makefile
++hw/kdrive/x2gokdrive/man/Makefile
+ hw/kdrive/src/Makefile
+ hw/xwayland/Makefile
+ test/Makefile

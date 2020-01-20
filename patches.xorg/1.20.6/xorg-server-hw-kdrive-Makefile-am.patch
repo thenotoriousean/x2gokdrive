@@ -1,0 +1,25 @@
+--- a/hw/kdrive/Makefile.am	2019-11-23 00:44:19.000000000 +0100
++++ b/hw/kdrive/Makefile.am	2020-01-20 14:14:46.857872079 +0100
+@@ -1,15 +1,20 @@
++if X2GOKDRIVE
++X2GOKDRIVE_SUBDIRS = x2gokdrive
++endif
++
+ if XEPHYR
+ XEPHYR_SUBDIRS = ephyr
+ endif
+ 
+ SERVER_SUBDIRS = 		\
+-	$(XEPHYR_SUBDIRS)
++	$(XEPHYR_SUBDIRS)	\
++	$(X2GOKDRIVE_SUBDIRS)
+ 
+ SUBDIRS =			\
+ 	src			\
+ 	$(SERVER_SUBDIRS)
+ 
+-DIST_SUBDIRS = ephyr src
++DIST_SUBDIRS = ephyr x2gokdrive src
+ 
+ relink:
+ 	$(AM_V_at)for i in $(SERVER_SUBDIRS) ; do $(MAKE) -C $$i relink || exit 1 ; done
