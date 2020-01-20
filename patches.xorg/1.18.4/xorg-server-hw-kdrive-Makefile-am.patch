@@ -1,7 +1,5 @@
-Index: xorg-server/hw/kdrive/Makefile.am
-===================================================================
---- xorg-server.orig/hw/kdrive/Makefile.am
-+++ xorg-server/hw/kdrive/Makefile.am
+--- a/hw/kdrive/Makefile.am	2020-01-20 12:22:40.859250080 +0100
++++ b/hw/kdrive/Makefile.am	2020-01-20 12:22:47.528277800 +0100
 @@ -6,6 +6,10 @@ if XFAKESERVER
  XFAKE_SUBDIRS = fake
  endif

@@ -48,6 +48,7 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     - patches.xorg/: add skeleton for 1.20.3 - needed for OpenSuSE Leap 15.1.
     - patches.xorg/1.20.3: add actual (rebased) patches and potentially
       missing files.
+    - patches.xorg/1.18.4: refresh against Ubuntu 16.04/xenial version.
   * debian/control:
     + Grammar fix.
     + Remove dependencies that refer to disabled features.
