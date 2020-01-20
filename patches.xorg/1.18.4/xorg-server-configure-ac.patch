@@ -1,5 +1,5 @@
---- a/configure.ac	2016-07-19 19:27:07.000000000 +0200
-+++ b/configure.ac	2020-01-20 18:51:57.864785918 +0100
+--- a/configure.ac	2020-01-20 20:06:03.642526897 +0100
++++ b/configure.ac	2020-01-20 20:10:26.746419200 +0100
 @@ -31,7 +31,7 @@ RELEASE_DATE="2016-07-19"
  RELEASE_NAME="Skordalia"
  AC_CONFIG_SRCDIR([Makefile.am])
@@ -21,7 +21,7 @@
  XEPHYR_LIBS=
  XEPHYR_INCS=
  
-+X2GOKDRIVE_LIBS=-lz -ljpeg -lpng -lpthread
++X2GOKDRIVE_LIBS=
 +X2GOKDRIVE_INCS=
 +
  AM_CONDITIONAL(KDRIVE, [test x$KDRIVE = xyes])
@@ -33,7 +33,7 @@
      AC_DEFINE(KDRIVESERVER,1,[Build Kdrive X server])
      AC_DEFINE(KDRIVEDDXACTIONS,,[Build kdrive ddx])
  
-@@ -2445,6 +2452,43 @@ if test "$KDRIVE" = yes; then
+@@ -2445,6 +2452,48 @@ if test "$KDRIVE" = yes; then
  
      AC_SUBST([XEPHYR_LIBS])
      AC_SUBST([XEPHYR_INCS])
@@ -54,7 +54,11 @@
 +    # X2GOKDRIVE needs nanosleep() which is in librt on Solaris
 +    AC_CHECK_FUNC([nanosleep], [],
 +        AC_CHECK_LIB([rt], [nanosleep], X2GOKDRIVE_LIBS="$X2GOKDRIVE_LIBS -lrt"))
-+    
++
++    # Add missing pthread references to x2gokdrive binary linking.
++    X2GOKDRIVE_CFLAGS="${X2GOKDRIVE_CFLAGS} -pthread"
++    X2GOKDRIVE_LIBS="${X2GOKDRIVE_LIBS} -lpthread"
++
 +    # damage shadow extension glx (NOTYET) fb mi
 +    KDRIVE_INC='-I$(top_srcdir)/hw/kdrive/src'
 +    KDRIVE_PURE_INCS="$KDRIVE_INC $MIEXT_SYNC_INC $MIEXT_DAMAGE_INC $MIEXT_SHADOW_INC $XEXT_INC $FB_INC $MI_INC"
@@ -71,13 +75,14 @@
 +    KDRIVE_LOCAL_LIBS="$KDRIVE_LOCAL_LIBS $KDRIVE_OS_LIB"
 +    KDRIVE_LIBS="$KDRIVE_LOCAL_LIBS $XSERVER_SYS_LIBS $GLX_SYS_LIBS $DLOPEN_LIBS"
 +
++    AC_SUBST([X2GOKDRIVE_CFLAGS])
 +    AC_SUBST([X2GOKDRIVE_LIBS])
 +    AC_SUBST([X2GOKDRIVE_INCS])
 +
  fi
  AC_SUBST([KDRIVE_INCS])
  AC_SUBST([KDRIVE_PURE_INCS])
-@@ -2460,6 +2504,7 @@ AM_CONDITIONAL(KDRIVE_MOUSE, [test "x$KD
+@@ -2460,6 +2509,7 @@ AM_CONDITIONAL(KDRIVE_MOUSE, [test "x$KD
  AM_CONDITIONAL(TSLIB, [test "x$HAVE_TSLIB" = xyes])
  AM_CONDITIONAL(KDRIVEFBDEV, [test "x$XFBDEV" = xyes])
  AM_CONDITIONAL(XEPHYR, [test "x$KDRIVE" = xyes && test "x$XEPHYR" = xyes])
@@ -85,7 +90,7 @@
  AM_CONDITIONAL(BUILD_KDRIVEFBDEVLIB, [test "x$KDRIVE" = xyes && test "x$KDRIVEFBDEVLIB" = xyes])
  AM_CONDITIONAL(XFAKESERVER, [test "x$KDRIVE" = xyes && test "x$XFAKE" = xyes])
  
-@@ -2635,6 +2680,8 @@ hw/xquartz/xpr/Makefile
+@@ -2635,6 +2685,8 @@ hw/xquartz/xpr/Makefile
  hw/kdrive/Makefile
  hw/kdrive/ephyr/Makefile
  hw/kdrive/ephyr/man/Makefile

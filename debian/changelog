@@ -69,6 +69,8 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     - Makefile.am: add print-debugging to figure out what is being generated
       on Ubuntu 16.04/xenial.
     - Makefile.am: revert print-debugging again.
+    - patches.xorg/1.18.4/xorg-server-configure-ac.patch: correctly add
+      -pthread and -lpthread references *after* the pkgconfig checks execute.
   * debian/control:
     + Grammar fix.
     + Remove dependencies that refer to disabled features.
