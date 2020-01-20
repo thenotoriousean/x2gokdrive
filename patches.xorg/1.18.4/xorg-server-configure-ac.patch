@@ -1,5 +1,5 @@
 --- a/configure.ac	2016-07-19 19:27:07.000000000 +0200
-+++ b/configure.ac	2020-01-20 17:43:44.281437625 +0100
++++ b/configure.ac	2020-01-20 18:51:57.864785918 +0100
 @@ -31,7 +31,7 @@ RELEASE_DATE="2016-07-19"
  RELEASE_NAME="Skordalia"
  AC_CONFIG_SRCDIR([Makefile.am])
@@ -21,7 +21,7 @@
  XEPHYR_LIBS=
  XEPHYR_INCS=
  
-+X2GOKDRIVE_LIBS=-lpthread
++X2GOKDRIVE_LIBS=-lz -ljpeg -lpng -lpthread
 +X2GOKDRIVE_INCS=
 +
  AM_CONDITIONAL(KDRIVE, [test x$KDRIVE = xyes])

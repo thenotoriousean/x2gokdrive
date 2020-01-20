@@ -63,6 +63,9 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
       X2GOKDRIVE_LIBS.
     - patches.xorg/1.19.6: refresh patch set for Ubuntu 18.04/bionic,
       including backporting of the XORG_VERSION_CURRENT change.
+    - patches.xorg/1.18.4/xorg-server-configure-ac.patch: add -lz and also
+      -ljpeg and -lpng to be on the safe side, since it seems that these
+      libraries are universally missing.
   * debian/control:
     + Grammar fix.
     + Remove dependencies that refer to disabled features.
