@@ -64,6 +64,13 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     + Try to pull libxfont1-dev (for old Ubuntu versions such as 16.04/xenial
       that don't support building X.Org against libXfont2) and fallback to
       libxfont-dev to retain the old, default behavior.
+    + Make libxfont1-dev an entirely optional dependency and libxfont-dev a
+      hard one. This should always install libxfont-dev (which typically is
+      the libXfont2-version), but also the libXfont1-version if available.
+      Ubuntu 16.04/xenial has X.Org Server 1.18.4 which is not compatible with
+      libXfont2, but Debian 9/stretch uses X.Org Server 1.19.2, which is
+      compatible with libXfont2 (and actually requires it), but also has both
+      packages available.
   * x2gokdrive.spec:
     + Drop Debian-style formatting in description.
     + Typo fixes.
