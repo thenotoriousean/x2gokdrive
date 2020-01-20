@@ -234,7 +234,12 @@ ephyrMapFramebuffer(KdScreenInfo * screen)
     buffer_height = ephyrBufferHeight(screen);
 
     priv->base =
-         remote_screen_init(screen, screen->x, screen->y,
+         remote_screen_init(screen,
+#if XORG_VERSION_CURRENT < 11900000
+                            0, 0,
+#else /* XORG_VERSION_CURRENT */
+                            screen->x, screen->y,
+#endif /* XORG_VERSION_CURRENT */
                           screen->width, screen->height, buffer_height,
                           &priv->bytes_per_line, &screen->fb.bitsPerPixel);
 
@@ -346,14 +351,22 @@ ephyrInternalDamageRedisplay(ScreenPtr pScreen)
 
 
 static void
-ephyrScreenBlockHandler(ScreenPtr pScreen, void *timeout)
+ephyrScreenBlockHandler(ScreenPtr pScreen, void *timeout
+#if XORG_VERSION_CURRENT < 11900000
+                        , void *pReadMask
+#endif /* XORG_VERSION_CURRENT */
+                       )
 {
     KdScreenPriv(pScreen);
     KdScreenInfo *screen = pScreenPriv->screen;
     EphyrScrPriv *scrpriv = screen->driver;
 
     pScreen->BlockHandler = scrpriv->BlockHandler;
-    (*pScreen->BlockHandler)(pScreen, timeout);
+    (*pScreen->BlockHandler)(pScreen, timeout
+#if XORG_VERSION_CURRENT < 11900000
+                             , pReadMask
+#endif /* XORG_VERSION_CURRENT */
+                            );
     scrpriv->BlockHandler = pScreen->BlockHandler;
     pScreen->BlockHandler = ephyrScreenBlockHandler;
 
@@ -1069,11 +1082,15 @@ ScreenPtr ephyrCursorScreen; /* screen containing the cursor */
 static void
 ephyrWarpCursor(DeviceIntPtr pDev, ScreenPtr pScreen, int x, int y)
 {
+#if XORG_VERSION_CURRENT < 11900000
     input_lock();
+#endif /* XORG_VERSION_CURRENT */
     ephyrCursorScreen = pScreen;
     miPointerWarpCursor(inputInfo.pointer, pScreen, x, y);
 
+#if XORG_VERSION_CURRENT < 11900000
     input_unlock();
+#endif /* XORG_VERSION_CURRENT */
 }
 
 miPointerScreenFuncRec ephyrPointerScreenFuncs = {

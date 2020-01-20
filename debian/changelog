@@ -49,6 +49,9 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     - patches.xorg/1.20.3: add actual (rebased) patches and potentially
       missing files.
     - patches.xorg/1.18.4: refresh against Ubuntu 16.04/xenial version.
+    - x2gokdrive{.c,remote.c,init.{c,h}}: patch for X.Org 1.18.x
+      compatibility, merging in the content from
+      patches.legacy/osuse_42.3.patch via preprocessor defines.
   * debian/control:
     + Grammar fix.
     + Remove dependencies that refer to disabled features.

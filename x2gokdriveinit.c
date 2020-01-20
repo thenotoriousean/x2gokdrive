@@ -333,5 +333,8 @@ ephyrInitFake(void) { return 1; }
 
 KdOsFuncs EphyrOsFuncs = {
     .Init = ephyrInitFake,
+#if XORG_VERSION_CURRENT < 11900000
+    .pollEvents = pollEvents,
+#endif /* XORG_VERSION_CURRENT */
 };
 #endif /* XORG_VERSION_CURRENT */

@@ -1436,7 +1436,9 @@ void *send_frame_thread (void *threadid)
         //only accept one client, close server socket
         shutdown(remoteVars.serversock, SHUT_RDWR);
         close(remoteVars.serversock);
+#if XORG_VERSION_CURRENT < 11900000
         SetNotifyFd(remoteVars.clientsock, clientReadNotify, X_NOTIFY_READ, NULL);
+#endif /* XORG_VERSION_CURRENT */
         remoteVars.client_connected=TRUE;
         if(remoteVars.checkConnectionTimer)
         {
@@ -1457,7 +1459,9 @@ void *send_frame_thread (void *threadid)
             if(!remoteVars.client_connected)
             {
                 EPHYR_DBG ("TCP connection closed\n");
+#if XORG_VERSION_CURRENT < 11900000
                 RemoveNotifyFd(remoteVars.clientsock);
+#endif /* XORG_VERSION_CURRENT */
                 shutdown(remoteVars.clientsock, SHUT_RDWR);
                 close(remoteVars.clientsock);
                 pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
@@ -2093,6 +2097,29 @@ clientReadNotify(int fd, int ready, void *data)
     remoteVars.evBufferOffset=restDataLength;
 
 }
+
+#if XORG_VERSION_CURRENT < 11900000
+void pollEvents(void)
+{
+    //EPHYR_DBG("polling events");
+    struct pollfd fds[2];
+    int    nfds = 1;
+    BOOL con;
+    pthread_mutex_lock(&remoteVars.sendqueue_mutex);
+    con=remoteVars.client_connected;
+    pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+    if(!con)
+        return;
+
+    memset(fds, 0 , sizeof(fds));
+    fds[0].fd = remoteVars.clientsock;
+    fds[0].events = POLLIN;
+    if(poll(fds, nfds, 0))
+    {
+       clientReadNotify(remoteVars.clientsock, 0, NULL);
+    }
+}
+#endif /* XORG_VERSION_CURRENT */
 
 unsigned int checkSocketConnection(OsTimerPtr timer, CARD32 time, void* args)
 {

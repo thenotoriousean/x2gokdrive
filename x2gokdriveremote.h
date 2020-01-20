@@ -87,6 +87,10 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <arpa/inet.h>
+#if XORG_VERSION_CURRENT < 11900000
+#include <poll.h>
+#endif /* XORG_VERSION_CURRENT */
+
 
 #define EPHYR_WANT_DEBUG 1
 // #warning DEBUG ENABLED
@@ -372,6 +376,10 @@ struct _remoteHostVars
 
 int send_selection(int sel, char* data, uint32_t length, uint32_t mimeData);
 
+#if XORG_VERSION_CURRENT < 11900000
+void clientReadNotify(int fd, int ready, void *data);
+void pollEvents(void);
+#endif /* XORG_VERSION_CURRENT */
 void clear_cache_data(uint32_t maxsize);
 void clear_frame_cache(uint32_t max_elements);
 
