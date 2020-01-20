@@ -1082,13 +1082,13 @@ ScreenPtr ephyrCursorScreen; /* screen containing the cursor */
 static void
 ephyrWarpCursor(DeviceIntPtr pDev, ScreenPtr pScreen, int x, int y)
 {
-#if XORG_VERSION_CURRENT < 11900000
+#if XORG_VERSION_CURRENT >= 11900000
     input_lock();
 #endif /* XORG_VERSION_CURRENT */
     ephyrCursorScreen = pScreen;
     miPointerWarpCursor(inputInfo.pointer, pScreen, x, y);
 
-#if XORG_VERSION_CURRENT < 11900000
+#if XORG_VERSION_CURRENT >= 11900000
     input_unlock();
 #endif /* XORG_VERSION_CURRENT */
 }

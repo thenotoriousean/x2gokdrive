@@ -56,6 +56,7 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
       1.20.5.
     - patches.xorg/: add 1.20.7 files, essentially copied and refreshed from
       1.20.6.
+    - x2gokdrive{,remote}.c: fix logic flaws.
   * debian/control:
     + Grammar fix.
     + Remove dependencies that refer to disabled features.

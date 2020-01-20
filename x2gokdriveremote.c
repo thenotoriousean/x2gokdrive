@@ -1436,7 +1436,7 @@ void *send_frame_thread (void *threadid)
         //only accept one client, close server socket
         shutdown(remoteVars.serversock, SHUT_RDWR);
         close(remoteVars.serversock);
-#if XORG_VERSION_CURRENT < 11900000
+#if XORG_VERSION_CURRENT >= 11900000
         SetNotifyFd(remoteVars.clientsock, clientReadNotify, X_NOTIFY_READ, NULL);
 #endif /* XORG_VERSION_CURRENT */
         remoteVars.client_connected=TRUE;
@@ -1459,7 +1459,7 @@ void *send_frame_thread (void *threadid)
             if(!remoteVars.client_connected)
             {
                 EPHYR_DBG ("TCP connection closed\n");
-#if XORG_VERSION_CURRENT < 11900000
+#if XORG_VERSION_CURRENT >= 11900000
                 RemoveNotifyFd(remoteVars.clientsock);
 #endif /* XORG_VERSION_CURRENT */
                 shutdown(remoteVars.clientsock, SHUT_RDWR);
