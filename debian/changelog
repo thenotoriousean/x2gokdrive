@@ -66,6 +66,8 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     - patches.xorg/1.18.4/xorg-server-configure-ac.patch: add -lz and also
       -ljpeg and -lpng to be on the safe side, since it seems that these
       libraries are universally missing.
+    - Makefile.am: add print-debugging to figure out what is being generated
+      on Ubuntu 16.04/xenial.
   * debian/control:
     + Grammar fix.
     + Remove dependencies that refer to disabled features.
