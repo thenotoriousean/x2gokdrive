@@ -74,6 +74,12 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
       libXfont2, but Debian 9/stretch uses X.Org Server 1.19.2, which is
       compatible with libXfont2 (and actually requires it), but also has both
       packages available.
+    + Depend upon libxfont1-dev << 1.5.2 (which is the version in Debian
+      9/stretch) or fall back to libxfont-dev *and* make sure that the
+      libxfont1-dev version is greater than 1.4.2. This should essentially
+      emulate libxfont1-dev (>> 1.4.2 << 1.5.2) | libxfont-dev (>> 1.4.2) and
+      fix issues with "hello" being picked with subsequent dependencies being
+      dropped (like libunwind, which is usually not optional).
   * x2gokdrive.spec:
     + Drop Debian-style formatting in description.
     + Typo fixes.
