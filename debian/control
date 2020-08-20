@@ -88,6 +88,7 @@ Build-Depends:
  libxcb-randr0-dev,
  libxcb-xv0-dev,
  libxcb-glx0-dev,
+ libxcb-xfixes0-dev,
  libxcb-xf86dri0-dev (>= 1.6),
 Standards-Version: 4.3.0
 Homepage: https://code.x2go.org/releases/source/x2gokdrive
