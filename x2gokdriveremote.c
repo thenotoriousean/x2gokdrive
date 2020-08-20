@@ -528,17 +528,44 @@ int send_deleted_cursors(void)
     return sent;
 }
 
-int send_selection(int sel, char* data, uint32_t length, uint32_t format)
+int send_output_selection(outputChunk* chunk)
+{
+    //client supports extended selections
+    if(remoteVars.selstruct.clientSupportsExetndedSelection)
+    {
+        //send extended selection
+        return send_selection_chunk(chunk->selection, chunk->data, chunk->size, chunk->mimeData, chunk->firstChunk, chunk->lastChunk, chunk->compressed, chunk->totalSize);
+    }
+    else
+    {
+        //older client doesn't support only uncompressed datas in single chunk
+        //not sending chunk in other case
+        if(!chunk->compressed && chunk->firstChunk && chunk->lastChunk)
+        {
+            return send_selection_chunk(chunk->selection, chunk->data, chunk->size, chunk->mimeData, TRUE, TRUE, FALSE, chunk->size);
+        }
+        EPHYR_DBG("Client doesn't support extended selection, not sending this chunk");
+    }
+    return 0;
+}
+
+int send_selection_chunk(int sel, unsigned char* data, uint32_t length, uint32_t format, BOOL first, BOOL last, BOOL compressed, uint32_t total)
 {
     unsigned char buffer[56] = {0};
     _X_UNUSED int ln = 0;
     int l = 0;
     int sent = 0;
 
-    *((uint32_t*)buffer)=SELECTION;
-    *((uint32_t*)buffer+1)=sel;
-    *((uint32_t*)buffer+2)=format;
-    *((uint32_t*)buffer+3)=length;
+
+    *((uint32_t*)buffer)=SELECTION;    //0
+    *((uint32_t*)buffer+1)=sel;        //4
+    *((uint32_t*)buffer+2)=format;     //8
+    *((uint32_t*)buffer+3)=length;     //16
+    *((uint32_t*)buffer+4)=first;      //20
+    *((uint32_t*)buffer+5)=last;       //24
+    *((uint32_t*)buffer+6)=compressed; //28
+    *((uint32_t*)buffer+7)=total; //28
+
 
 //    #warning check this
     ln=write(remoteVars.clientsock,buffer,56);
@@ -1470,13 +1497,37 @@ void *send_frame_thread (void *threadid)
             remoteVars.client_connected=TRUE;
 
 
-            if(!remoteVars.first_sendqueue_element && !remoteVars.firstCursor)
+            if(!remoteVars.first_sendqueue_element && !remoteVars.firstCursor && !remoteVars.selstruct.firstOutputChunk)
             {
                 /* sleep if frame queue is empty */
                 pthread_cond_wait(&remoteVars.have_sendqueue_cond, &remoteVars.sendqueue_mutex);
             }
 
             /* mutex is locked on this point */
+
+            //only send output selection chunks if there are no frames and cursors in the queue
+            //selections can take a lot of bandwidth and have less priority
+            if(remoteVars.selstruct.firstOutputChunk && !remoteVars.first_sendqueue_element && !remoteVars.firstCursor)
+            {
+                //get chunk from queue
+                outputChunk* chunk=remoteVars.selstruct.firstOutputChunk;
+                remoteVars.selstruct.firstOutputChunk=(outputChunk*)chunk->next;
+                if(!remoteVars.selstruct.firstOutputChunk)
+                {
+                    remoteVars.selstruct.lastOutputChunk=NULL;
+                }
+                pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+                //send chunk
+                send_output_selection(chunk);
+                //free chunk and it's data
+                if(chunk->data)
+                {
+                      free(chunk->data);
+                }
+//                 EPHYR_DBG(" REMOVE CHUNK %p %p %p", remoteVars.selstruct.firstOutputChunk, remoteVars.selstruct.lastOutputChunk, chunk);
+                free(chunk);
+                pthread_mutex_lock(&remoteVars.sendqueue_mutex);
+            }
 
             if(remoteVars.firstCursor)
             {
@@ -1498,40 +1549,6 @@ void *send_frame_thread (void *threadid)
             {
                 pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
             }
-
-            pthread_mutex_lock(&remoteVars.sendqueue_mutex);
-            if(remoteVars.selstruct.clipboard.changed)
-            {
-                size_t sz=remoteVars.selstruct.clipboard.size;
-                char* data=malloc(sz);
-                int format = 0;
-
-                memcpy(data, remoteVars.selstruct.clipboard.data, sz);
-                remoteVars.selstruct.clipboard.changed=FALSE;
-                format=remoteVars.selstruct.clipboard.mimeData;
-                pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
-                send_selection(CLIPBOARD,data,sz, format);
-                free(data);
-            }
-            else
-                pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
-
-            pthread_mutex_lock(&remoteVars.sendqueue_mutex);
-            if(remoteVars.selstruct.selection.changed)
-            {
-                size_t sz=remoteVars.selstruct.selection.size;
-                char* data=malloc(sz);
-                int format = 0;
-
-                memcpy(data, remoteVars.selstruct.selection.data, sz);
-                remoteVars.selstruct.selection.changed=FALSE;
-                format=remoteVars.selstruct.selection.mimeData;
-                pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
-                send_selection(PRIMARY, data, sz, format);
-                free(data);
-            }
-            else
-                pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
 
             pthread_mutex_lock(&remoteVars.sendqueue_mutex);
             if(remoteVars.first_sendqueue_element)
@@ -1635,6 +1652,25 @@ void *send_frame_thread (void *threadid)
     }
 //    #warning add some conditions to exit thread properly
     pthread_exit(0);
+}
+
+/* warning! sendqueue_mutex should be locked by thread calling this function! */
+void clear_output_selection(void)
+{
+    outputChunk* chunk=remoteVars.selstruct.firstOutputChunk;
+    outputChunk* prev_chunk;
+
+    while(chunk)
+    {
+        prev_chunk=chunk;
+        chunk=(outputChunk*)chunk->next;
+        if(prev_chunk->data)
+        {
+            free(prev_chunk->data);
+        }
+        free(prev_chunk);
+    }
+    remoteVars.selstruct.firstOutputChunk=remoteVars.selstruct.lastOutputChunk=NULL;
 }
 
 /* warning! sendqueue_mutex should be locked by thread calling this function! */
@@ -1797,8 +1833,130 @@ void disconnect_client(void)
     clear_send_queue();
     clear_frame_cache(0);
     freeCursors();
+    clear_output_selection();
     pthread_cond_signal(&remoteVars.have_sendqueue_cond);
     pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+}
+
+
+void readInputSelectionBuffer(char* buff)
+{
+    //read th rest of the chunk data
+
+    inputBuffer* selbuff = &remoteVars.selstruct.inSelection[remoteVars.selstruct.readingInputBuffer];
+
+    int leftToRead=selbuff->currentChunkSize - selbuff->currentChunkBytesReady;
+
+
+    int l=(leftToRead < EVLENGTH)?leftToRead:EVLENGTH;
+
+    //lock input selection
+    pthread_mutex_lock(&remoteVars.selstruct.inMutex);
+
+    //copy data to selection
+    memcpy(selbuff->data+selbuff->bytesReady, buff, l);
+    selbuff->bytesReady+=l;
+    selbuff->currentChunkBytesReady+=l;
+
+    if(selbuff->bytesReady==selbuff->size)
+    {
+        //selection buffer received completely
+//         EPHYR_DBG("READY Selection %d, MIME %d, Read %d from %d", remoteVars.selstruct.readingInputBuffer, selbuff->mimeData, selbuff->bytesReady, selbuff->size);
+        //send notify to system that we are using selection
+        own_selection(remoteVars.selstruct.readingInputBuffer);
+
+    }
+    if(selbuff->currentChunkBytesReady==selbuff->currentChunkSize)
+    {
+        //selection chunk received completely, next event will start with event header
+//         EPHYR_DBG("READY Selection Chunk, read %d",selbuff->currentChunkSize);
+        remoteVars.selstruct.readingInputBuffer=-1;
+    }
+    //unlock selection
+    pthread_mutex_unlock(&remoteVars.selstruct.inMutex);
+}
+
+void readInputSelectionHeader(char* buff)
+{
+
+    //read the input selection event.
+    //The event represents one chunk of imput selection
+    //it has a header and some data of the chunk
+
+    uint32_t size, totalSize;
+    uint8_t destination, mime;
+    inputBuffer* selbuff = NULL;
+    BOOL firstChunk=FALSE, lastChunk=FALSE;
+    BOOL compressed=FALSE;
+    uint32_t headerSize=10;
+    uint32_t l;
+
+    size=*((uint32_t*)buff+1);
+    destination=*((uint8_t*)buff+8);
+    mime=*((uint8_t*)buff+9);
+
+    //if client supports ext selection, read extended header
+    if(remoteVars.selstruct.clientSupportsExetndedSelection)
+    {
+        headerSize=17;
+        firstChunk=*((uint8_t*)buff + 10);
+        lastChunk=*((uint8_t*)buff + 11);
+        compressed=*((uint8_t*)buff + 12);
+        totalSize=*( (uint32_t*) (buff+13));
+    }
+    else
+    {
+        compressed=FALSE;
+        lastChunk=firstChunk=TRUE;
+        totalSize=size;
+    }
+
+//     EPHYR_DBG("HAVE NEW INCOMING SELECTION Chunk: sel %d size %d mime %d",destination, size, mime);
+
+    //lock selection
+    pthread_mutex_lock(&remoteVars.selstruct.inMutex);
+
+    remoteVars.selstruct.readingInputBuffer=-1;
+
+    selbuff = &remoteVars.selstruct.inSelection[destination];
+    if(firstChunk)
+    {
+        //if it's first chunk, initialize our selection buffer
+        if(selbuff->size && selbuff->data)
+        {
+            free(selbuff->data);
+        }
+        selbuff->size=totalSize;
+        selbuff->mimeData=mime;
+        selbuff->data=malloc(totalSize);
+        selbuff->bytesReady=0;
+    }
+
+    //read the selection data from header
+    l=(size < EVLENGTH-headerSize)?size:(EVLENGTH-headerSize);
+    memcpy(selbuff->data+selbuff->bytesReady, buff+headerSize, l);
+
+    selbuff->bytesReady+=l;
+
+    selbuff->currentChunkBytesReady=l;
+    selbuff->currentChunkSize=size;
+
+    if(selbuff->size == selbuff->bytesReady)
+    {
+        //Selection is completed
+//         EPHYR_DBG("READY INCOMING SELECTION for %d",destination);
+        //own the selection
+        own_selection(destination);
+    }
+
+    if(selbuff->currentChunkBytesReady != selbuff->currentChunkSize)
+    {
+        // we didn't recieve complete chunk yet, next event will have data
+        remoteVars.selstruct.readingInputBuffer=destination;
+//         EPHYR_DBG("READ INCOMING BUFFER %d, read %d from %d", destination, selbuff->bytesReady, selbuff->size);
+    }
+    //unlock selection
+    pthread_mutex_unlock(&remoteVars.selstruct.inMutex);
 }
 
 void
@@ -1839,38 +1997,9 @@ clientReadNotify(int fd, int ready, void *data)
     {
         char* buff=remoteVars.eventBuffer+i*EVLENGTH;
 
-        if(remoteVars.selstruct.readingInputBuffer)
+        if(remoteVars.selstruct.readingInputBuffer != -1)
         {
-            int leftToRead=remoteVars.selstruct.inBuffer.size - remoteVars.selstruct.inBuffer.position;
-            int chunk=(leftToRead < EVLENGTH)?leftToRead:EVLENGTH;
-
-            memcpy(remoteVars.selstruct.inBuffer.data+remoteVars.selstruct.inBuffer.position, buff, chunk);
-            remoteVars.selstruct.inBuffer.position+=chunk;
-            if(! (remoteVars.selstruct.inBuffer.position < remoteVars.selstruct.inBuffer.size))
-            {
-                inputBuffer* selbuff;
-                if(remoteVars.selstruct.inBuffer.target==PRIMARY)
-                {
-                    selbuff=&remoteVars.selstruct.inSelection;
-                }
-                else
-                {
-                    selbuff=&remoteVars.selstruct.inClipboard;
-                }
-                if(selbuff->data)
-                    free(selbuff->data);
-                selbuff->target=remoteVars.selstruct.inBuffer.target;
-                selbuff->data=remoteVars.selstruct.inBuffer.data;
-                remoteVars.selstruct.inBuffer.data=NULL;
-                selbuff->size=remoteVars.selstruct.inBuffer.size;
-                remoteVars.selstruct.inBuffer.size=0;
-                selbuff->mimeData=remoteVars.selstruct.inBuffer.mimeData;
-                remoteVars.selstruct.readingInputBuffer=FALSE;
-                EPHYR_DBG("READY TARGET %d, MIME %d, Read %d from %d",remoteVars.selstruct.inBuffer.target, selbuff->mimeData,
-                          remoteVars.selstruct.inBuffer.position, selbuff->size);
-                own_selection(selbuff->target);
-            }
-//            EPHYR_DBG("CHUNK IS DONE %d",remoteVars.selstruct.readingInputBuffer);
+            readInputSelectionBuffer(buff);
         }
         else
         {
@@ -2034,47 +2163,7 @@ clientReadNotify(int fd, int ready, void *data)
                 }
                 case SELECTIONEVENT:
                 {
-                    uint32_t size;
-                    uint8_t destination, mime;
-                    inputBuffer* selbuff = NULL;
-
-                    size=*((uint32_t*)buff+1);
-                    destination=*((uint8_t*)buff+8);
-                    mime=*((uint8_t*)buff+9);
-
-                    EPHYR_DBG("HAVE NEW INCOMING SELECTION: %d %d %d",size, destination, mime);
-
-                    if(destination==CLIPBOARD)
-                        selbuff=&(remoteVars.selstruct.inClipboard);
-                    else
-                        selbuff=&(remoteVars.selstruct.inSelection);
-                    if(size < EVLENGTH-10)
-                    {
-                        if(selbuff->data)
-                            free(selbuff->data);
-                        selbuff->size=size;
-                        selbuff->data=malloc(size);
-                        selbuff->target=destination;
-                        memcpy(selbuff->data, buff+10, size);
-                        selbuff->mimeData=mime;
-                        EPHYR_DBG("READY INCOMING SELECTION for %d",destination);
-                        own_selection(selbuff->target);
-
-                    }
-                    else
-                    {
-                        selbuff=&(remoteVars.selstruct.inBuffer);
-                        if(selbuff->data)
-                            free(selbuff->data);
-                        selbuff->data=malloc(size);
-                        memcpy(selbuff->data, buff+10, EVLENGTH-10);
-                        selbuff->mimeData=mime;
-                        selbuff->target=destination;
-                        selbuff->position=EVLENGTH-10;
-                        selbuff->size=size;
-                        remoteVars.selstruct.readingInputBuffer=TRUE;
-                        EPHYR_DBG("READ INCOMING BUFFER %d from %d",EVLENGTH-10, size);
-                    }
+                    readInputSelectionHeader(buff);
                     break;
                 }
                 default:
@@ -2201,6 +2290,15 @@ void terminateServer(int exitStatus)
     {
         pthread_cancel(remoteVars.send_thread_id);
     }
+    if(remoteVars.selstruct.selThreadId)
+    {
+        pthread_cancel(remoteVars.selstruct.selThreadId);
+        if(remoteVars.selstruct.xcbConnection)
+        {
+            xcb_disconnect(remoteVars.selstruct.xcbConnection);
+        }
+        pthread_mutex_destroy(&remoteVars.selstruct.inMutex);
+    }
 
     pthread_mutex_destroy(&remoteVars.mainimg_mutex);
     pthread_mutex_destroy(&remoteVars.sendqueue_mutex);
@@ -2212,27 +2310,14 @@ void terminateServer(int exitStatus)
         free(remoteVars.second_buffer);
     }
 
-    if(remoteVars.selstruct.clipboard.data)
-    {
-        free(remoteVars.selstruct.clipboard.data);
-    }
 
-    if(remoteVars.selstruct.selection.data)
+    if(remoteVars.selstruct.inSelection[0].data)
     {
-        free(remoteVars.selstruct.selection.data);
+        free(remoteVars.selstruct.inSelection[0].data);
     }
-
-    if(remoteVars.selstruct.inClipboard.data)
+    if(remoteVars.selstruct.inSelection[1].data)
     {
-        free(remoteVars.selstruct.inClipboard.data);
-    }
-    if(remoteVars.selstruct.inSelection.data)
-    {
-        free(remoteVars.selstruct.inSelection.data);
-    }
-    if(remoteVars.selstruct.inBuffer.data)
-    {
-        free(remoteVars.selstruct.inBuffer.data);
+        free(remoteVars.selstruct.inSelection[1].data);
     }
     setAgentState(TERMINATED);
     EPHYR_DBG("exit program with status %d", exitStatus);
@@ -2372,6 +2457,7 @@ remote_init(void)
 
     remoteVars.jpegQuality=JPG_QUALITY;
     remoteVars.compression=DEFAULT_COMPRESSION;
+    remoteVars.selstruct.selectionMode = CLIP_BOTH;
 
     pthread_mutex_init(&remoteVars.mainimg_mutex, NULL);
     pthread_mutex_init(&remoteVars.sendqueue_mutex,NULL);
@@ -3085,6 +3171,18 @@ uint32_t calculate_crc(uint32_t width, uint32_t height, int32_t dx, int32_t dy)
     return crc;
 }
 
+void remote_set_display_name(const char* name)
+{
+    int max_len=256;
+    if(strlen(name)<max_len)
+    {
+        max_len=strlen(name);
+    }
+    strncpy(RemoteHostVars.displayName, name, max_len);
+    RemoteHostVars.displayName[max_len]='\0';
+    EPHYR_DBG("DISPLAY name: %s",RemoteHostVars.displayName);
+}
+
 void *
 remote_screen_init(KdScreenInfo *screen,
                   int x, int y,
@@ -3097,10 +3195,10 @@ remote_screen_init(KdScreenInfo *screen,
     //but we need to reinstall it by the next screen init.
 
     EPHYR_DBG("REMOTE SCREEN INIT!!!!!!!!!!!!!!!!!!");
-    if(remoteVars.selstruct.callBackInstalled)
+    if(remoteVars.selstruct.threadStarted)
     {
-        EPHYR_DBG("SKIPPING CALLBACK INSTALL");
-        remoteVars.selstruct.callBackInstalled=FALSE;
+        EPHYR_DBG("SKIPPING Selection CALLBACK INSTALL");
+//         remoteVars.selstruct.callBackInstalled=FALSE;
     }
     else
     {

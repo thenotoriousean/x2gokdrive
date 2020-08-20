@@ -9,6 +9,8 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
   * Calculate screen dimensions (in mm) according to dpi value.
     Default DPI (Xorg) is 75. User can set DPI using -dpi command
     line option.
+    - Move selection functionality to separate thread. Use XCB API to manage
+      selections.
 
   [ Mihai Moldovan ]
   * Initial release:

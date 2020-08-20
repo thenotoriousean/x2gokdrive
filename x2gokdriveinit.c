@@ -256,6 +256,8 @@ ddxProcessArgument(int argc, char **argv, int i)
         /* compat with nxagent */
         return 1;
     }
+    else if (argv[i][0] == ':')
+        remote_set_display_name(argv[i]);
 
     return KdProcessArgument(argc, argv, i);
 }

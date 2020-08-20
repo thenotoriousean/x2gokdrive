@@ -259,40 +259,55 @@ struct sendqueue_element
     struct sendqueue_element* next;
 };
 
+//input selection
 typedef struct
 {
-    unsigned char* data;
-    uint32_t size;
-    int mimeData;
-    uint32_t position;
-    int target;
+    unsigned char* data; //data
+    uint32_t size; //total size of selection
+    uint32_t bytesReady; //how many bytes already read
+    uint32_t currentChunkSize; //size of chunk we reading now;
+    uint32_t currentChunkBytesReady; //how many bytes of current chunk are ready;
+    enum SelectionMime mimeData; //UTF_STRING or PIXMAP
+    xcb_timestamp_t timestamp; //ts when we own selection
+    BOOL owner; //if we are the owners of selection
 }inputBuffer;
 
+
+//chunk of data with output selection
 typedef struct
 {
-    unsigned char* data;
-    uint32_t size;
-    int mimeData;
-    BOOL changed;
-
-}outputBuffer;
+    unsigned char* data; //data
+    uint32_t size; //size of chunk in B
+    enum SelectionMime mimeData; //UTF_STRING or PIXMAP (text or image)
+    BOOL compressed; // if chunk is compressed
+    BOOL firstChunk; // if it's a first chunk in selection
+    BOOL lastChunk;  // if it's a last chunk in selection
+    enum SelectionType selection; //PRIMARY or CLIPBOARD
+    uint32_t totalSize; //the total size of the selection data
+    struct outputChunk* next; //next chunk in the queue
+}outputChunk;
 
 typedef struct
 {
-    BOOL readingIncremental;
-    uint32_t incrementalPosition;
-    Window clipWinId;
-    WindowPtr clipWinPtr;
-    BOOL callBackInstalled;
-    unsigned char selectionMode;
-//Output selection
-    outputBuffer clipboard;
-    outputBuffer selection;
-//Input selection
-    BOOL readingInputBuffer;
-    inputBuffer inBuffer;
-    inputBuffer inSelection;
-    inputBuffer inClipboard;
+    unsigned long selThreadId; //id of selection thread
+    enum ClipboardMode selectionMode; //CLIP_NONE, CLIP_CLIENT, CLIP_SERVER, CLIP_BOTH
+
+    //output selection members
+    uint32_t incrementalSize; //the total size of INCR selection we are currently reading
+    uint32_t incrementalSizeRead; //bytes already read
+    xcb_window_t clipWinId; // win id of clipboard window
+    xcb_connection_t* xcbConnection; //XCB connection
+    BOOL threadStarted; //if selection thread already started
+    BOOL clientSupportsExetndedSelection; //if client supports extended selection
+    xcb_atom_t incrAtom; //mime type of the incr selection we are reading
+    xcb_atom_t currentSelection; //selection we are currently reading
+    outputChunk* firstOutputChunk; //the first and last elements of the
+    outputChunk* lastOutputChunk;  //queue of selection chunks
+
+    //Input selection members
+    int readingInputBuffer; //which selection are reading input buffer at the moments: PRIMARY, CLIPBOARD or -1 if none
+    inputBuffer inSelection[2]; //PRIMARY an CLIPBOARD selection buffers
+    pthread_mutex_t inMutex; //mutex for synchronization of incoming selection
 }SelectionStructure;
 
 
@@ -306,6 +321,7 @@ struct _remoteHostVars
     char stateFile[256];
     char acceptAddr[256];
     char cookie[33];
+    char displayName[256];
     int listenPort;
     int jpegQuality;
     uint32_t framenum;
@@ -374,7 +390,11 @@ struct _remoteHostVars
     SelectionStructure selstruct;
 } RemoteHostVars;
 
-int send_selection(int sel, char* data, uint32_t length, uint32_t mimeData);
+int send_selection_chunk(int sel, unsigned char* data, uint32_t length, uint32_t format, BOOL first, BOOL last, BOOL compressed, uint32_t total);
+int send_output_selection(outputChunk* chunk);
+
+void readInputSelectionBuffer(char* buff);
+void readInputSelectionHeader(char* buff);
 
 #if XORG_VERSION_CURRENT < 11900000
 void pollEvents(void);
@@ -414,7 +434,7 @@ void clientReadNotify(int fd, int ready, void *data);
 void add_frame(uint32_t width, uint32_t height, int32_t x, int32_t y, uint32_t crc, uint32_t size);
 
 
-
+void clear_output_selection(void);
 
 void disconnect_client(void);
 
@@ -432,6 +452,7 @@ int remote_init(void);
 
 void remote_selection_init(void);
 
+void remote_set_display_name(const char* name);
 
 void *remote_screen_init(KdScreenInfo *screen,
                          int x, int y,

@@ -30,8 +30,24 @@
 
 #include "x2gokdriveremote.h"
 
+uint32_t max_chunk(void);
+
 void selection_init(struct _remoteHostVars *obj);
 void install_selection_callbacks(void);
-int own_selection(int target);
+int own_selection(enum SelectionType selection);
+
+xcb_atom_t atom(const char* name);
+char *atom_name(xcb_atom_t xatom);
+void request_selection_data( xcb_atom_t selection, xcb_atom_t target, xcb_atom_t property, xcb_timestamp_t t);
+void read_selection_property(xcb_atom_t selection, xcb_atom_t property);
+void process_selection_notify(xcb_generic_event_t *e);
+void process_property_notify(xcb_generic_event_t *e);
+void process_selection_owner_notify(xcb_generic_event_t *e);
+void process_selection_request(xcb_generic_event_t *e);
+void send_mime_types(xcb_selection_request_event_t* req);
+enum SelectionType selection_from_atom(xcb_atom_t selection);
+xcb_atom_t send_data(xcb_selection_request_event_t* req);
+xcb_atom_t set_data_property(xcb_selection_request_event_t* req, unsigned char* data, uint32_t size);
+BOOL is_png(unsigned char* data, uint32_t size);
 
 #endif /* X2GOKDRIVESELECTION_H */
