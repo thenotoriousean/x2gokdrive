@@ -92,6 +92,12 @@
 #endif /* XORG_VERSION_CURRENT */
 
 
+//FEATURE_VERSION is not cooresponding to actual version of server
+//it used to tell server which features are supported by server
+//Changes 0 - 1: sending and recieving client and OS version
+#define FEATURE_VERSION 1
+
+
 #define EPHYR_WANT_DEBUG 1
 // #warning DEBUG ENABLED
 
@@ -124,12 +130,13 @@ fprintf(stderr, __FILE__ ":%d,%s() " x "\n", __LINE__, __func__, ##a)
 //always 4
 #define XSERVERBPP 4
 
-enum msg_type{FRAME,DELETED,CURSOR, DELETEDCURSOR, SELECTION};
+enum msg_type{FRAME,DELETED, CURSOR, DELETEDCURSOR, SELECTION, SERVERVERSION};
 enum AgentState{STARTING, RUNNING, RESUMING, SUSPENDING, SUSPENDED, TERMINATING, TERMINATED};
 enum Compressions{JPEG,PNG};
 enum SelectionType{PRIMARY,CLIPBOARD};
 enum SelectionMime{STRING,UTF_STRING,PIXMAP};
 enum ClipboardMode{CLIP_NONE,CLIP_CLIENT,CLIP_SERVER,CLIP_BOTH};
+enum OS_VERSION{OS_LINUX, OS_WINDOWS, OS_DARWIN};
 
 #define DEFAULT_COMPRESSION JPEG
 
@@ -152,6 +159,7 @@ enum ClipboardMode{CLIP_NONE,CLIP_CLIENT,CLIP_SERVER,CLIP_BOTH};
 #define GEOMETRY 7
 #define UPDATE 8
 #define SELECTIONEVENT 9
+#define CLIENTVERSION 10
 
 #define EVLENGTH 41
 
@@ -333,6 +341,11 @@ struct _remoteHostVars
 
     unsigned long send_thread_id;
 
+    //client information
+    enum OS_VERSION client_os;
+    uint16_t client_version;
+    BOOL server_version_sent;
+
     //for control
     uint32_t cache_elements;
     uint32_t cache_size;
@@ -447,6 +460,7 @@ void remote_sendCursor(CursorPtr cursor);
 void remote_removeCursor(uint32_t serialNumber);
 void remote_send_main_image(void);
 
+void remote_sendVersion(void);
 
 int remote_init(void);
 

@@ -299,6 +299,20 @@ void remote_sendCursor(CursorPtr cursor)
     pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
 }
 
+
+void remote_sendVersion(void)
+{
+    unsigned char buffer[56] = {0};
+    _X_UNUSED int l;
+
+    *((uint32_t*)buffer)=SERVERVERSION; //4B
+    *((uint16_t*)buffer+2)=FEATURE_VERSION;
+    EPHYR_DBG("Sending server version: %d", FEATURE_VERSION);
+    l=write(remoteVars.clientsock,buffer,56);
+    remoteVars.server_version_sent=TRUE;
+}
+
+
 static
 int32_t send_cursor(struct cursorFrame* cursor)
 {
@@ -1467,6 +1481,7 @@ void *send_frame_thread (void *threadid)
         SetNotifyFd(remoteVars.clientsock, clientReadNotify, X_NOTIFY_READ, NULL);
 #endif /* XORG_VERSION_CURRENT */
         remoteVars.client_connected=TRUE;
+        remoteVars.server_version_sent=FALSE;
         if(remoteVars.checkConnectionTimer)
         {
             TimerFree(remoteVars.checkConnectionTimer);
@@ -1495,6 +1510,13 @@ void *send_frame_thread (void *threadid)
                 break;
             }
             remoteVars.client_connected=TRUE;
+
+            //check if we should send the server version to client
+            if(remoteVars.client_version && ! remoteVars.server_version_sent)
+            {
+                //the client supports versions and we didn't send our version yet
+                remote_sendVersion();
+            }
 
 
             if(!remoteVars.first_sendqueue_element && !remoteVars.firstCursor && !remoteVars.selstruct.firstOutputChunk)
@@ -2164,6 +2186,20 @@ clientReadNotify(int fd, int ready, void *data)
                 case SELECTIONEVENT:
                 {
                     readInputSelectionHeader(buff);
+                    break;
+                }
+                case CLIENTVERSION:
+                {
+                    int16_t ver=*((uint16_t*)buff+2);
+                    int16_t os=*((uint16_t*)buff+3);
+                    EPHYR_DBG("Client information: vesrion %d, os %d", ver, os);
+                    remoteVars.client_version=ver;
+                    if(os > OS_DARWIN)
+                    {
+                        EPHYR_DBG("Unsupported OS, assuming OS_LINUX");
+                    }
+                    else
+                        remoteVars.client_os=os;
                     break;
                 }
                 default:

@@ -12,6 +12,7 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     - Move selection functionality to separate thread. Use XCB API to manage
       selections.
     - add xcb-xfixes to deps.
+    - send a recive feature versions.
 
   [ Mihai Moldovan ]
   * Initial release:
