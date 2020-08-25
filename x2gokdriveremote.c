@@ -1482,6 +1482,8 @@ void *send_frame_thread (void *threadid)
 #endif /* XORG_VERSION_CURRENT */
         remoteVars.client_connected=TRUE;
         remoteVars.server_version_sent=FALSE;
+        remoteVars.client_version=0;
+        remoteVars.client_os=0;
         if(remoteVars.checkConnectionTimer)
         {
             TimerFree(remoteVars.checkConnectionTimer);
@@ -1517,6 +1519,7 @@ void *send_frame_thread (void *threadid)
                 //the client supports versions and we didn't send our version yet
                 remote_sendVersion();
             }
+
 
 
             if(!remoteVars.first_sendqueue_element && !remoteVars.firstCursor && !remoteVars.selstruct.firstOutputChunk)
@@ -2200,6 +2203,7 @@ clientReadNotify(int fd, int ready, void *data)
                     }
                     else
                         remoteVars.client_os=os;
+                    pthread_cond_signal(&remoteVars.have_sendqueue_cond);
                     break;
                 }
                 default:

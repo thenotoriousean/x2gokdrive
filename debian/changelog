@@ -13,6 +13,7 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
       selections.
     - add xcb-xfixes to deps.
     - send a recive feature versions.
+    - reinit client version on new connection and awaka sending thread when client version recieved.
 
   [ Mihai Moldovan ]
   * Initial release:
