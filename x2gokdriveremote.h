@@ -95,7 +95,8 @@
 //FEATURE_VERSION is not cooresponding to actual version of server
 //it used to tell server which features are supported by server
 //Changes 0 - 1: sending and recieving client and OS version
-#define FEATURE_VERSION 1
+//Changes 1 - 2: supporting extended selection and sending selection on demand
+#define FEATURE_VERSION 2
 
 
 #define EPHYR_WANT_DEBUG 1
@@ -130,7 +131,7 @@ fprintf(stderr, __FILE__ ":%d,%s() " x "\n", __LINE__, __func__, ##a)
 //always 4
 #define XSERVERBPP 4
 
-enum msg_type{FRAME,DELETED, CURSOR, DELETEDCURSOR, SELECTION, SERVERVERSION};
+enum msg_type{FRAME,DELETED, CURSOR, DELETEDCURSOR, SELECTION, SERVERVERSION, DEMANDCLIENTSELECTION};
 enum AgentState{STARTING, RUNNING, RESUMING, SUSPENDING, SUSPENDED, TERMINATING, TERMINATED};
 enum Compressions{JPEG,PNG};
 enum SelectionType{PRIMARY,CLIPBOARD};
@@ -160,6 +161,7 @@ enum OS_VERSION{OS_LINUX, OS_WINDOWS, OS_DARWIN};
 #define UPDATE 8
 #define SELECTIONEVENT 9
 #define CLIENTVERSION 10
+#define DEMANDSELECTION 11
 
 #define EVLENGTH 41
 
@@ -267,35 +269,59 @@ struct sendqueue_element
     struct sendqueue_element* next;
 };
 
+//chunk of data with output selection
+struct OutputChunk
+{
+    unsigned char* data; //data
+    uint32_t size; //size of chunk in B
+    enum SelectionMime mimeData; //UTF_STRING or PIXMAP (text or image)
+    uint32_t compressed_size; // if chunk is compressed the size of compressed data, otherwise 0
+    BOOL firstChunk; // if it's a first chunk in selection
+    BOOL lastChunk;  // if it's a last chunk in selection
+    enum SelectionType selection; //PRIMARY or CLIPBOARD
+    uint32_t totalSize; //the total size of the selection data
+    struct OutputChunk* next; //next chunk in the queue
+};
+
 //input selection
-typedef struct
+struct InputBuffer
 {
     unsigned char* data; //data
     uint32_t size; //total size of selection
     uint32_t bytesReady; //how many bytes already read
     uint32_t currentChunkSize; //size of chunk we reading now;
     uint32_t currentChunkBytesReady; //how many bytes of current chunk are ready;
+    uint32_t currentChunkCompressedSize; //if chunk is compressed, size of compressed data
+    unsigned char* currentChunkCompressedData; //if chunk is compressed, compressed dat will be stored here
     enum SelectionMime mimeData; //UTF_STRING or PIXMAP
     xcb_timestamp_t timestamp; //ts when we own selection
     BOOL owner; //if we are the owners of selection
-}inputBuffer;
+    enum {NOTIFIED, REQUESTED, COMPLETED} state;
+};
 
-
-//chunk of data with output selection
-typedef struct
+//requests which processing should be delayed till we get data from client
+struct DelayedRequest
 {
-    unsigned char* data; //data
-    uint32_t size; //size of chunk in B
-    enum SelectionMime mimeData; //UTF_STRING or PIXMAP (text or image)
-    BOOL compressed; // if chunk is compressed
-    BOOL firstChunk; // if it's a first chunk in selection
-    BOOL lastChunk;  // if it's a last chunk in selection
-    enum SelectionType selection; //PRIMARY or CLIPBOARD
-    uint32_t totalSize; //the total size of the selection data
-    struct outputChunk* next; //next chunk in the queue
-}outputChunk;
+    xcb_selection_request_event_t *request; // request from X-client
+    xcb_selection_notify_event_t* event; // event which we are going to send to X-client
+    struct DelayedRequest* next;
+};
 
-typedef struct
+//save running INCR transactions in this struct
+struct IncrTransaction
+{
+    xcb_window_t requestor;
+    xcb_atom_t property;
+    xcb_atom_t target;
+    char* data;
+    uint32_t size;
+    uint32_t sentBytes;
+    xcb_timestamp_t timestamp;
+    struct IncrTransaction* next;
+};
+
+
+struct SelectionStructure
 {
     unsigned long selThreadId; //id of selection thread
     enum ClipboardMode selectionMode; //CLIP_NONE, CLIP_CLIENT, CLIP_SERVER, CLIP_BOTH
@@ -306,17 +332,29 @@ typedef struct
     xcb_window_t clipWinId; // win id of clipboard window
     xcb_connection_t* xcbConnection; //XCB connection
     BOOL threadStarted; //if selection thread already started
-    BOOL clientSupportsExetndedSelection; //if client supports extended selection
+    BOOL clientSupportsExetndedSelection; //if client supports extended selection - sending selection in several chunks for big size data
+    BOOL clientSupportsOnDemandSelection; //if client supports selection on demand - sending data only if client requests it
     xcb_atom_t incrAtom; //mime type of the incr selection we are reading
     xcb_atom_t currentSelection; //selection we are currently reading
-    outputChunk* firstOutputChunk; //the first and last elements of the
-    outputChunk* lastOutputChunk;  //queue of selection chunks
+    struct OutputChunk* firstOutputChunk; //the first and last elements of the
+    struct OutputChunk* lastOutputChunk;  //queue of selection chunks
+    xcb_atom_t best_atom[2]; //the best mime type for selection to request on demand sel request from client
+    BOOL requestSelection[2]; //selection thread will set it to TRUE if the selection need to be requested
 
     //Input selection members
     int readingInputBuffer; //which selection are reading input buffer at the moments: PRIMARY, CLIPBOARD or -1 if none
-    inputBuffer inSelection[2]; //PRIMARY an CLIPBOARD selection buffers
+    struct InputBuffer inSelection[2]; //PRIMARY an CLIPBOARD selection buffers
+
+    //list of delayed requests
+    struct DelayedRequest* firstDelayedRequest;
+    struct DelayedRequest* lastDelayedRequest;
+
+    //list of INCR transactions
+    struct IncrTransaction* firstIncrTransaction;
+    struct IncrTransaction* lastIncrTransaction;
+
     pthread_mutex_t inMutex; //mutex for synchronization of incoming selection
-}SelectionStructure;
+};
 
 
 struct _remoteHostVars
@@ -400,11 +438,13 @@ struct _remoteHostVars
     BOOL client_connected;
     BOOL client_initialized;
 
-    SelectionStructure selstruct;
+    struct SelectionStructure selstruct;
 } RemoteHostVars;
 
-int send_selection_chunk(int sel, unsigned char* data, uint32_t length, uint32_t format, BOOL first, BOOL last, BOOL compressed, uint32_t total);
-int send_output_selection(outputChunk* chunk);
+int send_selection_chunk(int sel, unsigned char* data, uint32_t length, uint32_t format, BOOL first, BOOL last, uint32_t compressed, uint32_t total);
+int send_output_selection(struct OutputChunk* chunk);
+
+void set_client_version(uint16_t ver, uint16_t os);
 
 void readInputSelectionBuffer(char* buff);
 void readInputSelectionHeader(char* buff);
@@ -430,6 +470,7 @@ void setAgentState(int state);
 void terminateServer(int exitStatus);
 
 
+void unpack_current_chunk_to_buffer(struct InputBuffer* selbuff);
 
 unsigned char* image_compress(uint32_t image_width, uint32_t image_height,
                              unsigned char* RGBA_buffer, uint32_t* compressed_size, int bpp, char* fname);
@@ -476,5 +517,7 @@ void *remote_screen_init(KdScreenInfo *screen,
 void
 remote_paint_rect(KdScreenInfo *screen,
                   int sx, int sy, int dx, int dy, int width, int height);
+
+void request_selection_from_client(enum SelectionType selection);
 
 #endif /* X2GOKDRIVE_REMOTE_H */

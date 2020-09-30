@@ -36,6 +36,7 @@
 #endif
 #include "x2gokdriveremote.h"
 #include "x2gokdriveselection.h"
+#include <zlib.h>
 
 /* init it in OsInit() */
 static struct _remoteHostVars remoteVars = {0};
@@ -45,6 +46,7 @@ static BOOL remoteInitialized=FALSE;
 
 void remote_selection_init(void)
 {
+    remoteVars.selstruct.readingInputBuffer=-1;
     selection_init(&remoteVars);
 }
 
@@ -207,6 +209,7 @@ void remote_removeCursor(uint32_t serialNumber)
     struct sentCursor* prev = NULL;
     struct deletedCursor* dcur = NULL;
 
+
     pthread_mutex_lock(&remoteVars.sendqueue_mutex);
     cur=remoteVars.sentCursorsHead;
 
@@ -239,6 +242,7 @@ void remote_removeCursor(uint32_t serialNumber)
         remoteVars.first_deleted_cursor=remoteVars.last_deleted_cursor=dcur;
     }
     ++remoteVars.deletedcursor_list_size;
+
     pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
 }
 
@@ -253,8 +257,10 @@ void remote_sendCursor(CursorPtr cursor)
     cframe->data=0;
     cframe->next=0;
 
+
     pthread_mutex_lock(&remoteVars.sendqueue_mutex);
     cursorSent=isCursorSent(cursor->serialNumber);
+
     pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
     if(!cursorSent)
     {
@@ -289,13 +295,17 @@ void remote_sendCursor(CursorPtr cursor)
         cframe->forG=cursor->foreGreen*255./65535.0;
         cframe->forB=cursor->foreBlue*255./65535.0;
 
+
         pthread_mutex_lock(&remoteVars.sendqueue_mutex);
         addSentCursor(cursor->serialNumber);
+
         pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
     }
+
     pthread_mutex_lock(&remoteVars.sendqueue_mutex);
     addCursorToQueue(cframe);
     pthread_cond_signal(&remoteVars.have_sendqueue_cond);
+
     pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
 }
 
@@ -305,6 +315,7 @@ void remote_sendVersion(void)
     unsigned char buffer[56] = {0};
     _X_UNUSED int l;
 
+
     *((uint32_t*)buffer)=SERVERVERSION; //4B
     *((uint16_t*)buffer+2)=FEATURE_VERSION;
     EPHYR_DBG("Sending server version: %d", FEATURE_VERSION);
@@ -312,6 +323,16 @@ void remote_sendVersion(void)
     remoteVars.server_version_sent=TRUE;
 }
 
+void request_selection_from_client(enum SelectionType selection)
+{
+    unsigned char buffer[56] = {0};
+    _X_UNUSED int l;
+
+    *((uint32_t*)buffer)=DEMANDCLIENTSELECTION; //4B
+    *((uint16_t*)buffer+2)=(uint16_t)selection;
+    l=write(remoteVars.clientsock,buffer,56);
+    EPHYR_DBG("requesting selection from client");
+}
 
 static
 int32_t send_cursor(struct cursorFrame* cursor)
@@ -542,19 +563,19 @@ int send_deleted_cursors(void)
     return sent;
 }
 
-int send_output_selection(outputChunk* chunk)
+int send_output_selection(struct OutputChunk* chunk)
 {
     //client supports extended selections
     if(remoteVars.selstruct.clientSupportsExetndedSelection)
     {
         //send extended selection
-        return send_selection_chunk(chunk->selection, chunk->data, chunk->size, chunk->mimeData, chunk->firstChunk, chunk->lastChunk, chunk->compressed, chunk->totalSize);
+        return send_selection_chunk(chunk->selection, chunk->data, chunk->size, chunk->mimeData, chunk->firstChunk, chunk->lastChunk, chunk->compressed_size, chunk->totalSize);
     }
     else
     {
         //older client doesn't support only uncompressed datas in single chunk
         //not sending chunk in other case
-        if(!chunk->compressed && chunk->firstChunk && chunk->lastChunk)
+        if(!chunk->compressed_size && chunk->firstChunk && chunk->lastChunk)
         {
             return send_selection_chunk(chunk->selection, chunk->data, chunk->size, chunk->mimeData, TRUE, TRUE, FALSE, chunk->size);
         }
@@ -563,7 +584,7 @@ int send_output_selection(outputChunk* chunk)
     return 0;
 }
 
-int send_selection_chunk(int sel, unsigned char* data, uint32_t length, uint32_t format, BOOL first, BOOL last, BOOL compressed, uint32_t total)
+int send_selection_chunk(int sel, unsigned char* data, uint32_t length, uint32_t format, BOOL first, BOOL last, uint32_t compressed, uint32_t total)
 {
     unsigned char buffer[56] = {0};
     _X_UNUSED int ln = 0;
@@ -578,11 +599,19 @@ int send_selection_chunk(int sel, unsigned char* data, uint32_t length, uint32_t
     *((uint32_t*)buffer+4)=first;      //20
     *((uint32_t*)buffer+5)=last;       //24
     *((uint32_t*)buffer+6)=compressed; //28
-    *((uint32_t*)buffer+7)=total; //28
+    *((uint32_t*)buffer+7)=total; //32
 
 
 //    #warning check this
     ln=write(remoteVars.clientsock,buffer,56);
+
+    //if the data is compressed, send "compressed" amount of bytes
+//     EPHYR_DBG("sending chunk. total %d, chunk %d, compressed %d", total, length, compressed);
+    if(compressed)
+    {
+        length=compressed;
+    }
+
 
     while(sent<length)
     {
@@ -1339,6 +1368,7 @@ void sendMainImageFromSendThread(uint32_t width, uint32_t height, int32_t dx ,in
         EPHYR_DBG("sending mainImage");
     }
 
+
     pthread_mutex_lock(&remoteVars.mainimg_mutex);
 
     for(int j=0;j<9;++j)
@@ -1387,6 +1417,7 @@ void sendMainImageFromSendThread(uint32_t width, uint32_t height, int32_t dx ,in
         send_frame(width, height,dx,dy,0,regions);
     }
 
+
     pthread_mutex_unlock(&remoteVars.mainimg_mutex);
     free(regions[0].compressed_data);
 }
@@ -1395,6 +1426,7 @@ static
 void *send_frame_thread (void *threadid)
 {
     long tid;
+    enum SelectionType r;
     tid = (long)threadid;
 
     EPHYR_DBG("Started sending thread: #%ld!\n", tid);
@@ -1473,6 +1505,7 @@ void *send_frame_thread (void *threadid)
 
 
 
+
         pthread_mutex_lock(&remoteVars.sendqueue_mutex);
         //only accept one client, close server socket
         shutdown(remoteVars.serversock, SHUT_RDWR);
@@ -1482,8 +1515,7 @@ void *send_frame_thread (void *threadid)
 #endif /* XORG_VERSION_CURRENT */
         remoteVars.client_connected=TRUE;
         remoteVars.server_version_sent=FALSE;
-        remoteVars.client_version=0;
-        remoteVars.client_os=0;
+        set_client_version(0,0);
         if(remoteVars.checkConnectionTimer)
         {
             TimerFree(remoteVars.checkConnectionTimer);
@@ -1495,10 +1527,12 @@ void *send_frame_thread (void *threadid)
         remoteVars.data_copy=0;
         remoteVars.evBufferOffset=0;
         setAgentState(RUNNING);
+
         pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
 
         while(1)
         {
+
             pthread_mutex_lock(&remoteVars.sendqueue_mutex);
             if(!remoteVars.client_connected)
             {
@@ -1508,6 +1542,7 @@ void *send_frame_thread (void *threadid)
 #endif /* XORG_VERSION_CURRENT */
                 shutdown(remoteVars.clientsock, SHUT_RDWR);
                 close(remoteVars.clientsock);
+
                 pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
                 break;
             }
@@ -1535,12 +1570,13 @@ void *send_frame_thread (void *threadid)
             if(remoteVars.selstruct.firstOutputChunk && !remoteVars.first_sendqueue_element && !remoteVars.firstCursor)
             {
                 //get chunk from queue
-                outputChunk* chunk=remoteVars.selstruct.firstOutputChunk;
-                remoteVars.selstruct.firstOutputChunk=(outputChunk*)chunk->next;
+                struct OutputChunk* chunk=remoteVars.selstruct.firstOutputChunk;
+                remoteVars.selstruct.firstOutputChunk=chunk->next;
                 if(!remoteVars.selstruct.firstOutputChunk)
                 {
                     remoteVars.selstruct.lastOutputChunk=NULL;
                 }
+
                 pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
                 //send chunk
                 send_output_selection(chunk);
@@ -1551,7 +1587,26 @@ void *send_frame_thread (void *threadid)
                 }
 //                 EPHYR_DBG(" REMOVE CHUNK %p %p %p", remoteVars.selstruct.firstOutputChunk, remoteVars.selstruct.lastOutputChunk, chunk);
                 free(chunk);
+
                 pthread_mutex_lock(&remoteVars.sendqueue_mutex);
+            }
+
+            //check if we need to request the selection from client
+            if(remoteVars.selstruct.requestSelection[PRIMARY] || remoteVars.selstruct.requestSelection[CLIPBOARD])
+            {
+                for(r=PRIMARY; r<=CLIPBOARD; ++r)
+                {
+                    if(remoteVars.selstruct.requestSelection[r])
+                    {
+                        remoteVars.selstruct.requestSelection[r]=FALSE;
+
+                        pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+                        //send request for selection
+                        request_selection_from_client(r);
+
+                        pthread_mutex_lock(&remoteVars.sendqueue_mutex);
+                    }
+                }
             }
 
             if(remoteVars.firstCursor)
@@ -1563,6 +1618,7 @@ void *send_frame_thread (void *threadid)
                     remoteVars.firstCursor=remoteVars.firstCursor->next;
                 else
                     remoteVars.firstCursor=remoteVars.lastCursor=0;
+
                 pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
                 send_cursor(cframe);
                 if(cframe->data)
@@ -1572,8 +1628,10 @@ void *send_frame_thread (void *threadid)
             }
             else
             {
+
                 pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
             }
+
 
             pthread_mutex_lock(&remoteVars.sendqueue_mutex);
             if(remoteVars.first_sendqueue_element)
@@ -1614,15 +1672,18 @@ void *send_frame_thread (void *threadid)
                     uint32_t frame_height=frame->height;
 
                     /* unlock sendqueue for main thread */
+
                     pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
                     send_frame(frame_width, frame_height, x, y, crc, frame->regions);
                 }
                 else
                 {
                     EPHYR_DBG("Sending main image or screen update");
+
                     pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
                     sendMainImageFromSendThread(width, height, x, y);
                 }
+
 
                 pthread_mutex_lock(&remoteVars.sendqueue_mutex);
                 if(frame)
@@ -1665,11 +1726,14 @@ void *send_frame_thread (void *threadid)
                     send_deleted_cursors();
                 }
 
+
                 pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
                 remoteVars.framenum++;
             }
             else
             {
+
+
                 pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
             }
         }
@@ -1682,13 +1746,13 @@ void *send_frame_thread (void *threadid)
 /* warning! sendqueue_mutex should be locked by thread calling this function! */
 void clear_output_selection(void)
 {
-    outputChunk* chunk=remoteVars.selstruct.firstOutputChunk;
-    outputChunk* prev_chunk;
+    struct OutputChunk* chunk=remoteVars.selstruct.firstOutputChunk;
+    struct OutputChunk* prev_chunk;
 
     while(chunk)
     {
         prev_chunk=chunk;
-        chunk=(outputChunk*)chunk->next;
+        chunk=chunk->next;
         if(prev_chunk->data)
         {
             free(prev_chunk->data);
@@ -1852,6 +1916,7 @@ void setAgentState(int state)
 void disconnect_client(void)
 {
     EPHYR_DBG("DISCONNECTING CLIENT, DOING SOME CLEAN UP");
+
     pthread_mutex_lock(&remoteVars.sendqueue_mutex);
     remoteVars.client_connected=FALSE;
     setAgentState(SUSPENDED);
@@ -1860,7 +1925,45 @@ void disconnect_client(void)
     freeCursors();
     clear_output_selection();
     pthread_cond_signal(&remoteVars.have_sendqueue_cond);
+
+
     pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+}
+
+void unpack_current_chunk_to_buffer(struct InputBuffer* selbuff)
+{
+    //unpacking the data from current chunk to selbuff
+
+    z_stream stream;
+    stream.zalloc = Z_NULL;
+    stream.zfree = Z_NULL;
+    stream.opaque = Z_NULL;
+
+//     EPHYR_DBG("inflate %d bytes to %d", selbuff->currentChunkCompressedSize, selbuff->currentChunkSize);
+
+    stream.avail_in = selbuff->currentChunkCompressedSize;
+    stream.next_in = selbuff->currentChunkCompressedData;
+    stream.avail_out = selbuff->currentChunkSize;
+    stream.next_out = selbuff->data + selbuff->bytesReady;
+
+    inflateInit(&stream);
+    inflate(&stream, Z_NO_FLUSH);
+    inflateEnd(&stream);
+
+    if(stream.total_out != selbuff->currentChunkSize)
+    {
+        //something is wrong with extracting the data
+        EPHYR_DBG("WARNING!!!! extracting the data failed output has %d bytes instead of %d", (uint32_t)stream.total_out, selbuff->currentChunkSize);
+    }
+
+
+//     EPHYR_DBG("%s", selbuff->data + selbuff->bytesReady);
+    ///freeing compressed data
+    free(selbuff->currentChunkCompressedData);
+    selbuff->currentChunkCompressedData=NULL;
+
+    selbuff->bytesReady+=selbuff->currentChunkSize;
+    selbuff->currentChunkCompressedSize=0;
 }
 
 
@@ -1868,36 +1971,67 @@ void readInputSelectionBuffer(char* buff)
 {
     //read th rest of the chunk data
 
-    inputBuffer* selbuff = &remoteVars.selstruct.inSelection[remoteVars.selstruct.readingInputBuffer];
+    struct InputBuffer* selbuff;
+    int leftToRead, l;
 
-    int leftToRead=selbuff->currentChunkSize - selbuff->currentChunkBytesReady;
-
-
-    int l=(leftToRead < EVLENGTH)?leftToRead:EVLENGTH;
 
     //lock input selection
+
     pthread_mutex_lock(&remoteVars.selstruct.inMutex);
 
-    //copy data to selection
-    memcpy(selbuff->data+selbuff->bytesReady, buff, l);
-    selbuff->bytesReady+=l;
-    selbuff->currentChunkBytesReady+=l;
+    selbuff = &remoteVars.selstruct.inSelection[remoteVars.selstruct.readingInputBuffer];
+
+    //if the data is not compressed read it directly to the buffer
+    if(!selbuff->currentChunkCompressedSize)
+    {
+        leftToRead=selbuff->currentChunkSize - selbuff->currentChunkBytesReady;
+        l=(leftToRead < EVLENGTH)?leftToRead:EVLENGTH;
+
+        //copy data to selection
+        memcpy(selbuff->data+selbuff->bytesReady, buff, l);
+        selbuff->bytesReady+=l;
+        selbuff->currentChunkBytesReady+=l;
+        if(selbuff->currentChunkBytesReady==selbuff->currentChunkSize)
+        {
+            //selection chunk received completely, next event will start with event header
+            //         EPHYR_DBG("READY Selection Chunk, read %d",selbuff->currentChunkSize);
+            remoteVars.selstruct.readingInputBuffer=-1;
+        }
+    }
+    else
+    {
+        //copy to the buffer for compressed data
+        leftToRead=selbuff->currentChunkCompressedSize - selbuff->currentChunkBytesReady;
+        l=(leftToRead < EVLENGTH)?leftToRead:EVLENGTH;
+
+        //copy data to selection
+        memcpy(selbuff->currentChunkCompressedData+selbuff->currentChunkBytesReady, buff, l);
+        selbuff->currentChunkBytesReady+=l;
+        if(selbuff->currentChunkBytesReady==selbuff->currentChunkCompressedSize)
+        {
+            //selection chunk received completely, next event will start with event header
+            EPHYR_DBG("READY Selection Chunk, read %d",selbuff->currentChunkSize);
+            remoteVars.selstruct.readingInputBuffer=-1;
+            //unpack data to selection buffer
+            unpack_current_chunk_to_buffer(selbuff);
+        }
+    }
 
     if(selbuff->bytesReady==selbuff->size)
     {
         //selection buffer received completely
 //         EPHYR_DBG("READY Selection %d, MIME %d, Read %d from %d", remoteVars.selstruct.readingInputBuffer, selbuff->mimeData, selbuff->bytesReady, selbuff->size);
         //send notify to system that we are using selection
-        own_selection(remoteVars.selstruct.readingInputBuffer);
-
-    }
-    if(selbuff->currentChunkBytesReady==selbuff->currentChunkSize)
-    {
-        //selection chunk received completely, next event will start with event header
-//         EPHYR_DBG("READY Selection Chunk, read %d",selbuff->currentChunkSize);
-        remoteVars.selstruct.readingInputBuffer=-1;
+        //if state is requested we already own this selection after notify
+        if(selbuff->state != REQUESTED)
+            own_selection(remoteVars.selstruct.readingInputBuffer);
+        selbuff->state=COMPLETED;
+        //send notification event to interrupt sleeping selection thread
+        client_sel_data_notify(remoteVars.selstruct.readingInputBuffer);
     }
     //unlock selection
+
+
     pthread_mutex_unlock(&remoteVars.selstruct.inMutex);
 }
 
@@ -1910,9 +2044,9 @@ void readInputSelectionHeader(char* buff)
 
     uint32_t size, totalSize;
     uint8_t destination, mime;
-    inputBuffer* selbuff = NULL;
+    struct InputBuffer* selbuff = NULL;
     BOOL firstChunk=FALSE, lastChunk=FALSE;
-    BOOL compressed=FALSE;
+    uint32_t compressedSize=0;
     uint32_t headerSize=10;
     uint32_t l;
 
@@ -1923,20 +2057,21 @@ void readInputSelectionHeader(char* buff)
     //if client supports ext selection, read extended header
     if(remoteVars.selstruct.clientSupportsExetndedSelection)
     {
-        headerSize=17;
+        headerSize=20;
         firstChunk=*((uint8_t*)buff + 10);
         lastChunk=*((uint8_t*)buff + 11);
-        compressed=*((uint8_t*)buff + 12);
-        totalSize=*( (uint32_t*) (buff+13));
+        compressedSize=*((uint32_t*) (buff + 12));
+        totalSize=*( (uint32_t*) (buff+16));
     }
     else
     {
-        compressed=FALSE;
+        compressedSize=0;
         lastChunk=firstChunk=TRUE;
         totalSize=size;
     }
 
-//     EPHYR_DBG("HAVE NEW INCOMING SELECTION Chunk: sel %d size %d mime %d",destination, size, mime);
+     EPHYR_DBG("HAVE NEW INCOMING SELECTION Chunk: sel %d size %d mime %d compressed size %d, total %d",destination, size, mime, compressedSize, totalSize);
+
 
     //lock selection
     pthread_mutex_lock(&remoteVars.selstruct.inMutex);
@@ -1944,6 +2079,28 @@ void readInputSelectionHeader(char* buff)
     remoteVars.selstruct.readingInputBuffer=-1;
 
     selbuff = &remoteVars.selstruct.inSelection[destination];
+
+    //we recieved selection notify from client
+    if(firstChunk && lastChunk && remoteVars.selstruct.clientSupportsExetndedSelection && (totalSize == 0) &&(size == 0))
+    {
+        EPHYR_DBG("Selection notify from client for %d", destination);
+        if(selbuff->size && selbuff->data)
+        {
+            free(selbuff->data);
+        }
+        selbuff->size=0;
+        selbuff->mimeData=mime;
+        selbuff->data=0;
+        selbuff->bytesReady=0;
+        selbuff->state=NOTIFIED;
+// own selection
+        own_selection(destination);
+        //unlock mutex
+
+
+        pthread_mutex_unlock(&remoteVars.selstruct.inMutex);
+        return;
+    }
     if(firstChunk)
     {
         //if it's first chunk, initialize our selection buffer
@@ -1957,30 +2114,73 @@ void readInputSelectionHeader(char* buff)
         selbuff->bytesReady=0;
     }
 
-    //read the selection data from header
-    l=(size < EVLENGTH-headerSize)?size:(EVLENGTH-headerSize);
-    memcpy(selbuff->data+selbuff->bytesReady, buff+headerSize, l);
+    if(selbuff->currentChunkCompressedSize && selbuff->currentChunkCompressedData)
+    {
+        free(selbuff->currentChunkCompressedData);
+    }
+    selbuff->currentChunkCompressedData=NULL;
+    selbuff->currentChunkCompressedSize=0;
 
-    selbuff->bytesReady+=l;
+    //if compressed data will be read in buffer for compressed data
+    if(compressedSize)
+    {
+        selbuff->currentChunkCompressedData=malloc(compressedSize);
+        selbuff->currentChunkCompressedSize=compressedSize;
+        l=(compressedSize < EVLENGTH-headerSize)?compressedSize:(EVLENGTH-headerSize);
+        memcpy(selbuff->currentChunkCompressedData, buff+headerSize, l);
+    }
+    else
+    {
+        //read the selection data from header
+        l=(size < EVLENGTH-headerSize)?size:(EVLENGTH-headerSize);
+        memcpy(selbuff->data+selbuff->bytesReady, buff+headerSize, l);
+
+        selbuff->bytesReady+=l;
+    }
 
     selbuff->currentChunkBytesReady=l;
     selbuff->currentChunkSize=size;
+
+
+    if(!compressedSize)
+    {
+        if(selbuff->currentChunkBytesReady != selbuff->currentChunkSize)
+        {
+            // we didn't recieve complete chunk yet, next event will have data
+            remoteVars.selstruct.readingInputBuffer=destination;
+        }
+    }
+    else
+    {
+        if(selbuff->currentChunkBytesReady != selbuff->currentChunkCompressedSize)
+        {
+            // we didn't recieve complete chunk yet, next event will have data
+            remoteVars.selstruct.readingInputBuffer=destination;
+        }
+        else
+        {
+            //we read all compressed chunk data, unpack it to sel buff
+            unpack_current_chunk_to_buffer(selbuff);
+        }
+
+    }
 
     if(selbuff->size == selbuff->bytesReady)
     {
         //Selection is completed
 //         EPHYR_DBG("READY INCOMING SELECTION for %d",destination);
         //own the selection
-        own_selection(destination);
+        //if state is requested we already own this selection after notify
+        if(selbuff->state != REQUESTED)
+           own_selection(destination);
+        selbuff->state=COMPLETED;
+        //send notification event to interrupt sleeping selection thread
+        client_sel_data_notify(destination);
     }
 
-    if(selbuff->currentChunkBytesReady != selbuff->currentChunkSize)
-    {
-        // we didn't recieve complete chunk yet, next event will have data
-        remoteVars.selstruct.readingInputBuffer=destination;
-//         EPHYR_DBG("READ INCOMING BUFFER %d, read %d from %d", destination, selbuff->bytesReady, selbuff->size);
-    }
     //unlock selection
+
+
     pthread_mutex_unlock(&remoteVars.selstruct.inMutex);
 }
 
@@ -1994,6 +2194,8 @@ clientReadNotify(int fd, int ready, void *data)
 
     pthread_mutex_lock(&remoteVars.sendqueue_mutex);
     con=remoteVars.client_connected;
+
+
     pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
     if(!con)
         return;
@@ -2176,12 +2378,14 @@ clientReadNotify(int fd, int ready, void *data)
 
                     if(remoteVars.main_img  && x+width <= remoteVars.main_img_width  && y+height <= remoteVars.main_img_height )
                     {
+
                         pthread_mutex_unlock(&remoteVars.mainimg_mutex);
                         add_frame(width, height, x, y, 0, 0);
                     }
                     else
                     {
                         EPHYR_DBG("UPDATE: skip request");
+
                         pthread_mutex_unlock(&remoteVars.mainimg_mutex);
                     }
                     break;
@@ -2195,15 +2399,16 @@ clientReadNotify(int fd, int ready, void *data)
                 {
                     int16_t ver=*((uint16_t*)buff+2);
                     int16_t os=*((uint16_t*)buff+3);
+                    set_client_version(ver, os);
                     EPHYR_DBG("Client information: vesrion %d, os %d", ver, os);
-                    remoteVars.client_version=ver;
-                    if(os > OS_DARWIN)
-                    {
-                        EPHYR_DBG("Unsupported OS, assuming OS_LINUX");
-                    }
-                    else
-                        remoteVars.client_os=os;
                     pthread_cond_signal(&remoteVars.have_sendqueue_cond);
+                    break;
+                }
+                case DEMANDSELECTION:
+                {
+                    int16_t sel=*((uint16_t*)buff+2);
+//                     EPHYR_DBG("Client requesting selection %d", sel);
+                    client_sel_request_notify(sel);
                     break;
                 }
                 default:
@@ -2227,6 +2432,22 @@ clientReadNotify(int fd, int ready, void *data)
 
 }
 
+void set_client_version(uint16_t ver, uint16_t os)
+{
+    remoteVars.client_version=ver;
+    if(os > OS_DARWIN)
+    {
+        EPHYR_DBG("Unsupported OS, assuming OS_LINUX");
+    }
+    else
+        remoteVars.client_os=os;
+    //clients version >= 1 supporting extended selection (sending big amount of data aín several chunks)
+    remoteVars.selstruct.clientSupportsExetndedSelection=(ver > 1);
+    //Linux clients supporting sending selection on demand (not sending data if not needed)
+    remoteVars.selstruct.clientSupportsOnDemandSelection=((ver > 1) && (os == OS_LINUX));
+
+}
+
 #if XORG_VERSION_CURRENT < 11900000
 void pollEvents(void)
 {
@@ -2234,8 +2455,10 @@ void pollEvents(void)
     struct pollfd fds[2];
     int    nfds = 1;
     BOOL con;
+
     pthread_mutex_lock(&remoteVars.sendqueue_mutex);
     con=remoteVars.client_connected;
+
     pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
     if(!con)
         return;
@@ -2254,6 +2477,7 @@ unsigned int checkSocketConnection(OsTimerPtr timer, CARD32 time, void* args)
 {
     EPHYR_DBG("CHECKING ACCEPTED CONNECTION");
     TimerFree(timer);
+
     pthread_mutex_lock(&remoteVars.sendqueue_mutex);
     remoteVars.checkConnectionTimer=0;
     if(!remoteVars.client_connected)
@@ -2265,6 +2489,7 @@ unsigned int checkSocketConnection(OsTimerPtr timer, CARD32 time, void* args)
     {
         EPHYR_DBG("CLIENT CONNECTED");
     }
+
     pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
     return 0;
 }
@@ -2333,6 +2558,7 @@ void terminateServer(int exitStatus)
     if(remoteVars.selstruct.selThreadId)
     {
         pthread_cancel(remoteVars.selstruct.selThreadId);
+        remove_obsolete_incr_transactions(FALSE);
         if(remoteVars.selstruct.xcbConnection)
         {
             xcb_disconnect(remoteVars.selstruct.xcbConnection);
@@ -2718,6 +2944,7 @@ struct cache_elem* add_cache_element(uint32_t crc, int32_t dx, int32_t dy, uint3
                 ++i;
             }
         }
+
         pthread_mutex_unlock(&remoteVars.mainimg_mutex);
 
         el->rval/=numOfPix;
@@ -2798,6 +3025,7 @@ void initFrameRegions(struct cache_elem* frame)
         uint32_t bestm_crc = 0;
         struct cache_elem* best_match = NULL;
 
+
         pthread_mutex_lock(&remoteVars.sendqueue_mutex);
         best_match = find_best_match(frame, &match_val);
 
@@ -2805,6 +3033,7 @@ void initFrameRegions(struct cache_elem* frame)
         {
             best_match->busy+=1;
         }
+
         pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
 
         if(best_match && best_match->width>4 && best_match->height>4 && best_match->width * best_match->height > 100 )
@@ -2916,12 +3145,15 @@ void initFrameRegions(struct cache_elem* frame)
             }
         }
         /* if we didn't find any common regions and have best match element, mark it as not busy */
+
+
         pthread_mutex_lock(&remoteVars.sendqueue_mutex);
         if(best_match && frame->source != best_match)
         {
 //            EPHYR_DBG("Have best mutch but not common region");
             best_match->busy-=1;
         }
+
         pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
 
     }
@@ -3002,10 +3234,12 @@ void add_frame(uint32_t width, uint32_t height, int32_t x, int32_t y, uint32_t c
     struct cache_elem* frame = 0;
     struct sendqueue_element* element = NULL;
 
+
     pthread_mutex_lock(&remoteVars.sendqueue_mutex);
     if(! (remoteVars.client_connected && remoteVars.client_initialized))
     {
         /* don't have any clients connected, return */
+
         pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
         return;
     }
@@ -3013,6 +3247,7 @@ void add_frame(uint32_t width, uint32_t height, int32_t x, int32_t y, uint32_t c
     if(crc==0)
     {
         /* sending main image */
+
         pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
     }
     else
@@ -3031,6 +3266,7 @@ void add_frame(uint32_t width, uint32_t height, int32_t x, int32_t y, uint32_t c
         }
         frame->busy+=1;
 
+
         pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
 
         /* if element is new find common regions and compress the data */
@@ -3040,6 +3276,7 @@ void add_frame(uint32_t width, uint32_t height, int32_t x, int32_t y, uint32_t c
             initFrameRegions(frame);
         }
     }
+
 
     pthread_mutex_lock(&remoteVars.sendqueue_mutex);
     /* add element in the queue for sending */
@@ -3060,6 +3297,7 @@ void add_frame(uint32_t width, uint32_t height, int32_t x, int32_t y, uint32_t c
         remoteVars.first_sendqueue_element=remoteVars.last_sendqueue_element=element;
     }
     pthread_cond_signal(&remoteVars.have_sendqueue_cond);
+
     pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
 
     /* on this point will be sent wakeup single to send mutex */
@@ -3104,6 +3342,7 @@ remote_paint_rect(KdScreenInfo *screen,
          * OK, here we assuming that XSERVERBPP is 4. If not, we'll have troubles
          * but it should work faster like this
          */
+
         pthread_mutex_lock(&remoteVars.mainimg_mutex);
 
         maxdiff=2;
@@ -3169,6 +3408,7 @@ remote_paint_rect(KdScreenInfo *screen,
                 ind+=XSERVERBPP;
             }
         }
+
         pthread_mutex_unlock(&remoteVars.mainimg_mutex);
 
 
@@ -3202,11 +3442,13 @@ uint32_t calculate_crc(uint32_t width, uint32_t height, int32_t dx, int32_t dy)
 {
     uint32_t crc=adler32(0L, Z_NULL, 0);
 
+
     pthread_mutex_lock(&remoteVars.mainimg_mutex);
     for(uint32_t y=0; y< height;++y)
     {
         crc=adler32(crc,remoteVars.main_img+ ((y+dy)*remoteVars.main_img_width + dx)*XSERVERBPP, width*XSERVERBPP);
     }
+
     pthread_mutex_unlock(&remoteVars.mainimg_mutex);
     return crc;
 }
@@ -3248,6 +3490,7 @@ remote_screen_init(KdScreenInfo *screen,
 
     EPHYR_DBG("host_screen=%p x=%d, y=%d, wxh=%dx%d, buffer_height=%d",
               screen, x, y, width, height, buffer_height);
+
 
     pthread_mutex_lock(&remoteVars.mainimg_mutex);
 
@@ -3294,6 +3537,7 @@ remote_screen_init(KdScreenInfo *screen,
 
     *bytes_per_line = width*XSERVERBPP;
     *bits_per_pixel = 32;
+
     pthread_mutex_unlock(&remoteVars.mainimg_mutex);
 
     return remoteVars.main_img;
