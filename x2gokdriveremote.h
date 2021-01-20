@@ -439,7 +439,7 @@ struct _remoteHostVars
     BOOL client_initialized;
 
     struct SelectionStructure selstruct;
-} RemoteHostVars;
+} ;
 
 int send_selection_chunk(int sel, unsigned char* data, uint32_t length, uint32_t format, BOOL first, BOOL last, uint32_t compressed, uint32_t total);
 int send_output_selection(struct OutputChunk* chunk);

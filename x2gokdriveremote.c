@@ -40,6 +40,7 @@
 
 /* init it in OsInit() */
 static struct _remoteHostVars remoteVars = {0};
+struct _remoteHostVars RemoteHostVars;
 
 static BOOL remoteInitialized=FALSE;
 

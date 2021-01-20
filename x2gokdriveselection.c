@@ -51,6 +51,8 @@
 
 static struct _remoteHostVars *remoteVars = NULL;
 
+extern struct _remoteHostVars RemoteHostVars;
+
 //internal atoms
 static xcb_atom_t ATOM_ATOM;
 static xcb_atom_t ATOM_CLIPBOARD;
