@@ -659,7 +659,7 @@ void read_selection_property(xcb_atom_t selection, xcb_atom_t property)
                                     free(chunk->data);
                                     chunk->data=compressed_data;
                                     chunk->compressed_size=compressed_size;
-//                                     EPHYR_DBG("compressed chunk from %d to %d", chunk->size, chunk->compressed_size);
+                                    EPHYR_DBG("compressed chunk from %d to %d", chunk->size, chunk->compressed_size);
                                 }
                             }
                         }
@@ -722,7 +722,7 @@ void read_selection_property(xcb_atom_t selection, xcb_atom_t property)
                             remoteVars->selstruct.lastOutputChunk->next=chunk;
                             remoteVars->selstruct.lastOutputChunk=chunk;
                         }
-//                         EPHYR_DBG(" ADD CHUNK %p %p %p", remoteVars->selstruct.firstOutputChunk, remoteVars->selstruct.lastOutputChunk, chunk);
+                        EPHYR_DBG(" ADD CHUNK %p %p %p", remoteVars->selstruct.firstOutputChunk, remoteVars->selstruct.lastOutputChunk, chunk);
                         pthread_cond_signal(&remoteVars->have_sendqueue_cond);
 
 

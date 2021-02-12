@@ -96,7 +96,8 @@
 //it used to tell server which features are supported by server
 //Changes 0 - 1: sending and recieving client and OS version
 //Changes 1 - 2: supporting extended selection and sending selection on demand
-#define FEATURE_VERSION 2
+//Changes 2 - 3: supporting web client, sending cursors in PNG format and know about KEEPALIVE event
+#define FEATURE_VERSION 3
 
 
 #define EPHYR_WANT_DEBUG 1
@@ -137,7 +138,7 @@ enum Compressions{JPEG,PNG};
 enum SelectionType{PRIMARY,CLIPBOARD};
 enum SelectionMime{STRING,UTF_STRING,PIXMAP};
 enum ClipboardMode{CLIP_NONE,CLIP_CLIENT,CLIP_SERVER,CLIP_BOTH};
-enum OS_VERSION{OS_LINUX, OS_WINDOWS, OS_DARWIN};
+enum OS_VERSION{OS_LINUX, OS_WINDOWS, OS_DARWIN, WEB};
 
 #define DEFAULT_COMPRESSION JPEG
 
@@ -162,6 +163,7 @@ enum OS_VERSION{OS_LINUX, OS_WINDOWS, OS_DARWIN};
 #define SELECTIONEVENT 9
 #define CLIENTVERSION 10
 #define DEMANDSELECTION 11
+#define KEEPALIVE 12
 
 #define EVLENGTH 41
 
@@ -481,7 +483,7 @@ unsigned char* jpeg_compress(int quality, uint32_t image_width, uint32_t image_h
                              unsigned char* RGBA_buffer, uint32_t* jpeg_size, int bpp, char* fname);
 
 unsigned char* png_compress(uint32_t image_width, uint32_t image_height,
-                             unsigned char* RGBA_buffer, uint32_t* png_size);
+                             unsigned char* RGBA_buffer, uint32_t* png_size, BOOL compress_cursor);
 
 void clientReadNotify(int fd, int ready, void *data);
 

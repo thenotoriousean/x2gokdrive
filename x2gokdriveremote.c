@@ -267,9 +267,18 @@ void remote_sendCursor(CursorPtr cursor)
     {
         if(cursor->bits->argb)
         {
-            cframe->size=cursor->bits->width*cursor->bits->height*4;
-            cframe->data=malloc(cframe->size);
-            memcpy(cframe->data, cursor->bits->argb, cframe->size);
+            if(remoteVars.client_os == WEB)
+            {
+                //for web client we need to convert cursor data to PNG format
+                cframe->data=(char*)png_compress( cursor->bits->width, cursor->bits->height,
+                                                  (unsigned char *)cursor->bits->argb, &cframe->size, TRUE);
+            }
+            else
+            {
+                cframe->size=cursor->bits->width*cursor->bits->height*4;
+                cframe->data=malloc(cframe->size);
+                memcpy(cframe->data, cursor->bits->argb, cframe->size);
+            }
         }
         else
         {
@@ -2412,6 +2421,11 @@ clientReadNotify(int fd, int ready, void *data)
                     client_sel_request_notify(sel);
                     break;
                 }
+                case KEEPALIVE:
+                {
+                    //receive keepalive event, don't need to do anything
+                    break;
+                }
                 default:
                 {
                     EPHYR_DBG("UNSUPPORTED EVENT: %d",event_type);
@@ -2436,7 +2450,7 @@ clientReadNotify(int fd, int ready, void *data)
 void set_client_version(uint16_t ver, uint16_t os)
 {
     remoteVars.client_version=ver;
-    if(os > OS_DARWIN)
+    if(os > WEB)
     {
         EPHYR_DBG("Unsupported OS, assuming OS_LINUX");
     }
@@ -2773,7 +2787,7 @@ static void PngWriteCallback(png_structp  png_ptr, png_bytep data, png_size_t le
 }
 
 unsigned char* png_compress( uint32_t image_width, uint32_t image_height,
-                            unsigned char* RGBA_buffer, uint32_t* png_size)
+                            unsigned char* RGBA_buffer, uint32_t* png_size, BOOL compress_cursor)
 {
     struct
     {
@@ -2781,16 +2795,32 @@ unsigned char* png_compress( uint32_t image_width, uint32_t image_height,
         unsigned char *out;
     } outdata;
     unsigned char** rows = NULL;
+    int color_type;
+    int bpp;
+    png_structp p;
+    png_infop info_ptr;
 
-    png_structp p = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+    if(compress_cursor)
+    {
+        color_type = PNG_COLOR_TYPE_RGB_ALPHA;
+        bpp = 4;
+    }
+    else
+    {
+        color_type = PNG_COLOR_TYPE_RGB;
+        bpp = CACHEBPP;
+    }
 
-    png_infop info_ptr = png_create_info_struct(p);
+    p = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+
+    info_ptr = png_create_info_struct(p);
     setjmp(png_jmpbuf(p));
     png_set_IHDR(p, info_ptr,image_width, image_height, 8,
-                         PNG_COLOR_TYPE_RGB,
+                         color_type,
                          PNG_INTERLACE_NONE,
                          PNG_COMPRESSION_TYPE_DEFAULT,
                          PNG_FILTER_TYPE_DEFAULT);
+
 
     *png_size=0;
 
@@ -2800,7 +2830,7 @@ unsigned char* png_compress( uint32_t image_width, uint32_t image_height,
     outdata.out=0;
 
     for (uint32_t y = 0; y < image_height; ++y)
-        rows[y] = (unsigned char*)RGBA_buffer + y * image_width * CACHEBPP;
+        rows[y] = (unsigned char*)RGBA_buffer + y * image_width * bpp;
 
 
     png_set_rows(p, info_ptr, &rows[0]);
@@ -2880,7 +2910,7 @@ unsigned char* image_compress(uint32_t image_width, uint32_t image_height,
     if(remoteVars.compression==JPEG)
        return jpeg_compress(remoteVars.jpegQuality, image_width, image_height, RGBA_buffer, compressed_size, bpp, fname);
     else
-       return png_compress(image_width, image_height, RGBA_buffer, compressed_size);
+       return png_compress(image_width, image_height, RGBA_buffer, compressed_size, FALSE);
 }
 
 static
