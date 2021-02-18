@@ -48,6 +48,7 @@ static BOOL remoteInitialized=FALSE;
 void remote_selection_init(void)
 {
     remoteVars.selstruct.readingInputBuffer=-1;
+    remoteVars.selstruct.currentInputBuffer=CLIPBOARD;
     selection_init(&remoteVars);
 }
 
@@ -1989,7 +1990,7 @@ void readInputSelectionBuffer(char* buff)
 
     pthread_mutex_lock(&remoteVars.selstruct.inMutex);
 
-    selbuff = &remoteVars.selstruct.inSelection[remoteVars.selstruct.readingInputBuffer];
+    selbuff = &remoteVars.selstruct.inSelection[remoteVars.selstruct.currentInputBuffer];
 
     //if the data is not compressed read it directly to the buffer
     if(!selbuff->currentChunkCompressedSize)
@@ -2030,14 +2031,14 @@ void readInputSelectionBuffer(char* buff)
     if(selbuff->bytesReady==selbuff->size)
     {
         //selection buffer received completely
-//         EPHYR_DBG("READY Selection %d, MIME %d, Read %d from %d", remoteVars.selstruct.readingInputBuffer, selbuff->mimeData, selbuff->bytesReady, selbuff->size);
+//          EPHYR_DBG("READY Selection %d, MIME %d, Read %d from %d", remoteVars.selstruct.currentInputBuffer, selbuff->mimeData, selbuff->bytesReady, selbuff->size);
         //send notify to system that we are using selection
         //if state is requested we already own this selection after notify
         if(selbuff->state != REQUESTED)
-            own_selection(remoteVars.selstruct.readingInputBuffer);
+            own_selection(remoteVars.selstruct.currentInputBuffer);
         selbuff->state=COMPLETED;
         //send notification event to interrupt sleeping selection thread
-        client_sel_data_notify(remoteVars.selstruct.readingInputBuffer);
+        client_sel_data_notify(remoteVars.selstruct.currentInputBuffer);
     }
     //unlock selection
 
@@ -2078,6 +2079,13 @@ void readInputSelectionHeader(char* buff)
         compressedSize=0;
         lastChunk=firstChunk=TRUE;
         totalSize=size;
+    }
+
+    //sanity check
+    if((destination != PRIMARY)&& (destination!= CLIPBOARD))
+    {
+        EPHYR_DBG("WARNING: unsupported destination %d, setting to CLIPBOARD",destination);
+        destination=CLIPBOARD;
     }
 
      EPHYR_DBG("HAVE NEW INCOMING SELECTION Chunk: sel %d size %d mime %d compressed size %d, total %d",destination, size, mime, compressedSize, totalSize);
@@ -2157,7 +2165,7 @@ void readInputSelectionHeader(char* buff)
         if(selbuff->currentChunkBytesReady != selbuff->currentChunkSize)
         {
             // we didn't recieve complete chunk yet, next event will have data
-            remoteVars.selstruct.readingInputBuffer=destination;
+            remoteVars.selstruct.currentInputBuffer=remoteVars.selstruct.readingInputBuffer=destination;
         }
     }
     else
@@ -2165,7 +2173,7 @@ void readInputSelectionHeader(char* buff)
         if(selbuff->currentChunkBytesReady != selbuff->currentChunkCompressedSize)
         {
             // we didn't recieve complete chunk yet, next event will have data
-            remoteVars.selstruct.readingInputBuffer=destination;
+            remoteVars.selstruct.currentInputBuffer=remoteVars.selstruct.readingInputBuffer=destination;
         }
         else
         {

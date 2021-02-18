@@ -345,6 +345,7 @@ struct SelectionStructure
 
     //Input selection members
     int readingInputBuffer; //which selection are reading input buffer at the moments: PRIMARY, CLIPBOARD or -1 if none
+    int currentInputBuffer; //which selection represents input buffer at the moments: PRIMARY or CLIPBOARD
     struct InputBuffer inSelection[2]; //PRIMARY an CLIPBOARD selection buffers
 
     //list of delayed requests
