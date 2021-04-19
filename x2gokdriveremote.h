@@ -97,7 +97,8 @@
 //Changes 0 - 1: sending and recieving client and OS version
 //Changes 1 - 2: supporting extended selection and sending selection on demand
 //Changes 2 - 3: supporting web client, sending cursors in PNG format and know about KEEPALIVE event
-#define FEATURE_VERSION 3
+//Changes 3 - 4: extended clipboard support for web client
+#define FEATURE_VERSION 4
 
 
 #define EPHYR_WANT_DEBUG 1

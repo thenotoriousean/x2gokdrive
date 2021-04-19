@@ -2467,7 +2467,8 @@ void set_client_version(uint16_t ver, uint16_t os)
     //clients version >= 1 supporting extended selection (sending big amount of data aín several chunks)
     remoteVars.selstruct.clientSupportsExetndedSelection=(ver > 1);
     //Linux clients supporting sending selection on demand (not sending data if not needed)
-    remoteVars.selstruct.clientSupportsOnDemandSelection=((ver > 1) && (os == OS_LINUX));
+    //Web client support clipboard and selection on demand starting from v.4
+    remoteVars.selstruct.clientSupportsOnDemandSelection=(((ver > 1) && (os == OS_LINUX)) || ((ver > 3) && (os == WEB)));
 
 }
 

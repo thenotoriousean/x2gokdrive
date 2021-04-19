@@ -18,6 +18,7 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     - move declaration of RemoteHostVars from x2gokdriveremote.h to x2gokdriveremote.c.
     - add some support for HTML5 client (like converting pointer cursors to PNG format).
     - fix crashing if client is sending unrequested selection.
+    - extended clipboard support for HTML client.
 
   [ Mihai Moldovan ]
   * Initial release:

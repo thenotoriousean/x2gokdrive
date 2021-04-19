@@ -651,7 +651,7 @@ void read_selection_property(xcb_atom_t selection, xcb_atom_t property)
                         {
                             chunk->mimeData=UTF_STRING;
                             //for text chunks > 1K using zlib compression if client supports it
-                            if(remoteVars->selstruct.clientSupportsExetndedSelection && chunk->size > 1024)
+                            if(remoteVars->selstruct.clientSupportsExetndedSelection && chunk->size > 1024 && remoteVars->client_os != WEB )
                             {
                                 compressed_data=zcompress(chunk->data, chunk->size, &compressed_size);
                                 if(compressed_data && compressed_size)
@@ -891,7 +891,8 @@ void process_selection_owner_notify(xcb_generic_event_t *e)
         return;
     }
 
-    if(remoteVars->selstruct.selectionMode == CLIP_NONE || remoteVars->selstruct.selectionMode == CLIP_CLIENT)
+    //web clients V. < 4 not support selections
+    if(remoteVars->selstruct.selectionMode == CLIP_NONE || remoteVars->selstruct.selectionMode == CLIP_CLIENT || ((remoteVars->client_version < 4) && (remoteVars->client_os == WEB)))
     {
         EPHYR_DBG("Server selection is disabled");
         return;
