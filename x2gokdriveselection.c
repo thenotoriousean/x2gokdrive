@@ -931,6 +931,7 @@ void *selection_thread (void* id)
     xcb_xfixes_query_version_cookie_t xfixes_query_cookie;
     xcb_xfixes_query_version_reply_t *xfixes_query;
 
+    debug_selectThreadId=pthread_self();
 
     /* Create the window */
     remoteVars->selstruct.xcbConnection = xcb_connect (RemoteHostVars.displayName, NULL);

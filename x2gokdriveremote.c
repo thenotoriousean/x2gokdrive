@@ -1436,11 +1436,9 @@ void sendMainImageFromSendThread(uint32_t width, uint32_t height, int32_t dx ,in
 static
 void *send_frame_thread (void *threadid)
 {
-    long tid;
     enum SelectionType r;
-    tid = (long)threadid;
 
-    EPHYR_DBG("Started sending thread: #%ld!\n", tid);
+    debug_sendThreadId=pthread_self();
 
     while (1)
     {

@@ -19,6 +19,7 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     - add some support for HTML5 client (like converting pointer cursors to PNG format).
     - fix crashing if client is sending unrequested selection.
     - extended clipboard support for HTML client.
+    - add name of the thread to the debug output.
 
   [ Mihai Moldovan ]
   * Initial release:
