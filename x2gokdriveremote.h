@@ -476,6 +476,7 @@ unsigned int checkSocketConnection(OsTimerPtr timer, CARD32 time, void* args);
 void restartTimerOnInit(void);
 
 void open_socket(void);
+void close_server_socket(void);
 
 void setAgentState(int state);
 
@@ -496,6 +497,7 @@ unsigned char* png_compress(uint32_t image_width, uint32_t image_height,
                              unsigned char* RGBA_buffer, uint32_t* png_size, BOOL compress_cursor);
 
 void clientReadNotify(int fd, int ready, void *data);
+void serverAcceptNotify(int fd, int ready, void *data);
 
 void add_frame(uint32_t width, uint32_t height, int32_t x, int32_t y, uint32_t crc, uint32_t size);
 

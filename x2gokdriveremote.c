@@ -68,12 +68,10 @@ void restartTimerOnInit(void)
 
 
 static
-void cancelThreadBeforeStart(void)
+void cancelBeforeStart(void)
 {
-    shutdown(remoteVars.serversock, SHUT_RDWR);
-    close(remoteVars.serversock);
-    pthread_cancel(remoteVars.send_thread_id);
-    remoteVars.send_thread_id=0;
+    EPHYR_DBG("Closing server connection");
+    close_server_socket();
     setAgentState(SUSPENDED);
 }
 
@@ -100,7 +98,7 @@ void remote_handle_signal(int signum)
                     TimerFree(remoteVars.checkConnectionTimer);
                     remoteVars.checkConnectionTimer=0;
                 }
-                cancelThreadBeforeStart();
+                cancelBeforeStart();
                 return;
             }
             case RUNNING:
@@ -1440,315 +1438,212 @@ void *send_frame_thread (void *threadid)
 
     debug_sendThreadId=pthread_self();
 
-    while (1)
+    while(1)
     {
-        EPHYR_DBG ("waiting for TCP connection\n");
-        remoteVars.clientsock = accept ( remoteVars.serversock, (struct sockaddr *) &remoteVars.address, &remoteVars.addrlen );
-        if (remoteVars.clientsock <= 0)
+
+        pthread_mutex_lock(&remoteVars.sendqueue_mutex);
+        if(!remoteVars.client_connected)
         {
-            EPHYR_DBG( "ACCEPT ERROR OR CANCELD!\n");
+            EPHYR_DBG ("TCP connection closed\n");
+            shutdown(remoteVars.clientsock, SHUT_RDWR);
+            close(remoteVars.clientsock);
+
+            pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
             break;
         }
-        EPHYR_DBG ("Connection from (%s)...\n", inet_ntoa (remoteVars.address.sin_addr));
+        remoteVars.client_connected=TRUE;
 
-        if(strlen(remoteVars.acceptAddr))
+        //check if we should send the server version to client
+        if(remoteVars.client_version && ! remoteVars.server_version_sent)
         {
-            struct addrinfo hints, *res;
-            int errcode;
+            //the client supports versions and we didn't send our version yet
+            remote_sendVersion();
+        }
 
-            memset (&hints, 0, sizeof (hints));
-            hints.ai_family = AF_INET;
-            hints.ai_socktype = SOCK_STREAM;
-            hints.ai_flags |= AI_CANONNAME;
 
-            errcode = getaddrinfo (remoteVars.acceptAddr, NULL, &hints, &res);
-            if (errcode != 0 || !res)
+
+        if(!remoteVars.first_sendqueue_element && !remoteVars.firstCursor && !remoteVars.selstruct.firstOutputChunk)
+        {
+            /* sleep if frame queue is empty */
+            pthread_cond_wait(&remoteVars.have_sendqueue_cond, &remoteVars.sendqueue_mutex);
+        }
+
+        /* mutex is locked on this point */
+
+        //only send output selection chunks if there are no frames and cursors in the queue
+        //selections can take a lot of bandwidth and have less priority
+        if(remoteVars.selstruct.firstOutputChunk && !remoteVars.first_sendqueue_element && !remoteVars.firstCursor)
+        {
+            //get chunk from queue
+            struct OutputChunk* chunk=remoteVars.selstruct.firstOutputChunk;
+            remoteVars.selstruct.firstOutputChunk=chunk->next;
+            if(!remoteVars.selstruct.firstOutputChunk)
             {
-                EPHYR_DBG ("ERROR LOOKUP %s", remoteVars.acceptAddr);
-                terminateServer(-1);
+                remoteVars.selstruct.lastOutputChunk=NULL;
             }
-            if(  ((struct sockaddr_in *) (res->ai_addr))->sin_addr.s_addr != remoteVars.address.sin_addr.s_addr)
+
+            pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+            //send chunk
+            send_output_selection(chunk);
+            //free chunk and it's data
+            if(chunk->data)
             {
-                EPHYR_DBG("Connection only allowed from %s",inet_ntoa ( ((struct sockaddr_in *)(res->ai_addr))->sin_addr));
-                shutdown(remoteVars.clientsock, SHUT_RDWR);
-                close(remoteVars.clientsock);
-                continue;
+                free(chunk->data);
+            }
+            //                 EPHYR_DBG(" REMOVE CHUNK %p %p %p", remoteVars.selstruct.firstOutputChunk, remoteVars.selstruct.lastOutputChunk, chunk);
+            free(chunk);
+
+            pthread_mutex_lock(&remoteVars.sendqueue_mutex);
+        }
+
+        //check if we need to request the selection from client
+        if(remoteVars.selstruct.requestSelection[PRIMARY] || remoteVars.selstruct.requestSelection[CLIPBOARD])
+        {
+            for(r=PRIMARY; r<=CLIPBOARD; ++r)
+            {
+                if(remoteVars.selstruct.requestSelection[r])
+                {
+                    remoteVars.selstruct.requestSelection[r]=FALSE;
+
+                    pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+                    //send request for selection
+                    request_selection_from_client(r);
+
+                    pthread_mutex_lock(&remoteVars.sendqueue_mutex);
+                }
             }
         }
-        if(strlen(remoteVars.cookie))
+
+        if(remoteVars.firstCursor)
         {
-            char msg[33];
-            int length=32;
-            int ready=0;
+            /* get cursor from queue, delete it from queue, unlock mutex and send cursor. After sending free cursor */
+            struct cursorFrame* cframe=remoteVars.firstCursor;
 
-//            EPHYR_DBG("Checking cookie: %s",remoteVars.cookie);
+            if(remoteVars.firstCursor->next)
+                remoteVars.firstCursor=remoteVars.firstCursor->next;
+            else
+                remoteVars.firstCursor=remoteVars.lastCursor=0;
 
-            while(ready<length)
-            {
-                int chunk=read(remoteVars.clientsock, msg+ready, 32-ready);
+            pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+            send_cursor(cframe);
+            if(cframe->data)
+                free(cframe->data);
+            free(cframe);
 
-                if(chunk<=0)
-                {
-                    EPHYR_DBG("READ COOKIE ERROR");
-                    shutdown(remoteVars.clientsock, SHUT_RDWR);
-                    close(remoteVars.clientsock);
-                    continue;
-                }
-                ready+=chunk;
-
-                EPHYR_DBG("got %d COOKIE BYTES from client", ready);
-            }
-            if(strncmp(msg,remoteVars.cookie,32))
-            {
-                EPHYR_DBG("Wrong cookie");
-                shutdown(remoteVars.clientsock, SHUT_RDWR);
-                close(remoteVars.clientsock);
-                continue;
-            }
-            EPHYR_DBG("Cookie approved");
         }
         else
         {
-            EPHYR_DBG("Warning: not checking client's cookie");
+
+            pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
         }
-
-
 
 
         pthread_mutex_lock(&remoteVars.sendqueue_mutex);
-        //only accept one client, close server socket
-        shutdown(remoteVars.serversock, SHUT_RDWR);
-        close(remoteVars.serversock);
-#if XORG_VERSION_CURRENT >= 11900000
-        SetNotifyFd(remoteVars.clientsock, clientReadNotify, X_NOTIFY_READ, NULL);
-#endif /* XORG_VERSION_CURRENT */
-        remoteVars.client_connected=TRUE;
-        remoteVars.server_version_sent=FALSE;
-        set_client_version(0,0);
-        if(remoteVars.checkConnectionTimer)
+        if(remoteVars.first_sendqueue_element)
         {
-            TimerFree(remoteVars.checkConnectionTimer);
-            remoteVars.checkConnectionTimer=0;
-        }
-        remoteVars.client_initialized=FALSE;
-        remoteVars.con_start_time=time(NULL);
-        remoteVars.data_sent=0;
-        remoteVars.data_copy=0;
-        remoteVars.evBufferOffset=0;
-        setAgentState(RUNNING);
+            int elems=queue_elements();
+            struct cache_elem* frame = NULL;
+            struct sendqueue_element* current = NULL;
+            uint32_t  x, y = 0;
+            int32_t width, height = 0;
 
-        pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
-
-        while(1)
-        {
-
-            pthread_mutex_lock(&remoteVars.sendqueue_mutex);
-            if(!remoteVars.client_connected)
+            if(remoteVars.maxfr<elems)
             {
-                EPHYR_DBG ("TCP connection closed\n");
-#if XORG_VERSION_CURRENT >= 11900000
-                RemoveNotifyFd(remoteVars.clientsock);
-#endif /* XORG_VERSION_CURRENT */
-                shutdown(remoteVars.clientsock, SHUT_RDWR);
-                close(remoteVars.clientsock);
-
-                pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
-                break;
+                remoteVars.maxfr=elems;
             }
-            remoteVars.client_connected=TRUE;
+            //                EPHYR_DBG("have %d max frames in queue, current %d", remoteVars.,elems);
+            frame=remoteVars.first_sendqueue_element->frame;
 
-            //check if we should send the server version to client
-            if(remoteVars.client_version && ! remoteVars.server_version_sent)
+            /* delete first element from frame queue */
+            current=remoteVars.first_sendqueue_element;
+            if(remoteVars.first_sendqueue_element->next)
             {
-                //the client supports versions and we didn't send our version yet
-                remote_sendVersion();
-            }
-
-
-
-            if(!remoteVars.first_sendqueue_element && !remoteVars.firstCursor && !remoteVars.selstruct.firstOutputChunk)
-            {
-                /* sleep if frame queue is empty */
-                pthread_cond_wait(&remoteVars.have_sendqueue_cond, &remoteVars.sendqueue_mutex);
-            }
-
-            /* mutex is locked on this point */
-
-            //only send output selection chunks if there are no frames and cursors in the queue
-            //selections can take a lot of bandwidth and have less priority
-            if(remoteVars.selstruct.firstOutputChunk && !remoteVars.first_sendqueue_element && !remoteVars.firstCursor)
-            {
-                //get chunk from queue
-                struct OutputChunk* chunk=remoteVars.selstruct.firstOutputChunk;
-                remoteVars.selstruct.firstOutputChunk=chunk->next;
-                if(!remoteVars.selstruct.firstOutputChunk)
-                {
-                    remoteVars.selstruct.lastOutputChunk=NULL;
-                }
-
-                pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
-                //send chunk
-                send_output_selection(chunk);
-                //free chunk and it's data
-                if(chunk->data)
-                {
-                      free(chunk->data);
-                }
-//                 EPHYR_DBG(" REMOVE CHUNK %p %p %p", remoteVars.selstruct.firstOutputChunk, remoteVars.selstruct.lastOutputChunk, chunk);
-                free(chunk);
-
-                pthread_mutex_lock(&remoteVars.sendqueue_mutex);
-            }
-
-            //check if we need to request the selection from client
-            if(remoteVars.selstruct.requestSelection[PRIMARY] || remoteVars.selstruct.requestSelection[CLIPBOARD])
-            {
-                for(r=PRIMARY; r<=CLIPBOARD; ++r)
-                {
-                    if(remoteVars.selstruct.requestSelection[r])
-                    {
-                        remoteVars.selstruct.requestSelection[r]=FALSE;
-
-                        pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
-                        //send request for selection
-                        request_selection_from_client(r);
-
-                        pthread_mutex_lock(&remoteVars.sendqueue_mutex);
-                    }
-                }
-            }
-
-            if(remoteVars.firstCursor)
-            {
-                /* get cursor from queue, delete it from queue, unlock mutex and send cursor. After sending free cursor */
-                struct cursorFrame* cframe=remoteVars.firstCursor;
-
-                if(remoteVars.firstCursor->next)
-                    remoteVars.firstCursor=remoteVars.firstCursor->next;
-                else
-                    remoteVars.firstCursor=remoteVars.lastCursor=0;
-
-                pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
-                send_cursor(cframe);
-                if(cframe->data)
-                    free(cframe->data);
-                free(cframe);
-
+                remoteVars.first_sendqueue_element=remoteVars.first_sendqueue_element->next;
             }
             else
             {
+                remoteVars.first_sendqueue_element=remoteVars.last_sendqueue_element=NULL;
+            }
+            x=current->x;
+            y=current->y;
+            width=current->width;
+            height=current->height;
+            free(current);
+
+            if(frame)
+            {
+                uint32_t crc = frame->crc;
+                uint32_t frame_width=frame->width;
+                uint32_t frame_height=frame->height;
+
+                /* unlock sendqueue for main thread */
 
                 pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+                send_frame(frame_width, frame_height, x, y, crc, frame->regions);
+            }
+            else
+            {
+                EPHYR_DBG("Sending main image or screen update");
+
+                pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+                sendMainImageFromSendThread(width, height, x, y);
             }
 
 
             pthread_mutex_lock(&remoteVars.sendqueue_mutex);
-            if(remoteVars.first_sendqueue_element)
+            if(frame)
             {
-                int elems=queue_elements();
-                struct cache_elem* frame = NULL;
-                struct sendqueue_element* current = NULL;
-                uint32_t  x, y = 0;
-                int32_t width, height = 0;
+                frame->sent=TRUE;
+                frame->busy--;
+                if(frame->source)
+                    frame->source->busy--;
+                frame->source=0;
 
-                if(remoteVars.maxfr<elems)
+                for(int i=0;i<9;++i)
                 {
-                    remoteVars.maxfr=elems;
-                }
-//                EPHYR_DBG("have %d max frames in queue, current %d", remoteVars.,elems);
-                frame=remoteVars.first_sendqueue_element->frame;
-
-                /* delete first element from frame queue */
-                current=remoteVars.first_sendqueue_element;
-                if(remoteVars.first_sendqueue_element->next)
-                {
-                    remoteVars.first_sendqueue_element=remoteVars.first_sendqueue_element->next;
-                }
-                else
-                {
-                    remoteVars.first_sendqueue_element=remoteVars.last_sendqueue_element=NULL;
-                }
-                x=current->x;
-                y=current->y;
-                width=current->width;
-                height=current->height;
-                free(current);
-
-                if(frame)
-                {
-                    uint32_t crc = frame->crc;
-                    uint32_t frame_width=frame->width;
-                    uint32_t frame_height=frame->height;
-
-                    /* unlock sendqueue for main thread */
-
-                    pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
-                    send_frame(frame_width, frame_height, x, y, crc, frame->regions);
-                }
-                else
-                {
-                    EPHYR_DBG("Sending main image or screen update");
-
-                    pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
-                    sendMainImageFromSendThread(width, height, x, y);
-                }
-
-
-                pthread_mutex_lock(&remoteVars.sendqueue_mutex);
-                if(frame)
-                {
-                    frame->sent=TRUE;
-                    frame->busy--;
-                    if(frame->source)
-                        frame->source->busy--;
-                    frame->source=0;
-
-                    for(int i=0;i<9;++i)
+                    if(frame->regions[i].size)
                     {
-                        if(frame->regions[i].size)
-                        {
-                            free(frame->regions[i].compressed_data);
-                            frame->regions[i].size=0;
-                        }
-                        frame->regions[i].source_crc=0;
-                        frame->regions[i].rect.size.width=0;
+                        free(frame->regions[i].compressed_data);
+                        frame->regions[i].size=0;
                     }
+                    frame->regions[i].source_crc=0;
+                    frame->regions[i].rect.size.width=0;
                 }
-
-
-                if(remoteVars.cache_size>CACHEMAXSIZE)
-                {
-                    clear_cache_data(CACHEMAXSIZE);
-                }
-                if(remoteVars.cache_size>CACHEMAXELEMENTS)
-                {
-                    clear_frame_cache(CACHEMAXELEMENTS);
-                }
-
-                if(remoteVars.first_deleted_elements)
-                {
-                    send_deleted_elements();
-                }
-
-                if(remoteVars.first_deleted_cursor)
-                {
-                    send_deleted_cursors();
-                }
-
-
-                pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
-                remoteVars.framenum++;
             }
-            else
+
+
+            if(remoteVars.cache_size>CACHEMAXSIZE)
             {
-
-
-                pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+                clear_cache_data(CACHEMAXSIZE);
             }
+            if(remoteVars.cache_size>CACHEMAXELEMENTS)
+            {
+                clear_frame_cache(CACHEMAXELEMENTS);
+            }
+
+            if(remoteVars.first_deleted_elements)
+            {
+                send_deleted_elements();
+            }
+
+            if(remoteVars.first_deleted_cursor)
+            {
+                send_deleted_cursors();
+            }
+
+
+            pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+            remoteVars.framenum++;
         }
-        pthread_exit(0);
+        else
+        {
+
+
+            pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+        }
     }
-//    #warning add some conditions to exit thread properly
+    EPHYR_DBG("exit sending thread");
+    remoteVars.send_thread_id=0;
     pthread_exit(0);
 }
 
@@ -1933,6 +1828,11 @@ void disconnect_client(void)
     clear_frame_cache(0);
     freeCursors();
     clear_output_selection();
+#if XORG_VERSION_CURRENT >= 11900000
+    EPHYR_DBG("Remove notify FD for client sock %d",remoteVars.clientsock);
+    RemoveNotifyFd(remoteVars.clientsock);
+#endif /* XORG_VERSION_CURRENT */
+
     pthread_cond_signal(&remoteVars.have_sendqueue_cond);
 
 
@@ -2475,22 +2375,38 @@ void pollEvents(void)
 {
     //EPHYR_DBG("polling events");
     struct pollfd fds[2];
-    int    nfds = 1;
-    BOOL con;
-
-    pthread_mutex_lock(&remoteVars.sendqueue_mutex);
-    con=remoteVars.client_connected;
-
-    pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
-    if(!con)
-        return;
+    int nfds = 1;
+    BOOL client = FALSE;
 
     memset(fds, 0 , sizeof(fds));
-    fds[0].fd = remoteVars.clientsock;
+
+    pthread_mutex_lock(&remoteVars.sendqueue_mutex);
+
+    //We are in connected state, poll client socket
+    if(remoteVars.client_connected)
+    {
+        client = TRUE;
+        fds[0].fd = remoteVars.clientsock;
+    }  //we are in connecting state, poll server socket
+    else if(remoteVars.serversock != -1)
+    {
+        fds[0].fd = remoteVars.serversock;
+    }
+    else //not polling any sockets
+    {
+        pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+        return;
+    }
+
+    pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+
     fds[0].events = POLLIN;
     if(poll(fds, nfds, 0))
     {
-       clientReadNotify(remoteVars.clientsock, 0, NULL);
+        if(client)
+            clientReadNotify(fds[0].fd, 0, NULL);
+        else
+            serverAcceptNotify(fds[0].fd, 0, NULL);
     }
 }
 #endif /* XORG_VERSION_CURRENT */
@@ -2505,7 +2421,7 @@ unsigned int checkSocketConnection(OsTimerPtr timer, CARD32 time, void* args)
     if(!remoteVars.client_connected)
     {
         EPHYR_DBG("NO CLIENT CONNECTION SINCE %d seconds",ACCEPT_TIMEOUT);
-        cancelThreadBeforeStart();
+        cancelBeforeStart();
     }
     else
     {
@@ -2516,10 +2432,128 @@ unsigned int checkSocketConnection(OsTimerPtr timer, CARD32 time, void* args)
     return 0;
 }
 
+void serverAcceptNotify(int fd, int ready_sock, void *data)
+{
+    int ret;
+    remoteVars.clientsock = accept ( remoteVars.serversock, (struct sockaddr *) &remoteVars.address, &remoteVars.addrlen );
+    if (remoteVars.clientsock <= 0)
+    {
+        EPHYR_DBG( "ACCEPT ERROR OR CANCELD!\n");
+        return;
+    }
+    EPHYR_DBG ("Connection from (%s)...\n", inet_ntoa (remoteVars.address.sin_addr));
+
+    //only accept one client, close server socket
+    close_server_socket();
+
+    if(strlen(remoteVars.acceptAddr))
+    {
+        struct addrinfo hints, *res;
+        int errcode;
+
+        memset (&hints, 0, sizeof (hints));
+        hints.ai_family = AF_INET;
+        hints.ai_socktype = SOCK_STREAM;
+        hints.ai_flags |= AI_CANONNAME;
+
+        errcode = getaddrinfo (remoteVars.acceptAddr, NULL, &hints, &res);
+        if (errcode != 0 || !res)
+        {
+            EPHYR_DBG ("ERROR LOOKUP %s", remoteVars.acceptAddr);
+            terminateServer(-1);
+        }
+        if(  ((struct sockaddr_in *) (res->ai_addr))->sin_addr.s_addr != remoteVars.address.sin_addr.s_addr)
+        {
+            EPHYR_DBG("Connection only allowed from %s",inet_ntoa ( ((struct sockaddr_in *)(res->ai_addr))->sin_addr));
+            shutdown(remoteVars.clientsock, SHUT_RDWR);
+            close(remoteVars.clientsock);
+            return;
+        }
+    }
+    if(strlen(remoteVars.cookie))
+    {
+        char msg[33];
+        int length=32;
+        int ready=0;
+
+        //            EPHYR_DBG("Checking cookie: %s",remoteVars.cookie);
+
+        while(ready<length)
+        {
+            int chunk=read(remoteVars.clientsock, msg+ready, 32-ready);
+
+            if(chunk<=0)
+            {
+                EPHYR_DBG("READ COOKIE ERROR");
+                shutdown(remoteVars.clientsock, SHUT_RDWR);
+                close(remoteVars.clientsock);
+                continue;
+            }
+            ready+=chunk;
+
+            EPHYR_DBG("got %d COOKIE BYTES from client", ready);
+        }
+        if(strncmp(msg,remoteVars.cookie,32))
+        {
+            EPHYR_DBG("Wrong cookie");
+            shutdown(remoteVars.clientsock, SHUT_RDWR);
+            close(remoteVars.clientsock);
+            return;
+        }
+        EPHYR_DBG("Cookie approved");
+    }
+    else
+    {
+        EPHYR_DBG("Warning: not checking client's cookie");
+    }
+
+    pthread_mutex_lock(&remoteVars.sendqueue_mutex);
+    #if XORG_VERSION_CURRENT >= 11900000
+    EPHYR_DBG("Set notify FD for client sock: %d",remoteVars.clientsock);
+    SetNotifyFd(remoteVars.clientsock, clientReadNotify, X_NOTIFY_READ, NULL);
+    #endif /* XORG_VERSION_CURRENT */
+    remoteVars.client_connected=TRUE;
+    remoteVars.server_version_sent=FALSE;
+    set_client_version(0,0);
+    if(remoteVars.checkConnectionTimer)
+    {
+        TimerFree(remoteVars.checkConnectionTimer);
+        remoteVars.checkConnectionTimer=0;
+    }
+    remoteVars.client_initialized=FALSE;
+    remoteVars.con_start_time=time(NULL);
+    remoteVars.data_sent=0;
+    remoteVars.data_copy=0;
+    remoteVars.evBufferOffset=0;
+    setAgentState(RUNNING);
+
+    pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+
+   //here start a send thread
+    ret = pthread_create(&remoteVars.send_thread_id, NULL, send_frame_thread, (void *)remoteVars.send_thread_id);
+    if (ret)
+    {
+        EPHYR_DBG("ERROR; return code from pthread_create() is %d\n", ret);
+        terminateServer(-1);
+    }
+}
+
+
+void close_server_socket(void)
+{
+#if XORG_VERSION_CURRENT >= 11900000
+    EPHYR_DBG("Remove notify FD for server sock %d",remoteVars.serversock);
+    RemoveNotifyFd(remoteVars.serversock);
+#endif /* XORG_VERSION_CURRENT */
+    shutdown(remoteVars.serversock, SHUT_RDWR);
+    close(remoteVars.serversock);
+    remoteVars.serversock=-1;
+}
+
+
 void open_socket(void)
 {
     const int y = 1;
-    int ret = -1;
 
     remoteVars.serversock=socket (AF_INET, SOCK_STREAM, 0);
     setsockopt( remoteVars.serversock, SOL_SOCKET, SO_REUSEADDR, &y, sizeof(int));
@@ -2553,14 +2587,13 @@ void open_socket(void)
 
     remoteVars.checkConnectionTimer=TimerSet(0,0,ACCEPT_TIMEOUT, checkSocketConnection, NULL);
 
-    ret = pthread_create(&remoteVars.send_thread_id, NULL, send_frame_thread, (void *)remoteVars.send_thread_id);
-    if (ret)
-    {
-        EPHYR_DBG("ERROR; return code from pthread_create() is %d\n", ret);
-        terminateServer(-1);
-    }
+#if XORG_VERSION_CURRENT >= 11900000
+    EPHYR_DBG("Set notify FD for server sock: %d",remoteVars.serversock);
+    EPHYR_DBG ("waiting for TCP connection\n");
+    SetNotifyFd(remoteVars.serversock, serverAcceptNotify, X_NOTIFY_READ, NULL);
+#endif /* XORG_VERSION_CURRENT */
 
-    EPHYR_DBG("Socket is ready");
+    EPHYR_DBG("Server socket is ready");
 }
 
 
@@ -2742,6 +2775,8 @@ remote_init(void)
     fclose(stdin);
 
     memset(&remoteVars,0,sizeof(RemoteHostVars));
+
+    remoteVars.serversock=-1;
 
     remoteVars.jpegQuality=JPG_QUALITY;
     remoteVars.compression=DEFAULT_COMPRESSION;
