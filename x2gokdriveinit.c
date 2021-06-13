@@ -38,6 +38,7 @@
 #include "x2gokdrivelog.h"
 #include "glx_extinit.h"
 #include "x2gokdriveremote.h"
+#include "x2gokdrivedebug.h"
 
 extern Window EphyrPreExistingHostWin;
 extern Bool EphyrWantGrayScale;

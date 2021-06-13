@@ -45,6 +45,7 @@
 
 #endif
 #include "x2gokdriveselection.h"
+#include "x2gokdrivedebug.h"
 
 #define SELECTION_DELAY 30000 //timeout for selection operation
 #define INCR_SIZE 256*1024 //size of part for incr selection incr selection
@@ -931,7 +932,9 @@ void *selection_thread (void* id)
     xcb_xfixes_query_version_cookie_t xfixes_query_cookie;
     xcb_xfixes_query_version_reply_t *xfixes_query;
 
+#ifdef EPHYR_WANT_DEBUG
     debug_selectThreadId=pthread_self();
+#endif /* EPHYR_WANT_DEBUG */
 
     /* Create the window */
     remoteVars->selstruct.xcbConnection = xcb_connect (RemoteHostVars.displayName, NULL);

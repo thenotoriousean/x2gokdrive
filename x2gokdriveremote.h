@@ -100,24 +100,6 @@
 //Changes 3 - 4: extended clipboard support for web client
 #define FEATURE_VERSION 4
 
-
-#define EPHYR_WANT_DEBUG 1
-// #warning DEBUG ENABLED
-
-
-#if (EPHYR_WANT_DEBUG)
-#define EPHYR_DBG(x, a...) \
-if(pthread_self()==debug_sendThreadId)\
-fprintf(stderr,"SEND:"__FILE__ ":%d,%s() " x "\n", __LINE__, __func__, ##a);\
-else if (pthread_self()==debug_selectThreadId)\
-fprintf(stderr,"SEL:"__FILE__ ":%d,%s() " x "\n", __LINE__, __func__, ##a);\
-else \
-fprintf(stderr,"MAIN:"__FILE__ ":%d,%s() " x "\n", __LINE__, __func__, ##a)
-#else
-#define EPHYR_DBG(x, a...) do {} while (0)
-#endif
-
-
 #define MAXMSGSIZE 1024*16
 
 //port to listen by default
@@ -449,9 +431,6 @@ struct _remoteHostVars
 
     struct SelectionStructure selstruct;
 } ;
-
-unsigned long long int debug_sendThreadId;
-unsigned long long int debug_selectThreadId;
 
 int send_selection_chunk(int sel, unsigned char* data, uint32_t length, uint32_t format, BOOL first, BOOL last, uint32_t compressed, uint32_t total);
 int send_output_selection(struct OutputChunk* chunk);

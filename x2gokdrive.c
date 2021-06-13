@@ -43,6 +43,7 @@
 
 #include "inputstr.h"
 #include "scrnintstr.h"
+#include "x2gokdrivedebug.h"
 #include "x2gokdrivelog.h"
 
 #include "xkbsrv.h"

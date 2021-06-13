@@ -35,6 +35,7 @@
 
 #endif
 #include "x2gokdriveremote.h"
+#include "x2gokdrivedebug.h"
 #include "x2gokdriveselection.h"
 #include <zlib.h>
 
@@ -1436,7 +1437,9 @@ void *send_frame_thread (void *threadid)
 {
     enum SelectionType r;
 
+#ifdef EPHYR_WANT_DEBUG
     debug_sendThreadId=pthread_self();
+#endif /* EPHYR_WANT_DEBUG */
 
     while(1)
     {
