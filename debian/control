@@ -90,6 +90,7 @@ Build-Depends:
  libxcb-glx0-dev,
  libxcb-xfixes0-dev,
  libxcb-xf86dri0-dev (>= 1.6),
+ mesa-common-dev,
 Standards-Version: 4.3.0
 Homepage: https://code.x2go.org/releases/source/x2gokdrive
 Vcs-Git: git://code.x2go.org/x2gokdrive.git
