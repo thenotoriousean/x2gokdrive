@@ -61,9 +61,11 @@ void processScreenArg(const char *screen_size, char *parent_id);
 int ephyrInitFake(void);
 #endif /* XORG_VERSION_CURRENT */
 
+#if XORG_VERSION_CURRENT < 12007000
 #if INPUTTHREAD
 void ddxInputThreadInit(void);
 #endif /* INPUTTHREAD */
+#endif /* XORG_VERSION_CURRENT */
 
 int
 main(int argc, char *argv[], char *envp[])
