@@ -221,4 +221,20 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
       version variable, but we can do that as we go and accept build failures
       for the time being.
 
+  [ Mike Gabriel ]
+  * Initial release:
+    - patches.xorg/: Add 1.20.11 files, essentially copied and refreshed from
+      1.20.7.
+      This is the X.Org Xserver version shipped with Debian bullseye.
+    - x2gokdriveinit.c: Only define ddxInputThreadInit() prototype for
+      XORG_VERSION_CURRENT less than 1.20.7. Starting with 1.20.8, the
+      prototype definition is now available in include/os.h.
+    - x2gokdrivedebug.h: Introduce this new file and move all EPHYR_DBG
+      stuff into there. And: disable EPHYR_WANT_DEBUG as with it, the project
+      fails to build with standard Debian compiler flags."
+  * debian/control:
+    + Add B-D mesa-common-dev. Introduced here with the X.Org Xserver 1.20.11
+      patchset.
+    + Add B-D: libunwind-dev.
+
  -- Mike Gabriel <mike.gabriel@das-netzwerkteam.de>  Tue, 04 Jun 2019 14:10:43 +0200
