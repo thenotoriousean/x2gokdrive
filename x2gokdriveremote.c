@@ -2496,7 +2496,7 @@ void serverAcceptNotify(int fd, int ready_sock, void *data)
                 EPHYR_DBG("READ COOKIE ERROR");
                 shutdown(remoteVars.clientsock, SHUT_RDWR);
                 close(remoteVars.clientsock);
-                continue;
+                return;
             }
             ready+=chunk;
 

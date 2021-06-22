@@ -23,6 +23,7 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     - move calling of possibly thread-unsafe ospoll functions (SetNotifyFd,
       RemoveNotifyFd) to main thread.
     - (re)enable sessions debugging.
+    - fix infinite loop if reading of cookie has failed.
 
   [ Mihai Moldovan ]
   * Initial release:
