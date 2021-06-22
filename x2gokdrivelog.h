@@ -65,4 +65,19 @@ if (!(cond)) {EPHYR_LOG_ERROR("condition %s failed\n", #cond);return;}
 if (!(cond)) {EPHYR_LOG_ERROR("condition %s failed\n", #cond);return val;}
 #endif                          /*nomadik_return_val_if_fail */
 
+// # warning DEBUG ENABLED
+#define EPHYR_WANT_DEBUG
+
+#ifdef EPHYR_WANT_DEBUG
+#define EPHYR_DBG(x, a...) \
+if(pthread_self()==debug_sendThreadId)\
+fprintf(stderr,"SEND:"__FILE__ ":%d,%s() " x "\n", __LINE__, __func__, ##a);\
+else if (pthread_self()==debug_selectThreadId)\
+fprintf(stderr,"SEL:"__FILE__ ":%d,%s() " x "\n", __LINE__, __func__, ##a);\
+else \
+fprintf(stderr,"MAIN:"__FILE__ ":%d,%s() " x "\n", __LINE__, __func__, ##a)
+#else
+#define EPHYR_DBG(x, a...) do {} while (0)
+#endif
+
 #endif /* X2GOKDRIVELOG_H */

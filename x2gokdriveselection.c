@@ -45,7 +45,13 @@
 
 #endif
 #include "x2gokdriveselection.h"
-#include "x2gokdrivedebug.h"
+#include "x2gokdrivelog.h"
+
+#ifdef EPHYR_WANT_DEBUG
+extern unsigned long long int debug_sendThreadId;
+extern unsigned long long int debug_selectThreadId;
+#endif /* EPHYR_WANT_DEBUG */
+
 
 #define SELECTION_DELAY 30000 //timeout for selection operation
 #define INCR_SIZE 256*1024 //size of part for incr selection incr selection

@@ -70,7 +70,6 @@
 #include <xcb/xcb_keysyms.h>
 #include <xcb/randr.h>
 #include <xcb/xkb.h>
-#include "x2gokdrivelog.h"
 
 
 #include <jpeglib.h>

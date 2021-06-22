@@ -38,7 +38,12 @@
 #include "x2gokdrivelog.h"
 #include "glx_extinit.h"
 #include "x2gokdriveremote.h"
-#include "x2gokdrivedebug.h"
+
+#ifdef EPHYR_WANT_DEBUG
+extern unsigned long long int debug_sendThreadId;
+extern unsigned long long int debug_selectThreadId;
+#endif /* EPHYR_WANT_DEBUG */
+
 
 extern Window EphyrPreExistingHostWin;
 extern Bool EphyrWantGrayScale;

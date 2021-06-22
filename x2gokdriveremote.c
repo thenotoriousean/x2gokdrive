@@ -35,9 +35,15 @@
 
 #endif
 #include "x2gokdriveremote.h"
-#include "x2gokdrivedebug.h"
 #include "x2gokdriveselection.h"
+#include "x2gokdrivelog.h"
 #include <zlib.h>
+
+#ifdef EPHYR_WANT_DEBUG
+extern unsigned long long int debug_sendThreadId;
+extern unsigned long long int debug_selectThreadId;
+#endif /* EPHYR_WANT_DEBUG */
+
 
 /* init it in OsInit() */
 static struct _remoteHostVars remoteVars = {0};

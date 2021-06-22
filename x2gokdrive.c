@@ -43,10 +43,15 @@
 
 #include "inputstr.h"
 #include "scrnintstr.h"
-#include "x2gokdrivedebug.h"
 #include "x2gokdrivelog.h"
 
 #include "xkbsrv.h"
+
+#ifdef EPHYR_WANT_DEBUG
+unsigned long long int debug_sendThreadId;
+unsigned long long int debug_selectThreadId;
+#endif /* EPHYR_WANT_DEBUG */
+
 
 KdKeyboardInfo *ephyrKbd;
 KdPointerInfo *ephyrMouse;
