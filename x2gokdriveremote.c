@@ -258,11 +258,9 @@ void remote_sendCursor(CursorPtr cursor)
     BOOL cursorSent=FALSE;
 //    #warning check memory
     struct cursorFrame* cframe=malloc(sizeof(struct cursorFrame));
+    bzero(cframe, sizeof(struct cursorFrame));
 
     cframe->serialNumber=cursor->serialNumber;
-    cframe->size=0;
-    cframe->data=0;
-    cframe->next=0;
 
 
     pthread_mutex_lock(&remoteVars.sendqueue_mutex);
@@ -2920,7 +2918,6 @@ unsigned char* jpeg_compress (int quality, uint32_t image_width, uint32_t image_
         cinfo.in_color_space = JCS_EXT_BGR;     /* colorspace of input image */
     jpeg_set_defaults(&cinfo);
     jpeg_set_quality(&cinfo, quality, TRUE); /* limit to baseline-JPEG values */
-
     jpeg_start_compress(&cinfo, TRUE);
     row_stride = image_width * bpp;            /* JSAMPLEs per row in image_buffer */
 
@@ -2968,23 +2965,10 @@ static
 struct cache_elem* add_cache_element(uint32_t crc, int32_t dx, int32_t dy, uint32_t size, uint32_t width, uint32_t height)
 {
     struct cache_elem* el=malloc(sizeof(struct cache_elem));
-    el->next=0;
+    bzero(el, sizeof(struct cache_elem));
     el->crc=crc;
-    el->sent=FALSE;
-    el->busy=0;
-    el->rval=el->bval=el->gval=0;
     el->width=width;
     el->height=height;
-    el->source=0;
-
-
-    for(int i=0;i<9;++i)
-    {
-        el->regions[i].compressed_data=0;
-        el->regions[i].size=0;
-        el->regions[i].source_crc=0;
-        el->regions[i].rect.size.width=0;
-    }
 
 //    if(CACHEBPP==4)
 //    {
