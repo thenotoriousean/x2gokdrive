@@ -256,6 +256,61 @@ ddxProcessArgument(int argc, char **argv, int i)
         UseMsg();
         exit(1);
     }
+    else if (!strcmp(argv[i], "-clipboard"))
+    {
+        if ((i + 1) < argc)
+        {
+            /* compat with nxagent */
+            return 2;
+        }
+
+        UseMsg();
+        exit(1);
+    }
+    else if (!strcmp(argv[i], "-nomagicpixel"))
+    {
+        if ((i + 1) < argc)
+        {
+            /* compat with nxagent */
+            return 2;
+        }
+
+        UseMsg();
+        exit(1);
+    }
+    else if (!strcmp(argv[i], "-autodpi"))
+    {
+        if ((i + 1) < argc)
+        {
+            /* compat with nxagent */
+            return 2;
+        }
+
+        UseMsg();
+        exit(1);
+    }
+    else if (!strcmp(argv[i], "-autograb"))
+    {
+        if ((i + 1) < argc)
+        {
+            /* compat with nxagent */
+            return 2;
+        }
+
+        UseMsg();
+        exit(1);
+    }
+    else if (!strcmp(argv[i], "-keystrokefile"))
+    {
+        if ((i + 1) < argc)
+        {
+            /* compat with nxagent */
+            return 2;
+        }
+
+        UseMsg();
+        exit(1);
+    }
     else if (!strcmp(argv[i], "-D")) {
         /* compat with nxagent */
         return 1;
