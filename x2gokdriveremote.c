@@ -1703,13 +1703,15 @@ void clear_send_queue(void)
  */
 void clear_frame_cache(uint32_t max_elements)
 {
-//    EPHYR_DBG("cache elements %d, cache size %lu\n",cache_elements, cache_size);
-    while(remoteVars.first_cache_element && remoteVars.cache_elements > max_elements)
+//     EPHYR_DBG("cache elements %d, cache size %lu, reducing to size: %d\n", remoteVars.cache_elements, remoteVars.cache_size, max_elements);
+    while(remoteVars.first_cache_element && (remoteVars.cache_elements > max_elements))
     {
         struct cache_elem* next = NULL;
 
-        /* don't delete it now, return to it later */
-        if(remoteVars.first_cache_element->busy)
+        /* don't delete it now, return to it later
+         * but if max_elements is 0 we are clearing all elements
+         */
+        if(remoteVars.first_cache_element->busy && max_elements)
         {
             EPHYR_DBG("%x - is busy (%d), not deleting", remoteVars.first_cache_element->crc, remoteVars.first_cache_element->busy);
             return;
@@ -1721,7 +1723,8 @@ void clear_frame_cache(uint32_t max_elements)
             remoteVars.cache_size-=remoteVars.first_cache_element->size;
         }
 
-        if(remoteVars.client_connected)
+        //add element to deleted list if client is connected and we are not deleting all frame list
+        if(remoteVars.client_connected && max_elements)
         {
             /* add deleted element to the list for sending */
             struct deleted_elem* delem=malloc(sizeof(struct deleted_elem));
