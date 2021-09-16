@@ -97,7 +97,9 @@
 //Changes 1 - 2: supporting extended selection and sending selection on demand
 //Changes 2 - 3: supporting web client, sending cursors in PNG format and know about KEEPALIVE event
 //Changes 3 - 4: extended clipboard support for web client
-#define FEATURE_VERSION 4
+//Changes 4 - 5: support for CACHEREBUILD event
+
+#define FEATURE_VERSION 5
 
 #define MAXMSGSIZE 1024*16
 
@@ -119,7 +121,7 @@
 //always 4
 #define XSERVERBPP 4
 
-enum msg_type{FRAME,DELETED, CURSOR, DELETEDCURSOR, SELECTION, SERVERVERSION, DEMANDCLIENTSELECTION};
+enum msg_type{FRAME,DELETED, CURSOR, DELETEDCURSOR, SELECTION, SERVERVERSION, DEMANDCLIENTSELECTION, REINIT};
 enum AgentState{STARTING, RUNNING, RESUMING, SUSPENDING, SUSPENDED, TERMINATING, TERMINATED};
 enum Compressions{JPEG,PNG};
 enum SelectionType{PRIMARY,CLIPBOARD};
@@ -151,6 +153,7 @@ enum OS_VERSION{OS_LINUX, OS_WINDOWS, OS_DARWIN, WEB};
 #define CLIENTVERSION 10
 #define DEMANDSELECTION 11
 #define KEEPALIVE 12
+#define CACHEREBUILD 13
 
 #define EVLENGTH 41
 
@@ -428,6 +431,9 @@ struct _remoteHostVars
     BOOL client_connected;
     BOOL client_initialized;
 
+    //if all cache are cleared and notofictaion to client should be send
+    BOOL cache_rebuilt;
+
     struct SelectionStructure selstruct;
 } ;
 
@@ -511,5 +517,6 @@ remote_paint_rect(KdScreenInfo *screen,
                   int sx, int sy, int dx, int dy, int width, int height);
 
 void request_selection_from_client(enum SelectionType selection);
+void rebuild_caches(void);
 
 #endif /* X2GOKDRIVE_REMOTE_H */

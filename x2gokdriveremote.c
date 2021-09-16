@@ -598,6 +598,15 @@ int send_output_selection(struct OutputChunk* chunk)
     return 0;
 }
 
+void send_reinit_notification(void)
+{
+    unsigned char buffer[56] = {0};
+    _X_UNUSED int l;
+    *((uint32_t*)buffer)=REINIT;
+    EPHYR_DBG("SENDING REINIT NOTIFICATION");
+    l=write(remoteVars.clientsock,buffer,56);
+}
+
 int send_selection_chunk(int sel, unsigned char* data, uint32_t length, uint32_t format, BOOL first, BOOL last, uint32_t compressed, uint32_t total)
 {
     unsigned char buffer[56] = {0};
@@ -1469,13 +1478,23 @@ void *send_frame_thread (void *threadid)
 
 
 
-        if(!remoteVars.first_sendqueue_element && !remoteVars.firstCursor && !remoteVars.selstruct.firstOutputChunk)
+        if(!remoteVars.first_sendqueue_element && !remoteVars.firstCursor && !remoteVars.selstruct.firstOutputChunk &&
+            !remoteVars.cache_rebuilt)
         {
             /* sleep if frame queue is empty */
             pthread_cond_wait(&remoteVars.have_sendqueue_cond, &remoteVars.sendqueue_mutex);
         }
 
         /* mutex is locked on this point */
+
+        //send notification to client that cache is rebuilt
+        if(remoteVars.cache_rebuilt)
+        {
+            remoteVars.cache_rebuilt=FALSE;
+            pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+            send_reinit_notification();
+            pthread_mutex_lock(&remoteVars.sendqueue_mutex);
+        }
 
         //only send output selection chunks if there are no frames and cursors in the queue
         //selections can take a lot of bandwidth and have less priority
@@ -2340,6 +2359,12 @@ clientReadNotify(int fd, int ready, void *data)
                 case KEEPALIVE:
                 {
                     //receive keepalive event, don't need to do anything
+                    break;
+                }
+                case CACHEREBUILD:
+                {
+                    //rebuild all frame and cursors caches
+                    rebuild_caches();
                     break;
                 }
                 default:
@@ -3305,10 +3330,9 @@ void add_frame(uint32_t width, uint32_t height, int32_t x, int32_t y, uint32_t c
 
 
     pthread_mutex_lock(&remoteVars.sendqueue_mutex);
-    if(! (remoteVars.client_connected && remoteVars.client_initialized))
+    if(! (remoteVars.client_connected && remoteVars.client_initialized) || remoteVars.cache_rebuilt)
     {
-        /* don't have any clients connected, return */
-
+        /* don't have any clients connected, or cache rebuild is requested, return */
         pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
         return;
     }
@@ -3368,7 +3392,6 @@ void add_frame(uint32_t width, uint32_t height, int32_t x, int32_t y, uint32_t c
     pthread_cond_signal(&remoteVars.have_sendqueue_cond);
 
     pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
-
     /* on this point will be sent wakeup single to send mutex */
 }
 
@@ -3610,4 +3633,16 @@ remote_screen_init(KdScreenInfo *screen,
     pthread_mutex_unlock(&remoteVars.mainimg_mutex);
 
     return remoteVars.main_img;
+}
+
+void rebuild_caches(void)
+{
+    EPHYR_DBG("CLIENT REQUESTED CLEARING ALL CACHES AND QUEUES");
+    pthread_mutex_lock(&remoteVars.sendqueue_mutex);
+    clear_send_queue();
+    clear_frame_cache(0);
+    freeCursors();
+    remoteVars.cache_rebuilt=TRUE;
+    pthread_cond_signal(&remoteVars.have_sendqueue_cond);
+    pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
 }
