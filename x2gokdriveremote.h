@@ -138,7 +138,6 @@ enum OS_VERSION{OS_LINUX, OS_WINDOWS, OS_DARWIN, WEB};
 #define CACHEBPP 3
 
 
-#define CACHEMAXSIZE 50*1024*1024 //50MB
 #define CACHEMAXELEMENTS 200 //store max 200 elements in cache
 
 //Events
@@ -448,7 +447,6 @@ void readInputSelectionHeader(char* buff);
 #if XORG_VERSION_CURRENT < 11900000
 void pollEvents(void);
 #endif /* XORG_VERSION_CURRENT */
-void clear_cache_data(uint32_t maxsize);
 void clear_frame_cache(uint32_t max_elements);
 
 uint32_t calculate_crc(uint32_t width, uint32_t height, int32_t dx, int32_t dy);

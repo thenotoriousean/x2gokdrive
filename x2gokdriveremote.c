@@ -1637,11 +1637,6 @@ void *send_frame_thread (void *threadid)
                 }
             }
 
-
-            if(remoteVars.cache_size>CACHEMAXSIZE)
-            {
-                clear_cache_data(CACHEMAXSIZE);
-            }
             if(remoteVars.cache_size>CACHEMAXELEMENTS)
             {
                 clear_frame_cache(CACHEMAXELEMENTS);
@@ -1779,33 +1774,6 @@ void clear_frame_cache(uint32_t max_elements)
 //    EPHYR_DBG("cache elements %d, cache size %d\n", cache_elements, cache_size);
 }
 
-/*
- * only release images, keep the older frames for crc check *
- */
-void clear_cache_data(uint32_t maxsize)
-{
-    struct cache_elem* cur=remoteVars.first_cache_element;
-    while(cur && remoteVars.cache_size>maxsize)
-    {
-        struct cache_elem* next = NULL;
-
-        /* don't delete it now, return to it later */
-        if(cur->busy)
-        {
-            EPHYR_DBG("%x - busy (%d)", cur->crc, cur->busy);
-            return;
-        }
-        next=cur->next;
-        if(cur->size)
-        {
-            free(cur->data);
-            remoteVars.cache_size-=cur->size;
-            cur->size=0;
-            cur->data=0;
-        }
-        cur=next;
-    }
-}
 
 static
 const char* getAgentStateAsString(int state)
