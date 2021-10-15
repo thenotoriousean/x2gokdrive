@@ -138,7 +138,7 @@ enum OS_VERSION{OS_LINUX, OS_WINDOWS, OS_DARWIN, WEB};
 #define CACHEBPP 3
 
 
-#define CACHEMAXELEMENTS 200 //store max 200 elements in cache
+#define CACHEMAXELEMENTS 50 //store max 50 elements in cache
 
 //Events
 #define KEYPRESS 2
