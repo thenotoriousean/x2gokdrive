@@ -319,6 +319,11 @@ ddxProcessArgument(int argc, char **argv, int i)
         /* compat with nxagent */
         return 1;
     }
+    else if (!strcmp(argv[i], "-R")) {
+        /* start in rootless mode */
+        remote_set_rootless();
+        return 1;
+    }
     else if (argv[i][0] == ':')
         remote_set_display_name(argv[i]);
 

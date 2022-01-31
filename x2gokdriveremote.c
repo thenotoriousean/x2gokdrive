@@ -38,6 +38,7 @@
 #include "x2gokdriveselection.h"
 #include "x2gokdrivelog.h"
 #include <zlib.h>
+#include <propertyst.h>
 
 #ifdef EPHYR_WANT_DEBUG
 extern unsigned long long int debug_sendThreadId;
@@ -47,7 +48,7 @@ extern unsigned long long int debug_selectThreadId;
 
 /* init it in OsInit() */
 static struct _remoteHostVars remoteVars = {0};
-struct _remoteHostVars RemoteHostVars;
+// struct _remoteHostVars RemoteHostVars;
 
 static BOOL remoteInitialized=FALSE;
 
@@ -396,7 +397,7 @@ int32_t send_cursor(struct cursorFrame* cursor)
 }
 
 static
-int32_t send_frame(u_int32_t width, uint32_t height, uint32_t x, uint32_t y, uint32_t crc, struct frame_region* regions)
+int32_t send_frame(u_int32_t width, uint32_t height, uint32_t x, uint32_t y, uint32_t crc, struct frame_region* regions, uint32_t winId)
 {
     unsigned char buffer[64] = {0};
     _X_UNUSED int ln = 0;
@@ -418,6 +419,15 @@ int32_t send_frame(u_int32_t width, uint32_t height, uint32_t x, uint32_t y, uin
     *((uint32_t*)buffer+4)=y;
     *((uint32_t*)buffer+5)=numofregions;
     *((uint32_t*)buffer+6)=crc;
+    if(remoteVars.rootless)
+    {
+        *((uint32_t*)buffer+7)=winId;
+        /*if(winId)
+        {
+            EPHYR_DBG("Sending frame for Window 0x%X",winId);
+        }*/
+    }
+
 
 //    if(numofregions)
 //        EPHYR_DBG("SENDING NEW FRAME %x", crc);
@@ -1369,7 +1379,7 @@ BOOL find_common_regions(struct cache_elem* source, struct cache_elem* dest, BOO
 
 /* use only from send thread */
 static
-void sendMainImageFromSendThread(uint32_t width, uint32_t height, int32_t dx ,int32_t dy)
+void sendMainImageFromSendThread(uint32_t width, uint32_t height, int32_t dx ,int32_t dy, uint32_t winId)
 {
     _X_UNUSED uint32_t length = 0;
     struct frame_region regions[9] = {{0}};
@@ -1382,14 +1392,14 @@ void sendMainImageFromSendThread(uint32_t width, uint32_t height, int32_t dx ,in
 
     BOOL mainImage=FALSE;
 
-    if(width!=0)
+/*    if(width!=0)
     {
         EPHYR_DBG("sending UPDATE- %dx%d, %d,%d",width, height,dx,dy);
     }
     else
     {
         EPHYR_DBG("sending mainImage");
-    }
+    }*/
 
 
     pthread_mutex_lock(&remoteVars.mainimg_mutex);
@@ -1433,16 +1443,166 @@ void sendMainImageFromSendThread(uint32_t width, uint32_t height, int32_t dx ,in
 
     if(mainImage)
     {
-        send_frame(width, height,-1,-1,0,regions);
+        send_frame(width, height,-1,-1,0,regions, winId);
     }
     else
     {
-        send_frame(width, height,dx,dy,0,regions);
+        send_frame(width, height,dx,dy,0,regions, winId);
     }
 
 
     pthread_mutex_unlock(&remoteVars.mainimg_mutex);
     free(regions[0].compressed_data);
+}
+
+static
+void remote_send_win_updates(char* updateBuf, uint32_t bufSize)
+{
+    unsigned char buffer[56] = {0};
+    int l = 0;
+    int sent = 0;
+
+    *((uint32_t*)buffer)=WINUPDATE;
+    *((uint32_t*)buffer+1)=bufSize;
+
+    write(remoteVars.clientsock,buffer,56);
+
+    while(sent<bufSize)
+    {
+        l=write(remoteVars.clientsock,updateBuf+sent,((bufSize-sent)<MAXMSGSIZE)?(bufSize-sent):MAXMSGSIZE);
+        if(l<0)
+        {
+            EPHYR_DBG("Error sending windows update!!!!!");
+            break;
+        }
+        sent+=l;
+    }
+//     EPHYR_DBG("SENT WIN UPDATES %d",bufSize);
+    free(updateBuf);
+}
+
+
+void remote_process_window_updates(void)
+{
+    /*sendqueue mutex is locked here*/
+    struct remoteWindow* prev=NULL;
+    struct remoteWindow* rwin=remoteVars.windowList;
+    struct remoteWindow* tmp;
+    int bufSize=0;
+    int bufHead=0;
+    char* updateBuf=NULL;
+    int8_t state;
+    int16_t nameSize;
+    //calculate size of update buffer
+    while(rwin)
+    {
+        if((rwin->state == CHANGED)||(rwin->state == NEW))
+        {
+            bufSize+=WINUPDSIZE;
+            if(rwin->name)
+            {
+                bufSize+=strlen(rwin->name);
+            }
+        }
+        if(rwin->state==WDEL)
+        {
+            bufSize+=WINUPDDELSIZE;
+        }
+        rwin=rwin->next;
+    }
+    //copy update data to buffer
+    updateBuf=malloc(bufSize);
+    rwin=remoteVars.windowList;
+    while(rwin)
+    {
+        if(rwin->state != UNCHANGED)
+        {
+            memcpy(updateBuf+bufHead, &(rwin->id), sizeof(uint32_t));
+            bufHead+=sizeof(uint32_t);
+            state=rwin->state;
+            memcpy(updateBuf+bufHead, &state, sizeof(state));
+            bufHead+=sizeof(state);
+        }
+        if((rwin->state == CHANGED)||(rwin->state==NEW))
+        {
+            memcpy(updateBuf+bufHead, &(rwin->parentId), sizeof(uint32_t));
+            bufHead+=sizeof(uint32_t);
+
+            memcpy(updateBuf+bufHead, &(rwin->nextSibId), sizeof(uint32_t));
+            bufHead+=sizeof(uint32_t);
+
+            memcpy(updateBuf+bufHead, &(rwin->transWinId), sizeof(uint32_t));
+            bufHead+=sizeof(uint32_t);
+
+            memcpy(updateBuf+bufHead, &(rwin->x), sizeof(int16_t));
+            bufHead+=sizeof(int16_t);
+            memcpy(updateBuf+bufHead, &(rwin->y), sizeof(int16_t));
+            bufHead+=sizeof(int16_t);
+            memcpy(updateBuf+bufHead, &(rwin->w), sizeof(uint16_t));
+            bufHead+=sizeof(uint16_t);
+            memcpy(updateBuf+bufHead, &(rwin->h), sizeof(uint16_t));
+            bufHead+=sizeof(uint16_t);
+            memcpy(updateBuf+bufHead, &(rwin->bw), sizeof(uint16_t));
+            bufHead+=sizeof(uint16_t);
+            memcpy(updateBuf+bufHead, &(rwin->visibility), sizeof(int8_t));
+            bufHead+=sizeof(int8_t);
+            memcpy(updateBuf+bufHead, &(rwin->winType), sizeof(int8_t));
+            bufHead+=sizeof(int8_t);
+            nameSize=0;
+            if(rwin->name)
+            {
+                nameSize=strlen(rwin->name);
+            }
+            memcpy(updateBuf+bufHead, &nameSize, sizeof(nameSize));
+            bufHead+=sizeof(nameSize);
+            if(nameSize)
+            {
+                memcpy(updateBuf+bufHead, rwin->name, nameSize);
+                bufHead+=nameSize;
+            }
+            rwin->state=UNCHANGED;
+        }
+        if(rwin->state==WDEL)
+        {
+            //remove window from list and free resources
+            EPHYR_DBG("release window %p, %s",rwin->ptr, rwin->name);
+            if(rwin==remoteVars.windowList)
+            {
+                remoteVars.windowList=rwin->next;
+            }
+            if(prev)
+            {
+                prev->next=rwin->next;
+            }
+            tmp=rwin;
+            rwin=rwin->next;
+            if(tmp->name)
+            {
+                free(tmp->name);
+            }
+            free(tmp);
+        }
+        else
+        {
+            prev=rwin;
+            rwin=rwin->next;
+        }
+    }
+    /*
+    EPHYR_DBG("NEW LIST:");
+    rwin=remoteVars.windowList;
+    while(rwin)
+    {
+        EPHYR_DBG("=====%p",rwin->ptr);
+        rwin=rwin->next;
+    }*/
+
+    //send win updates
+    remoteVars.windowsUpdated=FALSE;
+    pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+    //send_updates
+    remote_send_win_updates(updateBuf, bufSize);
+    pthread_mutex_lock(&remoteVars.sendqueue_mutex);
 }
 
 static
@@ -1479,7 +1639,7 @@ void *send_frame_thread (void *threadid)
 
 
         if(!remoteVars.first_sendqueue_element && !remoteVars.firstCursor && !remoteVars.selstruct.firstOutputChunk &&
-            !remoteVars.cache_rebuilt)
+            !remoteVars.cache_rebuilt && !remoteVars.windowsUpdated)
         {
             /* sleep if frame queue is empty */
             pthread_cond_wait(&remoteVars.have_sendqueue_cond, &remoteVars.sendqueue_mutex);
@@ -1487,6 +1647,13 @@ void *send_frame_thread (void *threadid)
 
         /* mutex is locked on this point */
 
+        //if windows list is updated send changes to client
+        if(remoteVars.windowsUpdated)
+        {
+            remote_process_window_updates();
+        }
+
+        /*mutex still locked*/
         //send notification to client that cache is rebuilt
         if(remoteVars.cache_rebuilt)
         {
@@ -1570,7 +1737,7 @@ void *send_frame_thread (void *threadid)
             int elems=queue_elements();
             struct cache_elem* frame = NULL;
             struct sendqueue_element* current = NULL;
-            uint32_t  x, y = 0;
+            uint32_t  x=0, y = 0, winId=0;
             int32_t width, height = 0;
 
             if(remoteVars.maxfr<elems)
@@ -1594,6 +1761,7 @@ void *send_frame_thread (void *threadid)
             y=current->y;
             width=current->width;
             height=current->height;
+            winId=current->winId;
             free(current);
 
             if(frame)
@@ -1605,14 +1773,14 @@ void *send_frame_thread (void *threadid)
                 /* unlock sendqueue for main thread */
 
                 pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
-                send_frame(frame_width, frame_height, x, y, crc, frame->regions);
+                send_frame(frame_width, frame_height, x, y, crc, frame->regions, winId);
             }
             else
             {
-                EPHYR_DBG("Sending main image or screen update");
+//                 EPHYR_DBG("Sending main image or screen update");
 
                 pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
-                sendMainImageFromSendThread(width, height, x, y);
+                sendMainImageFromSendThread(width, height, x, y, winId);
             }
 
 
@@ -2283,17 +2451,22 @@ clientReadNotify(int fd, int ready, void *data)
 
                     int32_t x=*((uint32_t*)buff+3);
                     int32_t y=*((uint32_t*)buff+4);
+                    uint32_t winid=0;
+                    if(remoteVars.rootless)
+                    {
+                        winid=*((uint32_t*)buff+5);
+                    }
 
-                    EPHYR_DBG("HAVE UPDATE EVENT from client %dx%d %d,%d\n",width, height, x,y );
+//                     EPHYR_DBG("HAVE UPDATE request from client, window 0x%X %dx%d %d,%d\n",winid, width, height, x,y );
                     pthread_mutex_lock(&remoteVars.mainimg_mutex);
 
-                    EPHYR_DBG("DBF: %p, %d, %d",remoteVars.main_img, remoteVars.main_img_width, remoteVars.main_img_height);
+//                     EPHYR_DBG("DBF: %p, %d, %d",remoteVars.main_img, remoteVars.main_img_width, remoteVars.main_img_height);
 
                     if(remoteVars.main_img  && x+width <= remoteVars.main_img_width  && y+height <= remoteVars.main_img_height )
                     {
 
                         pthread_mutex_unlock(&remoteVars.mainimg_mutex);
-                        add_frame(width, height, x, y, 0, 0);
+                        add_frame(width, height, x, y, 0, 0, winid);
                     }
                     else
                     {
@@ -2335,6 +2508,11 @@ clientReadNotify(int fd, int ready, void *data)
                     rebuild_caches();
                     break;
                 }
+                case WINCHANGE:
+                {
+                    client_win_change(buff);
+                    break;
+                }
                 default:
                 {
                     EPHYR_DBG("UNSUPPORTED EVENT: %d",event_type);
@@ -2354,6 +2532,172 @@ clientReadNotify(int fd, int ready, void *data)
        memcpy(remoteVars.eventBuffer, remoteVars.eventBuffer+restDataPos, restDataLength);
     remoteVars.evBufferOffset=restDataLength;
 
+}
+
+#define SubSend(pWin) \
+((pWin->eventMask|wOtherEventMasks(pWin)) & SubstructureNotifyMask)
+
+#define StrSend(pWin) \
+((pWin->eventMask|wOtherEventMasks(pWin)) & StructureNotifyMask)
+
+#define SubStrSend(pWin,pParent) (StrSend(pWin) || SubSend(pParent))
+
+
+//this function is from dix/window.c
+static void
+ReflectStackChange(WindowPtr pWin, WindowPtr pSib, VTKind kind)
+{
+    /* Note that pSib might be NULL */
+    Bool WasViewable = (Bool) pWin->viewable;
+    Bool anyMarked;
+    WindowPtr pFirstChange;
+    WindowPtr pLayerWin;
+    ScreenPtr pScreen = pWin->drawable.pScreen;
+    /* if this is a root window, can't be restacked */
+    if (!pWin->parent)
+        return;
+    pFirstChange = MoveWindowInStack(pWin, pSib);
+    if (WasViewable) {
+        anyMarked = (*pScreen->MarkOverlappedWindows) (pWin, pFirstChange,
+                                                       &pLayerWin);
+        if (pLayerWin != pWin)
+            pFirstChange = pLayerWin;
+        if (anyMarked) {
+            (*pScreen->ValidateTree) (pLayerWin->parent, pFirstChange, kind);
+            (*pScreen->HandleExposures) (pLayerWin->parent);
+            if (pWin->drawable.pScreen->PostValidateTree)
+                (*pScreen->PostValidateTree) (pLayerWin->parent, pFirstChange,
+                                              kind);
+        }
+    }
+    if (pWin->realized)
+        WindowsRestructured();
+}
+
+
+
+void client_win_change(char* buff)
+{
+    WindowPtr pWin, pParent, pSib;
+    uint32_t winId=*((uint32_t*)(buff+4));
+    uint32_t newSibId=*((uint32_t*)(buff+8));
+    struct remoteWindow* rw;
+    int16_t x,y;
+    uint16_t w,h,bw;
+    int16_t nx=*((int16_t*)(buff+12));
+    int16_t ny=*((int16_t*)(buff+14));
+    uint16_t nw=*((int16_t*)(buff+16));
+    uint16_t nh=*((int16_t*)(buff+18));
+    BOOL move=FALSE, resize=FALSE, restack=FALSE;
+//     EPHYR_DBG("Client request win change: %p %d:%d %dx%d",fptr, nx,ny,nw,nh);
+    pWin=remote_find_window_on_screen_by_id(winId, remoteVars.ephyrScreen->pScreen->root);
+    if(!pWin)
+    {
+        EPHYR_DBG("Window with ID 0x%X not found on current screen",winId);
+        return;
+    }
+
+    pParent = pWin->parent;
+    pSib=0;
+    if(newSibId)
+    {
+        pSib=remote_find_window_on_screen_by_id(newSibId, remoteVars.ephyrScreen->pScreen->root);
+        if(!pSib)
+        {
+            EPHYR_DBG("New Sibling with ID 0x%X not found on current screen, Putting bellow all siblings",newSibId);
+        }
+    }
+    w = pWin->drawable.width;
+    h = pWin->drawable.height;
+    bw = pWin->borderWidth;
+    if (pParent)
+    {
+        x = pWin->drawable.x - pParent->drawable.x - (int16_t) bw;
+        y = pWin->drawable.y - pParent->drawable.y - (int16_t) bw;
+    }
+    else
+    {
+        x = pWin->drawable.x;
+        y = pWin->drawable.y;
+    }
+    if (SubStrSend(pWin, pParent))
+    {
+        xEvent event = {
+            .u.configureNotify.window = pWin->drawable.id,
+            .u.configureNotify.aboveSibling = pSib ? pSib->drawable.id : None,
+            .u.configureNotify.x = x,
+            .u.configureNotify.y = y,
+            .u.configureNotify.width = w,
+            .u.configureNotify.height = h,
+            .u.configureNotify.borderWidth = bw,
+            .u.configureNotify.override = pWin->overrideRedirect
+        };
+        event.u.u.type = ConfigureNotify;
+        #ifdef PANORAMIX
+        if (!noPanoramiXExtension && (!pParent || !pParent->parent)) {
+            event.u.configureNotify.x += screenInfo.screens[0]->x;
+            event.u.configureNotify.y += screenInfo.screens[0]->y;
+        }
+        #endif
+        DeliverEvents(pWin, &event, 1, NullWindow);
+    }
+
+    pthread_mutex_lock(&remoteVars.sendqueue_mutex);
+    rw=remote_find_window(pWin);
+    if(!rw)
+    {
+        EPHYR_DBG("Error!!!! window %p not found in list of ext windows",pWin);
+        pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+        return;
+    }
+
+    if( x!=nx || y!=ny)
+    {
+        if(rw)
+        {
+            rw->x=nx;
+            rw->y=ny;
+        }
+        move=TRUE;
+    }
+    if(w!=nw || h!=nh)
+    {
+        if(rw)
+        {
+            rw->w=nw;
+            rw->h=nh;
+        }
+        resize=TRUE;
+    }
+    if(pWin->nextSib!=pSib)
+    {
+        rw->nextSib=pSib;
+        if(pSib)
+        {
+            rw->nextSibId=pSib->drawable.id;
+        }
+        else
+        {
+            rw->nextSibId=0;
+        }
+        restack=TRUE;
+    }
+    pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+    if(move)
+    {
+        //         EPHYR_DBG("MOVE from %d:%d to %d:%d",x,y,nx,ny);
+        (*pWin->drawable.pScreen->MoveWindow) (pWin, nx, ny, pSib,VTMove);
+    }
+    if(resize)
+    {
+        //         EPHYR_DBG("RESIZE from %dx%d to %dx%d",w,h,nw,nh);
+        (*pWin->drawable.pScreen->ResizeWindow) (pWin, nx, ny, nw, nh, pSib);
+    }
+    if(restack)
+    {
+        EPHYR_DBG("Client request to move : %p on top of %p",pWin, pSib);
+        ReflectStackChange(pWin, pSib, VTOther);
+    }
 }
 
 void set_client_version(uint16_t ver, uint16_t os)
@@ -2776,8 +3120,6 @@ remote_init(void)
 
     fclose(stdout);
     fclose(stdin);
-
-    memset(&remoteVars,0,sizeof(RemoteHostVars));
 
     remoteVars.serversock=-1;
 
@@ -3290,7 +3632,7 @@ void initFrameRegions(struct cache_elem* frame)
     frame->compressed_size=length;
 }
 
-void add_frame(uint32_t width, uint32_t height, int32_t x, int32_t y, uint32_t crc, uint32_t size)
+void add_frame(uint32_t width, uint32_t height, int32_t x, int32_t y, uint32_t crc, uint32_t size, uint32_t winId)
 {
     Bool isNewElement = FALSE;
     struct cache_elem* frame = 0;
@@ -3348,6 +3690,7 @@ void add_frame(uint32_t width, uint32_t height, int32_t x, int32_t y, uint32_t c
     element->y=y;
     element->width=width;
     element->height=height;
+    element->winId=winId;
     if(remoteVars.last_sendqueue_element)
     {
         remoteVars.last_sendqueue_element->next=element;
@@ -3366,7 +3709,446 @@ void add_frame(uint32_t width, uint32_t height, int32_t x, int32_t y, uint32_t c
 
 void remote_send_main_image(void)
 {
-    add_frame(0, 0, 0, 0, 0, 0);
+    add_frame(0, 0, 0, 0, 0, 0,0);
+}
+
+struct remoteWindow* remote_find_window(WindowPtr win)
+{
+    struct remoteWindow* rw=remoteVars.windowList;
+//     EPHYR_DBG("LOOK for %p in list",win);
+    while(rw)
+    {
+        if(rw->ptr==win)
+        {
+            return rw;
+        }
+        rw=rw->next;
+    }
+//     EPHYR_DBG("WINDOW %p not found in list",win);
+    return NULL;
+}
+
+void remote_check_window(WindowPtr win)
+{
+    char *name=NULL;
+    int nameSize=0;
+    char *netName=NULL;
+    int netNameSize=0;
+    char *dispName=NULL;
+    int dispNameSize=0;
+    BOOL ignore = TRUE;
+    struct remoteWindow* rwin;
+    uint32_t transWinId=0;
+    uint8_t winType=WINDOW_TYPE_NORMAL;
+    int16_t x,y;
+    uint16_t w,h,bw;
+    WindowPtr parPtr;
+    WindowPtr nextSibPtr, tmpPtr;
+    parPtr=win->parent;
+    nextSibPtr=NULL;
+
+    //if prentwindow is root, set it to 0
+    if(parPtr == remoteVars.ephyrScreen->pScreen->root)
+    {
+        parPtr=NULL;
+    }
+    w = win->drawable.width;
+    h = win->drawable.height;
+    bw = win->borderWidth;
+    if (win->parent)
+    {
+        x = win->drawable.x - win->parent->drawable.x - (int) bw;
+        y = win->drawable.y - win->parent->drawable.y - (int) bw;
+    }
+    else
+    {
+        x = win->drawable.x;
+        y = win->drawable.y;
+    }
+
+//     EPHYR_DBG("Check win %p",win);
+    if(!win->optional || !win->optional->userProps || !win->mapped)
+    {
+        return;
+    }
+    //find nextSib
+    tmpPtr=win->nextSib;
+    while(tmpPtr)
+    {
+        if(remote_find_window(tmpPtr))
+        {
+            nextSibPtr=tmpPtr;
+            break;
+        }
+        tmpPtr=tmpPtr->nextSib;
+    }
+    /*
+     * if window is not in list, create and send to client. If not same, update and send to client
+     * if some list windows not there anymore, delete and send notification
+     */
+
+    if(win->optional && win->optional->userProps)
+    {
+        PropertyPtr prop=win->optional->userProps;
+//         EPHYR_DBG("======%p - PARENT %p = VIS %d === MAP %d =============",win, parPtr, win->visibility, win->mapped);
+        while(prop)
+        {
+            if(prop->propertyName==MakeAtom("WM_NAME", strlen("WM_NAME"),FALSE) && prop->data)
+            {
+                name=prop->data;
+                nameSize=prop->size;
+            }
+            if(prop->propertyName==MakeAtom("WM_HINTS", strlen("WM_HINTS"),FALSE) && prop->data)
+            {
+                ignore=FALSE;
+            }
+            if(prop->propertyName==MakeAtom("_NET_WM_NAME", strlen("_NET_WM_NAME"),FALSE) && prop->data)
+            {
+                netName=prop->data;
+                netNameSize=prop->size;
+            }
+            if(prop->propertyName==MakeAtom("WM_TRANSIENT_FOR", strlen("WM_TRANSIENT_FOR"),FALSE) && prop->data)
+            {
+                transWinId=((uint32_t*)prop->data)[0];
+                EPHYR_DBG("Trans Win 0x%X = 0x%X", transWinId, win->drawable.id);
+            }
+//             EPHYR_DBG("%s %s, Format %d, Size %d",NameForAtom(prop->propertyName), NameForAtom(prop->type), prop->format, prop->size);
+            if( prop->type == MakeAtom("STRING", strlen("STRING"),FALSE) || prop->type == MakeAtom("UTF8_STRING", strlen("UTF8_STRING"),FALSE))
+            {
+//                 EPHYR_DBG("-- %s",(char*)prop->data);
+            }
+            if( prop->type == MakeAtom("ATOM", strlen("ATOM"),FALSE))
+            {
+                ATOM* at=prop->data;
+                if(prop->propertyName==MakeAtom("_NET_WM_STATE", strlen("_NET_WM_STATE"),FALSE))
+                {
+                    EPHYR_DBG("--WINDOW STATE: %s, my ID 0x%X",NameForAtom( at[0] ), win->drawable.id);
+                }
+                    //                 EPHYR_DBG("--  %s",NameForAtom( at[0] ));
+                if(prop->propertyName==MakeAtom("_NET_WM_WINDOW_TYPE", strlen("_NET_WM_WINDOW_TYPE"),FALSE))
+                {
+                    EPHYR_DBG("WINDOW Type: %s, my ID 0x%X",NameForAtom( at[0] ), win->drawable.id);
+                    if(at[0]==MakeAtom("_NET_WM_WINDOW_TYPE_NORMAL", strlen("_NET_WM_WINDOW_TYPE_NORMAL"),FALSE))
+                    {
+//                         EPHYR_DBG("Normal window");
+                        winType=WINDOW_TYPE_NORMAL;
+                    }
+                    else if(at[0] ==MakeAtom("_NET_WM_WINDOW_TYPE_DIALOG", strlen("_NET_WM_WINDOW_TYPE_DIALOG"),FALSE))
+                    {
+//                         EPHYR_DBG("Dialog");
+                        winType=WINDOW_TYPE_DIALOG;
+                    }
+                    else if(at[0] ==MakeAtom("_NET_WM_WINDOW_TYPE_DROPDOWN_MENU", strlen("_NET_WM_WINDOW_TYPE_DROPDOWN_MENU"),FALSE))
+                    {
+//                         EPHYR_DBG("Dropdown menu");
+                        winType=WINDOW_TYPE_DROPDOWN_MENU;
+                    }
+                    else if(at[0] ==MakeAtom("_NET_WM_WINDOW_TYPE_POPUP_MENU", strlen("_NET_WM_WINDOW_TYPE_POPUP_MENU"),FALSE))
+                    {
+//                         EPHYR_DBG("Popup menu");
+                        winType=WINDOW_TYPE_POPUP_MENU;
+                    }
+                    else if( at[0] ==MakeAtom("_NET_WM_WINDOW_TYPE_SPLASH", strlen("_NET_WM_WINDOW_TYPE_SPLASH"),FALSE))
+                    {
+                        //                         EPHYR_DBG("Splash");
+                        winType=WINDOW_TYPE_SPLASH;
+                    }
+                    else if( at[0] ==MakeAtom("_NET_WM_WINDOW_TYPE_TOOLTIP", strlen("_NET_WM_WINDOW_TYPE_TOOLTIP"),FALSE))
+                    {
+                        //                         EPHYR_DBG("Splash");
+                        winType=WINDOW_TYPE_TOOLTIP;
+                    }
+                    else if( at[0] ==MakeAtom("_NET_WM_WINDOW_TYPE_COMBO", strlen("_NET_WM_WINDOW_TYPE_COMBO"),FALSE))
+                    {
+                        //                         EPHYR_DBG("Splash");
+                        winType=WINDOW_TYPE_COMBO;
+                    }
+                }
+            }
+            if(prop->propertyName==MakeAtom("WM_NAME", strlen("WM_NAME"),FALSE) && prop->data)
+            {
+//                 EPHYR_DBG("-- Name: %s",(char*)prop->data);
+            }
+            if(prop->propertyName==MakeAtom("WM_WINDOW_ROLE", strlen("WM_WINDOW_ROLE"),FALSE) && prop->data)
+            {
+//                 EPHYR_DBG("-- Role: %s",(char*)prop->data);
+            }
+            if(prop->propertyName==MakeAtom("WM_CLASS", strlen("WM_CLASS"),FALSE) && prop->data)
+            {
+//                 EPHYR_DBG("-- Class: %s",(char*)prop->data);
+            }
+            if(prop->propertyName==MakeAtom("WM_PROTOCOLS", strlen("WM_PROTOCOLS"),FALSE) && prop->data)
+            {
+//                 ATOM* at=prop->data;
+//                 EPHYR_DBG("-- WM_PROTOCOLS: %s",NameForAtom( at[0] ));
+            }
+            prop=prop->next;
+        }
+    }
+    if(ignore)
+    {
+//         EPHYR_DBG("=======IGNORE THIS WINDOW==============");
+        return;
+    }
+    if(netNameSize && netName)
+    {
+        dispName=netName;
+        dispNameSize=netNameSize;
+    }
+    else
+    {
+        dispName=name;
+        dispNameSize=nameSize;
+    }
+//     EPHYR_DBG("\n\nWIN: %p, %s, PAR: %p,  %d:%d %dx%d, border %d, visibility: %d, view %d, map %d ID %d", win, dispName, parPtr, x, y,
+//               w, h, bw,  win->visibility, win->viewable, win->mapped, win->drawable.id);
+
+    if(winType == WINDOW_TYPE_NORMAL && transWinId)
+    {
+        winType=WINDOW_TYPE_DIALOG;
+    }
+    rwin=remote_find_window(win);
+    if(!rwin)
+    {
+        /*create new window and put it as a first element of the list*/
+        rwin=malloc(sizeof(struct remoteWindow));
+        rwin->state=NEW;
+        rwin->ptr=win;
+        rwin->next=remoteVars.windowList;
+        remoteVars.windowList=rwin;
+        rwin->name=NULL;
+
+//         EPHYR_DBG("Add to list: %p, %s, %d:%d %dx%d, visibility: %d", rwin->ptr, rwin->name, rwin->x,rwin->y,
+//                            rwin->w, rwin->h, rwin->visibility);
+    }
+    else
+    {
+//         EPHYR_DBG("found in list: %p, %s, %d:%d %dx%d, visibility: %d", rwin->ptr, rwin->name, rwin->x,rwin->y,
+//                     rwin->w, rwin->h,rwin->visibility);
+
+        if(rwin->name || dispName)
+        {
+            if(rwin->name==NULL && dispName)
+            {
+                rwin->state=CHANGED;
+            }else if(strlen(rwin->name)!=dispNameSize)
+            {
+                rwin->state=CHANGED;
+            }else if (strncmp(rwin->name,dispName, dispNameSize))
+            {
+                rwin->state=CHANGED;
+            }
+        }
+
+        if(rwin->x != x || rwin->y !=  y ||
+            rwin->w !=  w || rwin->h !=  h || rwin->bw != bw || rwin->visibility != win->visibility)
+        {
+            rwin->state=CHANGED;
+        }
+        if(rwin->parent != parPtr || rwin->nextSib != nextSibPtr)
+        {
+            EPHYR_DBG("STACK order changed for %p %s old parent %p new parent %p, old nextsib %p, new nextsib %p", rwin->ptr, rwin->name, rwin->parent, parPtr, rwin->nextSib, nextSibPtr);
+            rwin->state=CHANGED;
+        }
+    }
+
+    rwin->foundInWinTree=TRUE;
+    rwin->x=x;
+    rwin->y=y;
+    rwin->w=w;
+    rwin->h=h;
+    rwin->bw=bw;
+    rwin->visibility=win->visibility;
+    rwin->parent=parPtr;
+    rwin->nextSib=nextSibPtr;
+    rwin->winType=winType;
+    rwin->id=win->drawable.id;
+    rwin->transWinId=transWinId;
+    if(rwin->parent)
+        rwin->parentId=rwin->parent->drawable.id;
+    else
+        rwin->parentId=0;
+    if(rwin->nextSib)
+        rwin->nextSibId=rwin->nextSib->drawable.id;
+    else
+        rwin->nextSibId=0;
+
+    if(!rwin->name || strlen(rwin->name)!=dispNameSize || strncmp(rwin->name,dispName,dispNameSize))
+    {
+        if(rwin->name)
+        {
+            free(rwin->name);
+            rwin->name=NULL;
+        }
+        if(dispNameSize)
+        {
+            rwin->name=malloc(dispNameSize+1);
+            strncpy(rwin->name, dispName, dispNameSize);
+            rwin->name[dispNameSize]='\0';
+        }
+    }
+    if(rwin->state != UNCHANGED)
+    {
+        remoteVars.windowsUpdated=TRUE;
+        if(rwin->state==NEW)
+        {
+            EPHYR_DBG("NEW WINDOW %p, %s, %d:%d %dx%d bw-%d, visibility: %d parent %p nextSib %p",rwin->ptr, rwin->name, rwin->x,rwin->y,
+                      rwin->w, rwin->h, rwin->bw ,rwin->visibility, rwin->parent, rwin->nextSib);
+        }
+        else
+        {
+//             EPHYR_DBG("WINDOW CHANGED:");
+        }
+/*        if(rwin->name &&( !strncmp (rwin->name, "xterm",4)))
+        {
+            EPHYR_DBG("=======WIN: %p, %s, %d:%d %dx%d bw-%d, visibility: %d parent %p nextSib %p", rwin->ptr, rwin->name, rwin->x,rwin->y,
+                   rwin->w, rwin->h, rwin->bw ,rwin->visibility, rwin->parent, rwin->nextSib);
+
+        }*/
+
+        //only for debug purpose
+        /*
+        EPHYR_DBG("CURRENT STACK:");
+        WindowPtr wn = remoteVars.ephyrScreen->pScreen->root->firstChild;
+        while(wn)
+        {
+            char* nm=NULL;
+            struct remoteWindow* rw=remote_find_window(wn);
+            if(rw)
+            {
+                nm=rw->name;
+            }
+            if(wn->mapped)
+            {
+              EPHYR_DBG("%p (%s) mapped: %d",wn,nm,wn->mapped);
+            }
+            wn=wn->nextSib;
+        }
+        EPHYR_DBG("END OF STACK:");*/
+        //
+    }
+//     EPHYR_DBG("========================================================");
+
+}
+
+void remote_check_windowstree(WindowPtr root)
+{
+    WindowPtr child;
+    child=root->firstChild;
+    while(child)
+    {
+        remote_check_windowstree(child);
+        remote_check_window(child);
+        child=child->nextSib;
+    }
+}
+
+WindowPtr remote_find_window_on_screen_by_id(uint32_t winId, WindowPtr root)
+{
+    WindowPtr child;
+    child=root->firstChild;
+    while(child)
+    {
+        if(child->drawable.id == winId)
+        {
+            return child;
+        }
+        if(remote_find_window_on_screen_by_id(winId,child))
+        {
+            return child;
+        }
+        child=child->nextSib;
+    }
+    return NULL;
+}
+
+WindowPtr remote_find_window_on_screen(WindowPtr win, WindowPtr root)
+{
+    WindowPtr child;
+    child=root->firstChild;
+    while(child)
+    {
+        if(child == win)
+        {
+            return win;
+        }
+        if(remote_find_window_on_screen(win,child))
+        {
+            return win;
+        }
+        child=child->nextSib;
+    }
+    return NULL;
+}
+
+void remote_check_rootless_windows_for_updates(KdScreenInfo *screen)
+{
+    struct remoteWindow* rwin;
+    pthread_mutex_lock(&remoteVars.sendqueue_mutex);
+
+    //don't check windows if no client is connected
+    if(remoteVars.client_connected==FALSE)
+    {
+        pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+        return;
+    }
+
+    //         EPHYR_DBG("START TREE CHECK");
+    remote_check_windowstree(screen->pScreen->root);
+
+    //check all windows in list and mark as deleted if not found in the tree
+    rwin=remoteVars.windowList;
+    while(rwin)
+    {
+        if(!rwin->foundInWinTree)
+        {
+            remoteVars.windowsUpdated=TRUE;
+            //mark window as deleted
+            rwin->state=WDEL;
+//             EPHYR_DBG("DELETED WINDOW:  %p, %s",rwin->ptr, rwin->name);
+        }
+        rwin->foundInWinTree=FALSE;
+        rwin=rwin->next;
+    }
+    /*
+    //         EPHYR_DBG("END TREE CHECK");
+    //if client is not connected, release deleted windows here
+    if(remoteVars.client_connected==FALSE)
+    {
+        //sendqueue mutex is locked here
+        prev=NULL;
+        rwin=remoteVars.windowList;
+        while(rwin)
+        {
+            if(rwin->state==WDEL)
+            {
+                //remove window from list and free resources
+//                 EPHYR_DBG("release window %p, %s",rwin->ptr, rwin->name);
+                if(rwin==remoteVars.windowList)
+                {
+                    remoteVars.windowList=rwin->next;
+                }
+                if(prev)
+                {
+                    prev->next=rwin->next;
+                }
+                tmp=rwin;
+                rwin=rwin->next;
+                if(tmp->name)
+                {
+                    free(tmp->name);
+                }
+                free(tmp);
+            }
+            else
+            {
+                prev=rwin;
+                rwin=rwin->next;
+            }
+        }
+        remoteVars.windowsUpdated=FALSE;
+    }*/
+    pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
 }
 
 void
@@ -3378,7 +4160,10 @@ remote_paint_rect(KdScreenInfo *screen,
 
 
     uint32_t size=width*height*XSERVERBPP;
-
+    if(remoteVars.rootless)
+    {
+        remote_check_rootless_windows_for_updates(screen);
+    }
     if(size)
     {
         int32_t dirtyx_max = 0;
@@ -3492,7 +4277,7 @@ remote_paint_rect(KdScreenInfo *screen,
 //            EPHYR_DBG("new update rect dimensions: %dx%d", width, height);
 //        }
 
-        add_frame(width, height, dx, dy, calculate_crc(width, height,dx,dy), size);
+        add_frame(width, height, dx, dy, calculate_crc(width, height,dx,dy), size,0);
     }
 }
 
@@ -3520,9 +4305,15 @@ void remote_set_display_name(const char* name)
     {
         max_len=strlen(name);
     }
-    strncpy(RemoteHostVars.displayName, name, max_len);
-    RemoteHostVars.displayName[max_len]='\0';
-    EPHYR_DBG("DISPLAY name: %s",RemoteHostVars.displayName);
+    strncpy(remoteVars.displayName, name, max_len);
+    remoteVars.displayName[max_len]='\0';
+    EPHYR_DBG("DISPLAY name: %s",remoteVars.displayName);
+}
+
+void remote_set_rootless(void)
+{
+    EPHYR_DBG("Running in ROOTLESS mode");
+    remoteVars.rootless=TRUE;
 }
 
 void *

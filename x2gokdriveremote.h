@@ -121,13 +121,22 @@
 //always 4
 #define XSERVERBPP 4
 
-enum msg_type{FRAME,DELETED, CURSOR, DELETEDCURSOR, SELECTION, SERVERVERSION, DEMANDCLIENTSELECTION, REINIT};
+enum msg_type{FRAME,DELETED, CURSOR, DELETEDCURSOR, SELECTION, SERVERVERSION, DEMANDCLIENTSELECTION, REINIT, WINUPDATE};
 enum AgentState{STARTING, RUNNING, RESUMING, SUSPENDING, SUSPENDED, TERMINATING, TERMINATED};
 enum Compressions{JPEG,PNG};
 enum SelectionType{PRIMARY,CLIPBOARD};
 enum SelectionMime{STRING,UTF_STRING,PIXMAP};
 enum ClipboardMode{CLIP_NONE,CLIP_CLIENT,CLIP_SERVER,CLIP_BOTH};
 enum OS_VERSION{OS_LINUX, OS_WINDOWS, OS_DARWIN, WEB};
+enum WinUpdateType{UPD_NEW,UPD_CHANGED,UPD_DELETED};
+enum WinType{WINDOW_TYPE_DESKTOP, WINDOW_TYPE_DOCK, WINDOW_TYPE_TOOLBAR, WINDOW_TYPE_MENU, WINDOW_TYPE_UTILITY, WINDOW_TYPE_SPLASH,
+    WINDOW_TYPE_DIALOG, WINDOW_TYPE_DROPDOWN_MENU, WINDOW_TYPE_POPUP_MENU, WINDOW_TYPE_TOOLTIP, WINDOW_TYPE_NOTIFICATION,
+    WINDOW_TYPE_COMBO, WINDOW_TYPE_DND, WINDOW_TYPE_NORMAL};
+
+//Size of 1 window update (new or changed window) = 4xwinId + type of update + 5 coordinates + visibility + type of window + size of name buffer
+    #define WINUPDSIZE 4*sizeof(uint32_t) + sizeof(int8_t) + 5*sizeof(int16_t) + sizeof(int8_t) + sizeof(int8_t) + sizeof(int16_t)
+//Size of 1 window update (deleted window) = winId + type of update
+#define WINUPDDELSIZE sizeof(uint32_t) + sizeof(int8_t)
 
 #define DEFAULT_COMPRESSION JPEG
 
@@ -153,6 +162,8 @@ enum OS_VERSION{OS_LINUX, OS_WINDOWS, OS_DARWIN, WEB};
 #define DEMANDSELECTION 11
 #define KEEPALIVE 12
 #define CACHEREBUILD 13
+#define WINCHANGE 14
+
 
 #define EVLENGTH 41
 
@@ -257,6 +268,7 @@ struct sendqueue_element
     int32_t x, y;
     uint32_t width, height;
     uint32_t crc;
+    uint32_t winId;
     struct sendqueue_element* next;
 };
 
@@ -348,6 +360,20 @@ struct SelectionStructure
     pthread_mutex_t inMutex; //mutex for synchronization of incoming selection
 };
 
+struct remoteWindow
+{
+    enum {UNCHANGED, CHANGED, NEW, WDEL}state;
+    int16_t x,y;
+    uint16_t w,h,bw;
+    int8_t visibility;
+    uint8_t winType;
+    char* name;
+    BOOL foundInWinTree;
+    uint32_t id;
+    uint32_t parentId, nextSibId, transWinId;
+    struct remoteWindow *next;
+    WindowPtr ptr, parent, nextSib;
+};
 
 struct _remoteHostVars
 {
@@ -392,6 +418,7 @@ struct _remoteHostVars
     int numofimg;
 
     int clientsock, serversock;
+    BOOL rootless;
 
 
     struct cache_elem* first_cache_element;
@@ -419,6 +446,9 @@ struct _remoteHostVars
 
     struct sentCursor* sentCursorsHead;
     struct sentCursor* sentCursorsTail;
+
+    struct remoteWindow* windowList;
+    BOOL windowsUpdated;
 
     pthread_mutex_t sendqueue_mutex;
     pthread_mutex_t mainimg_mutex;
@@ -481,7 +511,7 @@ unsigned char* png_compress(uint32_t image_width, uint32_t image_height,
 void clientReadNotify(int fd, int ready, void *data);
 void serverAcceptNotify(int fd, int ready, void *data);
 
-void add_frame(uint32_t width, uint32_t height, int32_t x, int32_t y, uint32_t crc, uint32_t size);
+void add_frame(uint32_t width, uint32_t height, int32_t x, int32_t y, uint32_t crc, uint32_t size, uint32_t winId);
 
 
 void clear_output_selection(void);
@@ -516,5 +546,15 @@ remote_paint_rect(KdScreenInfo *screen,
 
 void request_selection_from_client(enum SelectionType selection);
 void rebuild_caches(void);
+void remote_set_rootless(void);
+void remote_check_windowstree(WindowPtr root);
+void remote_check_window(WindowPtr win);
+struct remoteWindow* remote_find_window(WindowPtr win);
+WindowPtr remote_find_window_on_screen(WindowPtr win, WindowPtr root);
+WindowPtr remote_find_window_on_screen_by_id(uint32_t winId, WindowPtr root);
+void remote_process_window_updates(void);
+void send_reinit_notification(void);
+void client_win_change(char* buff);
+void remote_check_rootless_windows_for_updates(KdScreenInfo *screen);
 
 #endif /* X2GOKDRIVE_REMOTE_H */

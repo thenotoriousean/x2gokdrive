@@ -58,7 +58,6 @@ extern unsigned long long int debug_selectThreadId;
 
 static struct _remoteHostVars *remoteVars = NULL;
 
-extern struct _remoteHostVars RemoteHostVars;
 
 //internal atoms
 static xcb_atom_t ATOM_ATOM;
@@ -943,10 +942,10 @@ void *selection_thread (void* id)
 #endif /* EPHYR_WANT_DEBUG */
 
     /* Create the window */
-    remoteVars->selstruct.xcbConnection = xcb_connect (RemoteHostVars.displayName, NULL);
+    remoteVars->selstruct.xcbConnection = xcb_connect (remoteVars->displayName, NULL);
     if(xcb_connection_has_error(remoteVars->selstruct.xcbConnection))
     {
-        EPHYR_DBG("Warning! can't create XCB connection to display %s, selections exchange between client and server will be disabled", RemoteHostVars.displayName);
+        EPHYR_DBG("Warning! can't create XCB connection to display %s, selections exchange between client and server will be disabled", remoteVars->displayName);
         remoteVars->selstruct.xcbConnection=0;
         pthread_exit(0);
         return NULL;
