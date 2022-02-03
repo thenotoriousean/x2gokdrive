@@ -37,6 +37,7 @@
 #include "x2gokdriveremote.h"
 #include "x2gokdriveselection.h"
 #include "x2gokdrivelog.h"
+#include "inputstr.h"
 #include <zlib.h>
 #include <propertyst.h>
 
@@ -2588,6 +2589,8 @@ void client_win_change(char* buff)
     int16_t ny=*((int16_t*)(buff+14));
     uint16_t nw=*((int16_t*)(buff+16));
     uint16_t nh=*((int16_t*)(buff+18));
+    uint8_t focus=*((int8_t*)(buff+20));
+
     BOOL move=FALSE, resize=FALSE, restack=FALSE;
 //     EPHYR_DBG("Client request win change: %p %d:%d %dx%d",fptr, nx,ny,nw,nh);
     pWin=remote_find_window_on_screen_by_id(winId, remoteVars.ephyrScreen->pScreen->root);
@@ -2697,6 +2700,15 @@ void client_win_change(char* buff)
     {
         EPHYR_DBG("Client request to move : %p on top of %p",pWin, pSib);
         ReflectStackChange(pWin, pSib, VTOther);
+    }
+    if(rw->hasFocus!=focus)
+    {
+        EPHYR_DBG("Focus changed for 0x%X",winId);
+        rw->hasFocus=focus;
+        if(focus)
+        {
+            SetInputFocus(wClient(pWin), inputInfo.keyboard, pWin->drawable.id,  RevertToParent, CurrentTime, TRUE);
+        }
     }
 }
 
@@ -3742,6 +3754,8 @@ void remote_check_window(WindowPtr win)
     uint8_t winType=WINDOW_TYPE_NORMAL;
     int16_t x,y;
     uint16_t w,h,bw;
+    uint32_t focusWinId=0;
+    FocusClassPtr focus = inputInfo.keyboard->focus;
     WindowPtr parPtr;
     WindowPtr nextSibPtr, tmpPtr;
     parPtr=win->parent;
@@ -3786,7 +3800,12 @@ void remote_check_window(WindowPtr win)
      * if window is not in list, create and send to client. If not same, update and send to client
      * if some list windows not there anymore, delete and send notification
      */
-
+    if (focus->win == NoneWin)
+        focusWinId = None;
+    else if (focus->win == PointerRootWin)
+        focusWinId = PointerRoot;
+    else
+        focusWinId = focus->win->drawable.id;
     if(win->optional && win->optional->userProps)
     {
         PropertyPtr prop=win->optional->userProps;
@@ -3951,6 +3970,9 @@ void remote_check_window(WindowPtr win)
             rwin->state=CHANGED;
         }
     }
+
+    rwin->hasFocus=(win->drawable.id==focusWinId);
+
 
     rwin->foundInWinTree=TRUE;
     rwin->x=x;

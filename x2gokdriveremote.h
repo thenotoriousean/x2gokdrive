@@ -366,6 +366,7 @@ struct remoteWindow
     int16_t x,y;
     uint16_t w,h,bw;
     int8_t visibility;
+    int8_t hasFocus;
     uint8_t winType;
     char* name;
     BOOL foundInWinTree;
