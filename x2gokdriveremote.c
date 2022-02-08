@@ -46,6 +46,58 @@ extern unsigned long long int debug_sendThreadId;
 extern unsigned long long int debug_selectThreadId;
 #endif /* EPHYR_WANT_DEBUG */
 
+typedef struct {
+    int32_t flags;     /* marks which fields in this structure are defined */
+    Bool input;     /* does this application rely on the window manager to
+    get keyboard input? */
+    int initial_state;      /* see below */
+    Pixmap icon_pixmap;     /* pixmap to be used as icon */
+    Window icon_window;     /* window to be used as icon */
+    int icon_x, icon_y;     /* initial position of icon */
+    Pixmap icon_mask;       /* icon mask bitmap */
+    XID window_group;       /* id of related window group */
+    /* this structure may be extended in the future */
+} ExWMHints;
+#define ExInputHint               (1L << 0)
+#define ExStateHint               (1L << 1)
+#define ExIconPixmapHint          (1L << 2)
+#define ExIconWindowHint          (1L << 3)
+#define ExIconPositionHint        (1L << 4)
+#define ExIconMaskHint            (1L << 5)
+#define ExWindowGroupHint         (1L << 6)
+#define ExXUrgencyHint            (1L << 8)
+
+/* Size hints mask bits */
+
+#define ExUSPosition	(1L << 0)	/* user specified x, y */
+#define ExUSSize		(1L << 1)	/* user specified width, height */
+#define ExPPosition	(1L << 2)	/* program specified position */
+#define ExPSize		(1L << 3)	/* program specified size */
+#define ExPMinSize	(1L << 4)	/* program specified minimum size */
+#define ExPMaxSize	(1L << 5)	/* program specified maximum size */
+#define ExPResizeInc	(1L << 6)	/* program specified resize increments */
+#define ExPAspect		(1L << 7)	/* program specified min and max aspect ratios */
+#define ExPBaseSize	(1L << 8)
+#define ExPWinGravity	(1L << 9)
+
+/* Values */
+
+typedef struct {
+    int32_t flags;		/* marks which fields in this structure are defined */
+    int x, y;		/* Obsolete */
+    int width, height;	/* Obsolete */
+    int min_width, min_height;
+    int max_width, max_height;
+    int width_inc, height_inc;
+    struct {
+        int x;		/* numerator */
+        int y;		/* denominator */
+    } min_aspect, max_aspect;
+    int base_width, base_height;
+    int win_gravity;
+    /* this structure may be extended in the future */
+} ExSizeHints;
+
 
 /* init it in OsInit() */
 static struct _remoteHostVars remoteVars = {0};
@@ -1504,6 +1556,7 @@ void remote_process_window_updates(void)
             {
                 bufSize+=strlen(rwin->name);
             }
+            bufSize+=rwin->icon_size;
         }
         if(rwin->state==WDEL)
         {
@@ -1543,6 +1596,10 @@ void remote_process_window_updates(void)
             bufHead+=sizeof(uint16_t);
             memcpy(updateBuf+bufHead, &(rwin->h), sizeof(uint16_t));
             bufHead+=sizeof(uint16_t);
+            memcpy(updateBuf+bufHead, &(rwin->minw), sizeof(uint16_t));
+            bufHead+=sizeof(uint16_t);
+            memcpy(updateBuf+bufHead, &(rwin->minh), sizeof(uint16_t));
+            bufHead+=sizeof(uint16_t);
             memcpy(updateBuf+bufHead, &(rwin->bw), sizeof(uint16_t));
             bufHead+=sizeof(uint16_t);
             memcpy(updateBuf+bufHead, &(rwin->visibility), sizeof(int8_t));
@@ -1560,6 +1617,17 @@ void remote_process_window_updates(void)
             {
                 memcpy(updateBuf+bufHead, rwin->name, nameSize);
                 bufHead+=nameSize;
+            }
+            memcpy(updateBuf+bufHead, &(rwin->icon_size), sizeof(uint32_t));
+            bufHead+=sizeof(uint32_t);
+            if(rwin->icon_size)
+            {
+                memcpy(updateBuf+bufHead, rwin->icon_png, rwin->icon_size);
+                bufHead+=rwin->icon_size;
+                //send icon data only once
+                free(rwin->icon_png);
+                rwin->icon_png=0;
+                rwin->icon_size=0;
             }
             rwin->state=UNCHANGED;
         }
@@ -1580,6 +1648,10 @@ void remote_process_window_updates(void)
             if(tmp->name)
             {
                 free(tmp->name);
+            }
+            if(tmp->icon_png)
+            {
+                free(tmp->icon_png);
             }
             free(tmp);
         }
@@ -3749,12 +3821,18 @@ void remote_check_window(WindowPtr win)
     char *dispName=NULL;
     int dispNameSize=0;
     BOOL ignore = TRUE;
+    BOOL hasFocus=FALSE;
     struct remoteWindow* rwin;
     uint32_t transWinId=0;
     uint8_t winType=WINDOW_TYPE_NORMAL;
-    int16_t x,y;
+    int16_t x,y,i, minw=0, minh=0;
     uint16_t w,h,bw;
+    uint32_t iw,ih;
+    uint32_t max_icon_w=0, max_icon_h=0;
+    unsigned char *icon_data;
     uint32_t focusWinId=0;
+    ExWMHints* wmhints;
+    ExSizeHints* sizehints;
     FocusClassPtr focus = inputInfo.keyboard->focus;
     WindowPtr parPtr;
     WindowPtr nextSibPtr, tmpPtr;
@@ -3806,10 +3884,11 @@ void remote_check_window(WindowPtr win)
         focusWinId = PointerRoot;
     else
         focusWinId = focus->win->drawable.id;
+    hasFocus=(win->drawable.id==focusWinId);
     if(win->optional && win->optional->userProps)
     {
         PropertyPtr prop=win->optional->userProps;
-//         EPHYR_DBG("======%p - PARENT %p = VIS %d === MAP %d =============",win, parPtr, win->visibility, win->mapped);
+        EPHYR_DBG("======%x - PARENT %p = VIS %d === MAP %d =============",win->drawable.id, parPtr, win->visibility, win->mapped);
         while(prop)
         {
             if(prop->propertyName==MakeAtom("WM_NAME", strlen("WM_NAME"),FALSE) && prop->data)
@@ -3831,7 +3910,25 @@ void remote_check_window(WindowPtr win)
                 transWinId=((uint32_t*)prop->data)[0];
                 EPHYR_DBG("Trans Win 0x%X = 0x%X", transWinId, win->drawable.id);
             }
-//             EPHYR_DBG("%s %s, Format %d, Size %d",NameForAtom(prop->propertyName), NameForAtom(prop->type), prop->format, prop->size);
+            if(prop->propertyName==MakeAtom("_NET_WM_ICON", strlen("_NET_WM_ICON"),FALSE) && prop->data)
+            {
+                i=0;
+                while(i<prop->size/4)
+                {
+                    iw=((uint32_t*)prop->data)[i++];
+                    ih=((uint32_t*)prop->data)[i++];
+                    EPHYR_DBG("ICON: %dx%d", iw, ih);
+                    if(iw>max_icon_w)
+                    {
+                        max_icon_w=iw;
+                        max_icon_h=ih;
+                        icon_data=(unsigned char*)prop->data+i*4;
+                    }
+                    i+=iw*ih;
+                }
+
+            }
+            //             EPHYR_DBG("%s %s, Format %d, Size %d",NameForAtom(prop->propertyName), NameForAtom(prop->type), prop->format, prop->size);
             if( prop->type == MakeAtom("STRING", strlen("STRING"),FALSE) || prop->type == MakeAtom("UTF8_STRING", strlen("UTF8_STRING"),FALSE))
             {
 //                 EPHYR_DBG("-- %s",(char*)prop->data);
@@ -3841,7 +3938,10 @@ void remote_check_window(WindowPtr win)
                 ATOM* at=prop->data;
                 if(prop->propertyName==MakeAtom("_NET_WM_STATE", strlen("_NET_WM_STATE"),FALSE))
                 {
-                    EPHYR_DBG("--WINDOW STATE: %s, my ID 0x%X",NameForAtom( at[0] ), win->drawable.id);
+                    for(i=0;i<prop->size;++i)
+                    {
+                        EPHYR_DBG("--WINDOW STATE[%d]: %s, my ID 0x%X",i, NameForAtom( at[i] ), win->drawable.id);
+                    }
                 }
                     //                 EPHYR_DBG("--  %s",NameForAtom( at[0] ));
                 if(prop->propertyName==MakeAtom("_NET_WM_WINDOW_TYPE", strlen("_NET_WM_WINDOW_TYPE"),FALSE))
@@ -3874,13 +3974,15 @@ void remote_check_window(WindowPtr win)
                     }
                     else if( at[0] ==MakeAtom("_NET_WM_WINDOW_TYPE_TOOLTIP", strlen("_NET_WM_WINDOW_TYPE_TOOLTIP"),FALSE))
                     {
-                        //                         EPHYR_DBG("Splash");
                         winType=WINDOW_TYPE_TOOLTIP;
                     }
                     else if( at[0] ==MakeAtom("_NET_WM_WINDOW_TYPE_COMBO", strlen("_NET_WM_WINDOW_TYPE_COMBO"),FALSE))
                     {
-                        //                         EPHYR_DBG("Splash");
                         winType=WINDOW_TYPE_COMBO;
+                    }
+                    else if( at[0] ==MakeAtom("_NET_WM_WINDOW_TYPE_UTILITY", strlen("_NET_WM_WINDOW_TYPE_UTILITY"),FALSE))
+                    {
+                        winType=WINDOW_TYPE_UTILITY;
                     }
                 }
             }
@@ -3900,6 +4002,34 @@ void remote_check_window(WindowPtr win)
             {
 //                 ATOM* at=prop->data;
 //                 EPHYR_DBG("-- WM_PROTOCOLS: %s",NameForAtom( at[0] ));
+            }
+            if(prop->propertyName==MakeAtom("WM_HINTS", strlen("WM_HINTS"),FALSE))
+            {
+                EPHYR_DBG("--WM HINTS:");
+                wmhints=(ExWMHints*)prop->data;
+                if(wmhints->flags & ExInputHint)
+                {
+                    EPHYR_DBG("     Input: %d",wmhints->input);
+                }
+                if(wmhints->flags & ExStateHint)
+                {
+                    EPHYR_DBG("     State: %d",wmhints->initial_state);
+                }
+            }
+            if(prop->propertyName==MakeAtom("WM_NORMAL_HINTS", strlen("WM_NORMAL_HINTS"),FALSE))
+            {
+                EPHYR_DBG("--SIZE HINTS:");
+                sizehints=(ExSizeHints*)prop->data;
+                if(sizehints[0].flags & ExPMinSize)
+                {
+                    minw=sizehints->min_width;
+                    minh=sizehints->min_height;
+                    EPHYR_DBG("     Min Size: %dx%d",sizehints->min_width, sizehints->min_height);
+                }
+                if(sizehints[0].flags & ExUSSize)
+                {
+                    EPHYR_DBG("     User Size: need calc");
+                }
             }
             prop=prop->next;
         }
@@ -3936,6 +4066,16 @@ void remote_check_window(WindowPtr win)
         rwin->next=remoteVars.windowList;
         remoteVars.windowList=rwin;
         rwin->name=NULL;
+        rwin->icon_png=NULL;
+        rwin->icon_size=0;
+        rwin->minw=minw;
+        rwin->minh=minh;
+        if(max_icon_w)
+        {
+            rwin->icon_png=png_compress( max_icon_w, max_icon_h,
+                                         icon_data, &rwin->icon_size, TRUE);
+        }
+
 
 //         EPHYR_DBG("Add to list: %p, %s, %d:%d %dx%d, visibility: %d", rwin->ptr, rwin->name, rwin->x,rwin->y,
 //                            rwin->w, rwin->h, rwin->visibility);
@@ -3969,9 +4109,18 @@ void remote_check_window(WindowPtr win)
             EPHYR_DBG("STACK order changed for %p %s old parent %p new parent %p, old nextsib %p, new nextsib %p", rwin->ptr, rwin->name, rwin->parent, parPtr, rwin->nextSib, nextSibPtr);
             rwin->state=CHANGED;
         }
+        if(rwin->visibility!=win->visibility)
+        {
+            EPHYR_DBG("Visibilty changed for 0x%X from %d to %d", rwin->id, rwin->visibility, win->visibility);
+            rwin->state=CHANGED;
+        }
+        if(rwin->hasFocus!=hasFocus)
+        {
+            EPHYR_DBG("Focus changed for 0x%X from %d to %d", rwin->id, rwin->hasFocus, hasFocus);
+        }
     }
 
-    rwin->hasFocus=(win->drawable.id==focusWinId);
+    rwin->hasFocus=hasFocus;
 
 
     rwin->foundInWinTree=TRUE;
@@ -4049,8 +4198,7 @@ void remote_check_window(WindowPtr win)
         EPHYR_DBG("END OF STACK:");*/
         //
     }
-//     EPHYR_DBG("========================================================");
-
+    EPHYR_DBG("=====FOCUS WIN ID 0x%X=====================",focusWinId);
 }
 
 void remote_check_windowstree(WindowPtr root)

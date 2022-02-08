@@ -133,8 +133,8 @@ enum WinType{WINDOW_TYPE_DESKTOP, WINDOW_TYPE_DOCK, WINDOW_TYPE_TOOLBAR, WINDOW_
     WINDOW_TYPE_DIALOG, WINDOW_TYPE_DROPDOWN_MENU, WINDOW_TYPE_POPUP_MENU, WINDOW_TYPE_TOOLTIP, WINDOW_TYPE_NOTIFICATION,
     WINDOW_TYPE_COMBO, WINDOW_TYPE_DND, WINDOW_TYPE_NORMAL};
 
-//Size of 1 window update (new or changed window) = 4xwinId + type of update + 5 coordinates + visibility + type of window + size of name buffer
-    #define WINUPDSIZE 4*sizeof(uint32_t) + sizeof(int8_t) + 5*sizeof(int16_t) + sizeof(int8_t) + sizeof(int8_t) + sizeof(int16_t)
+//Size of 1 window update (new or changed window) = 4xwinId + type of update + 7 coordinates + visibility + type of window + size of name buffer + icon_size
+#define WINUPDSIZE 4*sizeof(uint32_t) + sizeof(int8_t) + 7*sizeof(int16_t) + sizeof(int8_t) + sizeof(int8_t) + sizeof(int16_t) + sizeof(int32_t)
 //Size of 1 window update (deleted window) = winId + type of update
 #define WINUPDDELSIZE sizeof(uint32_t) + sizeof(int8_t)
 
@@ -364,11 +364,13 @@ struct remoteWindow
 {
     enum {UNCHANGED, CHANGED, NEW, WDEL}state;
     int16_t x,y;
-    uint16_t w,h,bw;
+    uint16_t w,h,bw, minw, minh;
     int8_t visibility;
     int8_t hasFocus;
     uint8_t winType;
     char* name;
+    unsigned char* icon_png;
+    uint32_t icon_size;
     BOOL foundInWinTree;
     uint32_t id;
     uint32_t parentId, nextSibId, transWinId;
