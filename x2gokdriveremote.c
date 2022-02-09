@@ -2586,6 +2586,11 @@ clientReadNotify(int fd, int ready, void *data)
                     client_win_change(buff);
                     break;
                 }
+                case WINCLOSE:
+                {
+                    client_win_close(buff);
+                    break;
+                }
                 default:
                 {
                     EPHYR_DBG("UNSUPPORTED EVENT: %d",event_type);
@@ -2647,6 +2652,29 @@ ReflectStackChange(WindowPtr pWin, WindowPtr pSib, VTKind kind)
         WindowsRestructured();
 }
 
+void client_win_close(char* buff)
+{
+    WindowPtr pWin;
+    uint32_t winId=*((uint32_t*)(buff+4));
+    xEvent e;
+//     EPHYR_DBG("Client request win close: 0x%x",winId);
+    pWin=remote_find_window_on_screen_by_id(winId, remoteVars.ephyrScreen->pScreen->root);
+    if(!pWin)
+    {
+        EPHYR_DBG("Window with ID 0x%X not found on current screen",winId);
+        return;
+    }
+    e.u.u.type = ClientMessage;
+    e.u.u.detail = 32;
+    e.u.clientMessage.window = winId;
+    e.u.clientMessage.u.l.type = MakeAtom("WM_PROTOCOLS",strlen("WM_PROTOCOLS"),FALSE);
+    e.u.clientMessage.u.l.longs0 = MakeAtom("WM_DELETE_WINDOW",strlen("WM_DELETE_WINDOW"),FALSE);
+    e.u.clientMessage.u.l.longs1 = 0;
+    e.u.clientMessage.u.l.longs2 = 0;
+    e.u.clientMessage.u.l.longs3 = 0;
+    e.u.clientMessage.u.l.longs4 = 0;
+    DeliverEvents(pWin, &e, 1, NullWindow);
+}
 
 
 void client_win_change(char* buff)
@@ -3831,7 +3859,7 @@ void remote_check_window(WindowPtr win)
     uint32_t max_icon_w=0, max_icon_h=0;
     unsigned char *icon_data;
     uint32_t focusWinId=0;
-    ExWMHints* wmhints;
+//     ExWMHints* wmhints;
     ExSizeHints* sizehints;
     FocusClassPtr focus = inputInfo.keyboard->focus;
     WindowPtr parPtr;
@@ -3986,7 +4014,7 @@ void remote_check_window(WindowPtr win)
                     }
                 }
             }
-            if(prop->propertyName==MakeAtom("WM_NAME", strlen("WM_NAME"),FALSE) && prop->data)
+/*            if(prop->propertyName==MakeAtom("WM_NAME", strlen("WM_NAME"),FALSE) && prop->data)
             {
 //                 EPHYR_DBG("-- Name: %s",(char*)prop->data);
             }
@@ -4000,8 +4028,8 @@ void remote_check_window(WindowPtr win)
             }
             if(prop->propertyName==MakeAtom("WM_PROTOCOLS", strlen("WM_PROTOCOLS"),FALSE) && prop->data)
             {
-//                 ATOM* at=prop->data;
-//                 EPHYR_DBG("-- WM_PROTOCOLS: %s",NameForAtom( at[0] ));
+                 ATOM* at=prop->data;
+                 EPHYR_DBG("-- WM_PROTOCOLS: %s",NameForAtom( at[0] ));
             }
             if(prop->propertyName==MakeAtom("WM_HINTS", strlen("WM_HINTS"),FALSE))
             {
@@ -4015,7 +4043,7 @@ void remote_check_window(WindowPtr win)
                 {
                     EPHYR_DBG("     State: %d",wmhints->initial_state);
                 }
-            }
+            }*/
             if(prop->propertyName==MakeAtom("WM_NORMAL_HINTS", strlen("WM_NORMAL_HINTS"),FALSE))
             {
                 EPHYR_DBG("--SIZE HINTS:");

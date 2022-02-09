@@ -163,7 +163,7 @@ enum WinType{WINDOW_TYPE_DESKTOP, WINDOW_TYPE_DOCK, WINDOW_TYPE_TOOLBAR, WINDOW_
 #define KEEPALIVE 12
 #define CACHEREBUILD 13
 #define WINCHANGE 14
-
+#define WINCLOSE 15
 
 #define EVLENGTH 41
 
@@ -558,6 +558,7 @@ WindowPtr remote_find_window_on_screen_by_id(uint32_t winId, WindowPtr root);
 void remote_process_window_updates(void);
 void send_reinit_notification(void);
 void client_win_change(char* buff);
+void client_win_close(char* buff);
 void remote_check_rootless_windows_for_updates(KdScreenInfo *screen);
 
 #endif /* X2GOKDRIVE_REMOTE_H */
