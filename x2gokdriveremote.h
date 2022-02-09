@@ -133,6 +133,9 @@ enum WinType{WINDOW_TYPE_DESKTOP, WINDOW_TYPE_DOCK, WINDOW_TYPE_TOOLBAR, WINDOW_
     WINDOW_TYPE_DIALOG, WINDOW_TYPE_DROPDOWN_MENU, WINDOW_TYPE_POPUP_MENU, WINDOW_TYPE_TOOLTIP, WINDOW_TYPE_NOTIFICATION,
     WINDOW_TYPE_COMBO, WINDOW_TYPE_DND, WINDOW_TYPE_NORMAL};
 
+//new state requested by WINCHANGE event
+enum WinState{WIN_UNCHANGED, WIN_DELETED, WIN_ICONIFIED};
+
 //Size of 1 window update (new or changed window) = 4xwinId + type of update + 7 coordinates + visibility + type of window + size of name buffer + icon_size
 #define WINUPDSIZE 4*sizeof(uint32_t) + sizeof(int8_t) + 7*sizeof(int16_t) + sizeof(int8_t) + sizeof(int8_t) + sizeof(int16_t) + sizeof(int32_t)
 //Size of 1 window update (deleted window) = winId + type of update
@@ -163,7 +166,6 @@ enum WinType{WINDOW_TYPE_DESKTOP, WINDOW_TYPE_DOCK, WINDOW_TYPE_TOOLBAR, WINDOW_
 #define KEEPALIVE 12
 #define CACHEREBUILD 13
 #define WINCHANGE 14
-#define WINCLOSE 15
 
 #define EVLENGTH 41
 
@@ -558,7 +560,8 @@ WindowPtr remote_find_window_on_screen_by_id(uint32_t winId, WindowPtr root);
 void remote_process_window_updates(void);
 void send_reinit_notification(void);
 void client_win_change(char* buff);
-void client_win_close(char* buff);
+void client_win_close(uint32_t winId);
+void client_win_iconify(uint32_t winId);
 void remote_check_rootless_windows_for_updates(KdScreenInfo *screen);
 
 #endif /* X2GOKDRIVE_REMOTE_H */

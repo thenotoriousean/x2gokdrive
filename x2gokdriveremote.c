@@ -2586,11 +2586,6 @@ clientReadNotify(int fd, int ready, void *data)
                     client_win_change(buff);
                     break;
                 }
-                case WINCLOSE:
-                {
-                    client_win_close(buff);
-                    break;
-                }
                 default:
                 {
                     EPHYR_DBG("UNSUPPORTED EVENT: %d",event_type);
@@ -2652,12 +2647,11 @@ ReflectStackChange(WindowPtr pWin, WindowPtr pSib, VTKind kind)
         WindowsRestructured();
 }
 
-void client_win_close(char* buff)
+void client_win_close(uint32_t winId)
 {
     WindowPtr pWin;
-    uint32_t winId=*((uint32_t*)(buff+4));
     xEvent e;
-//     EPHYR_DBG("Client request win close: 0x%x",winId);
+    //     EPHYR_DBG("Client request win close: 0x%x",winId);
     pWin=remote_find_window_on_screen_by_id(winId, remoteVars.ephyrScreen->pScreen->root);
     if(!pWin)
     {
@@ -2676,6 +2670,29 @@ void client_win_close(char* buff)
     DeliverEvents(pWin, &e, 1, NullWindow);
 }
 
+void client_win_iconify(uint32_t winId)
+{
+    WindowPtr pWin;
+    xEvent e;
+    EPHYR_DBG("Client request win iconify: 0x%x",winId);
+    pWin=remote_find_window_on_screen_by_id(winId, remoteVars.ephyrScreen->pScreen->root);
+    if(!pWin)
+    {
+        EPHYR_DBG("Window with ID 0x%X not found on current screen",winId);
+        return;
+    }
+    e.u.u.type = ClientMessage;
+    e.u.u.detail = 32;
+    e.u.clientMessage.window = winId;
+    e.u.clientMessage.u.l.type = MakeAtom("WM_CHANGE_STATE",strlen("WM_CHANGE_STATE"),FALSE);
+    e.u.clientMessage.u.l.longs0 = 3;//iconicState
+    e.u.clientMessage.u.l.longs1 = 0;
+    e.u.clientMessage.u.l.longs2 = 0;
+    e.u.clientMessage.u.l.longs3 = 0;
+    e.u.clientMessage.u.l.longs4 = 0;
+    DeliverEvents(pWin->parent, &e, 1, NullWindow);
+}
+
 
 void client_win_change(char* buff)
 {
@@ -2690,13 +2707,26 @@ void client_win_change(char* buff)
     uint16_t nw=*((int16_t*)(buff+16));
     uint16_t nh=*((int16_t*)(buff+18));
     uint8_t focus=*((int8_t*)(buff+20));
-
+    uint8_t newstate=*((int8_t*)(buff+21));
     BOOL move=FALSE, resize=FALSE, restack=FALSE;
+
 //     EPHYR_DBG("Client request win change: %p %d:%d %dx%d",fptr, nx,ny,nw,nh);
     pWin=remote_find_window_on_screen_by_id(winId, remoteVars.ephyrScreen->pScreen->root);
     if(!pWin)
     {
         EPHYR_DBG("Window with ID 0x%X not found on current screen",winId);
+        return;
+    }
+
+    if(newstate==WIN_DELETED)
+    {
+        client_win_close(winId);
+        return;
+    }
+    if(newstate==WIN_ICONIFIED)
+    {
+        client_win_iconify(winId);
+        ReflectStackChange(pWin, 0, VTOther);
         return;
     }
 
@@ -4014,7 +4044,11 @@ void remote_check_window(WindowPtr win)
                     }
                 }
             }
-/*            if(prop->propertyName==MakeAtom("WM_NAME", strlen("WM_NAME"),FALSE) && prop->data)
+            if(prop->propertyName==MakeAtom("WM_STATE", strlen("WM_STATE"),FALSE) && prop->data)
+            {
+                EPHYR_DBG("-- WM_STATE: %d",*((uint32_t*)(prop->data)));
+            }
+            /*            if(prop->propertyName==MakeAtom("WM_NAME", strlen("WM_NAME"),FALSE) && prop->data)
             {
 //                 EPHYR_DBG("-- Name: %s",(char*)prop->data);
             }
