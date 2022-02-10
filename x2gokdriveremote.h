@@ -483,6 +483,7 @@ void readInputSelectionHeader(char* buff);
 void pollEvents(void);
 #endif /* XORG_VERSION_CURRENT */
 void clear_frame_cache(uint32_t max_elements);
+void delete_all_windows(void);
 
 uint32_t calculate_crc(uint32_t width, uint32_t height, int32_t dx, int32_t dy);
 

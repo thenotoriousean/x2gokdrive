@@ -2055,6 +2055,30 @@ void setAgentState(int state)
     remoteVars.agentState=state;
 }
 
+void delete_all_windows(void)
+{
+    //sendqueue_mutex should be locked here
+    struct remoteWindow* rwin=remoteVars.windowList;
+    struct remoteWindow* tmp;
+    while(rwin)
+    {
+        //remove window from list and free resources
+        //EPHYR_DBG("release window %p, %s",rwin->ptr, rwin->name);
+        tmp=rwin;
+        rwin=rwin->next;
+        if(tmp->name)
+        {
+            free(tmp->name);
+        }
+        if(tmp->icon_png)
+        {
+            free(tmp->icon_png);
+        }
+        free(tmp);
+    }
+    remoteVars.windowList=NULL;
+}
+
 void disconnect_client(void)
 {
     EPHYR_DBG("DISCONNECTING CLIENT, DOING SOME CLEAN UP");
@@ -2062,6 +2086,7 @@ void disconnect_client(void)
     pthread_mutex_lock(&remoteVars.sendqueue_mutex);
     remoteVars.client_connected=FALSE;
     setAgentState(SUSPENDED);
+    delete_all_windows();
     clear_send_queue();
     clear_frame_cache(0);
     freeCursors();
@@ -4342,44 +4367,6 @@ void remote_check_rootless_windows_for_updates(KdScreenInfo *screen)
         rwin->foundInWinTree=FALSE;
         rwin=rwin->next;
     }
-    /*
-    //         EPHYR_DBG("END TREE CHECK");
-    //if client is not connected, release deleted windows here
-    if(remoteVars.client_connected==FALSE)
-    {
-        //sendqueue mutex is locked here
-        prev=NULL;
-        rwin=remoteVars.windowList;
-        while(rwin)
-        {
-            if(rwin->state==WDEL)
-            {
-                //remove window from list and free resources
-//                 EPHYR_DBG("release window %p, %s",rwin->ptr, rwin->name);
-                if(rwin==remoteVars.windowList)
-                {
-                    remoteVars.windowList=rwin->next;
-                }
-                if(prev)
-                {
-                    prev->next=rwin->next;
-                }
-                tmp=rwin;
-                rwin=rwin->next;
-                if(tmp->name)
-                {
-                    free(tmp->name);
-                }
-                free(tmp);
-            }
-            else
-            {
-                prev=rwin;
-                rwin=rwin->next;
-            }
-        }
-        remoteVars.windowsUpdated=FALSE;
-    }*/
     pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
 }
 
@@ -4633,6 +4620,7 @@ void rebuild_caches(void)
     clear_send_queue();
     clear_frame_cache(0);
     freeCursors();
+    delete_all_windows();
     remoteVars.cache_rebuilt=TRUE;
     pthread_cond_signal(&remoteVars.have_sendqueue_cond);
     pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
