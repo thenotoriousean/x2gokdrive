@@ -4157,11 +4157,13 @@ void remote_check_window(WindowPtr win)
         rwin->icon_size=0;
         rwin->minw=minw;
         rwin->minh=minh;
-        if(max_icon_w)
+        if(max_icon_w && (winType==WINDOW_TYPE_NORMAL || winType==WINDOW_TYPE_DIALOG))
         {
             rwin->icon_png=png_compress( max_icon_w, max_icon_h,
                                          icon_data, &rwin->icon_size, TRUE);
         }
+        else
+            max_icon_w=0;
 
 
 //         EPHYR_DBG("Add to list: %p, %s, %d:%d %dx%d, visibility: %d", rwin->ptr, rwin->name, rwin->x,rwin->y,
