@@ -1634,7 +1634,7 @@ void remote_process_window_updates(void)
         if(rwin->state==WDEL)
         {
             //remove window from list and free resources
-            EPHYR_DBG("release window %p, %s",rwin->ptr, rwin->name);
+//             EPHYR_DBG("release window %p, %s",rwin->ptr, rwin->name);
             if(rwin==remoteVars.windowList)
             {
                 remoteVars.windowList=rwin->next;
@@ -2843,7 +2843,7 @@ void client_win_change(char* buff)
     pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
     if(move)
     {
-        //         EPHYR_DBG("MOVE from %d:%d to %d:%d",x,y,nx,ny);
+//         EPHYR_DBG("MOVE from %d:%d to %d:%d",x,y,nx,ny);
         (*pWin->drawable.pScreen->MoveWindow) (pWin, nx, ny, pSib,VTMove);
     }
     if(resize)
@@ -2853,12 +2853,12 @@ void client_win_change(char* buff)
     }
     if(restack)
     {
-        EPHYR_DBG("Client request to move : %p on top of %p",pWin, pSib);
+//         EPHYR_DBG("Client request to move : %p on top of %p",pWin, pSib);
         ReflectStackChange(pWin, pSib, VTOther);
     }
     if(rw->hasFocus!=focus)
     {
-        EPHYR_DBG("Focus changed for 0x%X",winId);
+//         EPHYR_DBG("Focus changed for 0x%X",winId);
         rw->hasFocus=focus;
         if(focus)
         {
@@ -3971,7 +3971,7 @@ void remote_check_window(WindowPtr win)
     if(win->optional && win->optional->userProps)
     {
         PropertyPtr prop=win->optional->userProps;
-        EPHYR_DBG("======%x - PARENT %p = VIS %d === MAP %d =============",win->drawable.id, parPtr, win->visibility, win->mapped);
+//         EPHYR_DBG("======%x - PARENT %p = VIS %d === MAP %d =============",win->drawable.id, parPtr, win->visibility, win->mapped);
         while(prop)
         {
             if(prop->propertyName==MakeAtom("WM_NAME", strlen("WM_NAME"),FALSE) && prop->data)
@@ -3991,7 +3991,7 @@ void remote_check_window(WindowPtr win)
             if(prop->propertyName==MakeAtom("WM_TRANSIENT_FOR", strlen("WM_TRANSIENT_FOR"),FALSE) && prop->data)
             {
                 transWinId=((uint32_t*)prop->data)[0];
-                EPHYR_DBG("Trans Win 0x%X = 0x%X", transWinId, win->drawable.id);
+//                 EPHYR_DBG("Trans Win 0x%X = 0x%X", transWinId, win->drawable.id);
             }
             if(prop->propertyName==MakeAtom("_NET_WM_ICON", strlen("_NET_WM_ICON"),FALSE) && prop->data)
             {
@@ -4000,7 +4000,7 @@ void remote_check_window(WindowPtr win)
                 {
                     iw=((uint32_t*)prop->data)[i++];
                     ih=((uint32_t*)prop->data)[i++];
-                    EPHYR_DBG("ICON: %dx%d", iw, ih);
+//                     EPHYR_DBG("ICON: %dx%d", iw, ih);
                     if(iw>max_icon_w)
                     {
                         max_icon_w=iw;
@@ -4012,24 +4012,24 @@ void remote_check_window(WindowPtr win)
 
             }
             //             EPHYR_DBG("%s %s, Format %d, Size %d",NameForAtom(prop->propertyName), NameForAtom(prop->type), prop->format, prop->size);
-            if( prop->type == MakeAtom("STRING", strlen("STRING"),FALSE) || prop->type == MakeAtom("UTF8_STRING", strlen("UTF8_STRING"),FALSE))
-            {
-//                 EPHYR_DBG("-- %s",(char*)prop->data);
-            }
+//             if( prop->type == MakeAtom("STRING", strlen("STRING"),FALSE) || prop->type == MakeAtom("UTF8_STRING", strlen("UTF8_STRING"),FALSE))
+//             {
+// //                 EPHYR_DBG("-- %s",(char*)prop->data);
+//             }
             if( prop->type == MakeAtom("ATOM", strlen("ATOM"),FALSE))
             {
                 ATOM* at=prop->data;
-                if(prop->propertyName==MakeAtom("_NET_WM_STATE", strlen("_NET_WM_STATE"),FALSE))
-                {
-                    for(i=0;i<prop->size;++i)
-                    {
-                        EPHYR_DBG("--WINDOW STATE[%d]: %s, my ID 0x%X",i, NameForAtom( at[i] ), win->drawable.id);
-                    }
-                }
+//                 if(prop->propertyName==MakeAtom("_NET_WM_STATE", strlen("_NET_WM_STATE"),FALSE))
+//                 {
+//                     for(i=0;i<prop->size;++i)
+//                     {
+// //                         EPHYR_DBG("--WINDOW STATE[%d]: %s, my ID 0x%X",i, NameForAtom( at[i] ), win->drawable.id);
+//                     }
+//                 }
                     //                 EPHYR_DBG("--  %s",NameForAtom( at[0] ));
                 if(prop->propertyName==MakeAtom("_NET_WM_WINDOW_TYPE", strlen("_NET_WM_WINDOW_TYPE"),FALSE))
                 {
-                    EPHYR_DBG("WINDOW Type: %s, my ID 0x%X",NameForAtom( at[0] ), win->drawable.id);
+//                     EPHYR_DBG("WINDOW Type: %s, my ID 0x%X",NameForAtom( at[0] ), win->drawable.id);
                     if(at[0]==MakeAtom("_NET_WM_WINDOW_TYPE_NORMAL", strlen("_NET_WM_WINDOW_TYPE_NORMAL"),FALSE))
                     {
 //                         EPHYR_DBG("Normal window");
@@ -4069,10 +4069,10 @@ void remote_check_window(WindowPtr win)
                     }
                 }
             }
-            if(prop->propertyName==MakeAtom("WM_STATE", strlen("WM_STATE"),FALSE) && prop->data)
-            {
-                EPHYR_DBG("-- WM_STATE: %d",*((uint32_t*)(prop->data)));
-            }
+//             if(prop->propertyName==MakeAtom("WM_STATE", strlen("WM_STATE"),FALSE) && prop->data)
+//             {
+// //                 EPHYR_DBG("-- WM_STATE: %d",*((uint32_t*)(prop->data)));
+//             }
             /*            if(prop->propertyName==MakeAtom("WM_NAME", strlen("WM_NAME"),FALSE) && prop->data)
             {
 //                 EPHYR_DBG("-- Name: %s",(char*)prop->data);
@@ -4105,17 +4105,17 @@ void remote_check_window(WindowPtr win)
             }*/
             if(prop->propertyName==MakeAtom("WM_NORMAL_HINTS", strlen("WM_NORMAL_HINTS"),FALSE))
             {
-                EPHYR_DBG("--SIZE HINTS:");
+//                 EPHYR_DBG("--SIZE HINTS:");
                 sizehints=(ExSizeHints*)prop->data;
                 if(sizehints[0].flags & ExPMinSize)
                 {
                     minw=sizehints->min_width;
                     minh=sizehints->min_height;
-                    EPHYR_DBG("     Min Size: %dx%d",sizehints->min_width, sizehints->min_height);
+//                     EPHYR_DBG("     Min Size: %dx%d",sizehints->min_width, sizehints->min_height);
                 }
                 if(sizehints[0].flags & ExUSSize)
                 {
-                    EPHYR_DBG("     User Size: need calc");
+//                     EPHYR_DBG("     User Size: need calc");
                 }
             }
             prop=prop->next;
@@ -4195,17 +4195,17 @@ void remote_check_window(WindowPtr win)
         }
         if(rwin->parent != parPtr || rwin->nextSib != nextSibPtr)
         {
-            EPHYR_DBG("STACK order changed for %p %s old parent %p new parent %p, old nextsib %p, new nextsib %p", rwin->ptr, rwin->name, rwin->parent, parPtr, rwin->nextSib, nextSibPtr);
+//             EPHYR_DBG("STACK order changed for %p %s old parent %p new parent %p, old nextsib %p, new nextsib %p", rwin->ptr, rwin->name, rwin->parent, parPtr, rwin->nextSib, nextSibPtr);
             rwin->state=CHANGED;
         }
         if(rwin->visibility!=win->visibility)
         {
-            EPHYR_DBG("Visibilty changed for 0x%X from %d to %d", rwin->id, rwin->visibility, win->visibility);
+//             EPHYR_DBG("Visibilty changed for 0x%X from %d to %d", rwin->id, rwin->visibility, win->visibility);
             rwin->state=CHANGED;
         }
         if(rwin->hasFocus!=hasFocus)
         {
-            EPHYR_DBG("Focus changed for 0x%X from %d to %d", rwin->id, rwin->hasFocus, hasFocus);
+//             EPHYR_DBG("Focus changed for 0x%X from %d to %d", rwin->id, rwin->hasFocus, hasFocus);
         }
     }
 
@@ -4252,8 +4252,8 @@ void remote_check_window(WindowPtr win)
         remoteVars.windowsUpdated=TRUE;
         if(rwin->state==NEW)
         {
-            EPHYR_DBG("NEW WINDOW %p, %s, %d:%d %dx%d bw-%d, visibility: %d parent %p nextSib %p",rwin->ptr, rwin->name, rwin->x,rwin->y,
-                      rwin->w, rwin->h, rwin->bw ,rwin->visibility, rwin->parent, rwin->nextSib);
+//             EPHYR_DBG("NEW WINDOW %p, %s, %d:%d %dx%d bw-%d, visibility: %d parent %p nextSib %p",rwin->ptr, rwin->name, rwin->x,rwin->y,
+//                       rwin->w, rwin->h, rwin->bw ,rwin->visibility, rwin->parent, rwin->nextSib);
         }
         else
         {
@@ -4287,7 +4287,7 @@ void remote_check_window(WindowPtr win)
         EPHYR_DBG("END OF STACK:");*/
         //
     }
-    EPHYR_DBG("=====FOCUS WIN ID 0x%X=====================",focusWinId);
+//     EPHYR_DBG("=====FOCUS WIN ID 0x%X=====================",focusWinId);
 }
 
 void remote_check_windowstree(WindowPtr root)
