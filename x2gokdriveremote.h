@@ -98,8 +98,9 @@
 //Changes 2 - 3: supporting web client, sending cursors in PNG format and know about KEEPALIVE event
 //Changes 3 - 4: extended clipboard support for web client
 //Changes 4 - 5: support for CACHEREBUILD event
+//Changes 5 - 6: support for rootless mode
 
-#define FEATURE_VERSION 5
+#define FEATURE_VERSION 6
 
 #define MAXMSGSIZE 1024*16
 
