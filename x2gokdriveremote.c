@@ -3995,11 +3995,14 @@ void remote_check_window(WindowPtr win)
             }
             if(prop->propertyName==MakeAtom("_NET_WM_ICON", strlen("_NET_WM_ICON"),FALSE) && prop->data)
             {
+//                 EPHYR_DBG("_NET_WM_ICON size: %d",prop->size);
                 i=0;
                 while(i<prop->size/4)
                 {
                     iw=((uint32_t*)prop->data)[i++];
                     ih=((uint32_t*)prop->data)[i++];
+                    if(!iw || !ih ||iw>256 ||  ih>256)
+                        break;
 //                     EPHYR_DBG("ICON: %dx%d", iw, ih);
                     if(iw>max_icon_w)
                     {

@@ -30,6 +30,7 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     - don't check cache data size, only amount of elements.
     - reduce amount of cache elements to save resources.
     - rootless mode for x2gokdrive.
+    - improve icon handling in rootless mode.
 
   [ Mihai Moldovan ]
   * Initial release:
