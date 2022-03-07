@@ -3942,7 +3942,7 @@ void remote_check_window(WindowPtr win)
     }
 
 //     EPHYR_DBG("Check win %p",win);
-    if(!win->optional || !win->optional->userProps || !win->mapped)
+    if(!win->optional || !win->optional->userProps || !win->mapped || win->visibility<0 || win->visibility>2)
     {
         return;
     }
@@ -4169,8 +4169,8 @@ void remote_check_window(WindowPtr win)
             max_icon_w=0;
 
 
-//         EPHYR_DBG("Add to list: %p, %s, %d:%d %dx%d, visibility: %d", rwin->ptr, rwin->name, rwin->x,rwin->y,
-//                            rwin->w, rwin->h, rwin->visibility);
+//         EPHYR_DBG("Add to list: ID 0x%X, type %d, %s, %d:%d %dx%d, visibility: %d", win->drawable.id, winType, rwin->name, x,y,
+//                             w, h, win->visibility);
     }
     else
     {
