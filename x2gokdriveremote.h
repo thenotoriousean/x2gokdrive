@@ -99,8 +99,9 @@
 //Changes 3 - 4: extended clipboard support for web client
 //Changes 4 - 5: support for CACHEREBUILD event
 //Changes 5 - 6: support for rootless mode
+//Changes 6 - 7: Sending KEYRELEASE immediately after KEYPRESS to avoid the "key sticking"
 
-#define FEATURE_VERSION 6
+#define FEATURE_VERSION 7
 
 #define MAXMSGSIZE 1024*16
 

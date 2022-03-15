@@ -2472,6 +2472,9 @@ clientReadNotify(int fd, int ready, void *data)
 //                    }
 
                     ephyrClientKey(event_type,state, key);
+
+//send key release immeidately after key press to avoid "key sticking"
+                    ephyrClientKey(KeyRelease,state, key);
                     break;
                 }
                 case KeyRelease:
