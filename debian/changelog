@@ -1,10 +1,5 @@
 x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
 
-  [ Mike Gabriel ]
-  * Initial release.
-  * debian/control:
-    + Fix B-Ds for building against Ubuntu trusty.
-
   [ Oleksandr Shneyder ]
   * Calculate screen dimensions (in mm) according to dpi value.
     Default DPI (Xorg) is 75. User can set DPI using -dpi command
@@ -249,6 +244,7 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
       fails to build with standard Debian compiler flags."
     - patches.xorg/: Support building against xorg-server 21.1.3.
   * debian/control:
+    + Fix B-Ds for building against Ubuntu trusty.
     + Add B-D mesa-common-dev. Introduced here with the X.Org Xserver 1.20.11
       patchset.
     + Add B-D: libxcvt (or 'sl' for not so recent versions of Debian/Ubuntu).
