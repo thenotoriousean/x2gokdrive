@@ -58,7 +58,7 @@ Build-Depends:
  libaudit-dev [linux-any],
  libpam-dev,
  libgl1-mesa-dev (>= 9.2),
- libunwind-dev [amd64 arm64 armel armhf hppa i386 ia64 mips64 mips64el mipsel powerpc powerpcspe ppc64 ppc64el sh4] | hello,
+ libunwind-dev [amd64 arm64 armel armhf hppa i386 ia64 mips64 mips64el mipsel powerpc powerpcspe ppc64 ppc64el sh4],
  libxcvt-dev | sl,
  libxmuu-dev (>= 1:0.99.1),
  libxext-dev (>= 1:0.99.1),
