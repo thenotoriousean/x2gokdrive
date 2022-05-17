@@ -252,6 +252,6 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     + Add B-D mesa-common-dev. Introduced here with the X.Org Xserver 1.20.11
       patchset.
     + Add B-D: libunwind-dev.
-    + Add B-D: libxcvt (or hello for not so recent versions of Debian/Ubuntu).
+    + Add B-D: libxcvt (or 'sl' for not so recent versions of Debian/Ubuntu).
 
  -- Mike Gabriel <mike.gabriel@das-netzwerkteam.de>  Tue, 04 Jun 2019 14:10:43 +0200
