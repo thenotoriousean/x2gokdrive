@@ -11,7 +11,6 @@ Build-Depends:
  xorg-server-source,
  libjpeg-dev,
  libpng-dev,
- libunwind-dev,
 # xorg-server
  debhelper (>= 9),
  dh-autoreconf,
