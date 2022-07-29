@@ -3284,6 +3284,7 @@ int
 remote_init(void)
 {
 
+    EPHYR_DBG("Setting initial arguments");
     char* displayVar = NULL;
 
     /*init it in OsInit*/
@@ -3296,6 +3297,11 @@ remote_init(void)
     remoteVars.jpegQuality=JPG_QUALITY;
     remoteVars.compression=DEFAULT_COMPRESSION;
     remoteVars.selstruct.selectionMode = CLIP_BOTH;
+    if(!strlen(remote_get_init_geometry()))
+    {
+        EPHYR_DBG("Setting initial geometry to \"800x600\"");
+        remote_set_init_geometry("800x600");
+    }
 
     pthread_mutex_init(&remoteVars.mainimg_mutex, NULL);
     pthread_mutex_init(&remoteVars.sendqueue_mutex,NULL);
@@ -4524,6 +4530,22 @@ uint32_t calculate_crc(uint32_t width, uint32_t height, int32_t dx, int32_t dy)
     pthread_mutex_unlock(&remoteVars.mainimg_mutex);
     return crc;
 }
+
+const char* remote_get_init_geometry()
+{
+    return remoteVars.initGeometry;
+}
+
+void remote_set_init_geometry(char* geometry)
+{
+    if(strlen(geometry)>128)
+    {
+        EPHYR_DBG("INIT Geometry %s is too long, we'll ignore it", geometry);
+        return;
+    }
+    strncpy(remoteVars.initGeometry,geometry,strlen(geometry));
+}
+
 
 void remote_set_display_name(const char* name)
 {

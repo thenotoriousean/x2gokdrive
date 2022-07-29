@@ -239,6 +239,7 @@ ddxProcessArgument(int argc, char **argv, int i)
         if ((i + 1) < argc)
         {
             /* compat with nxagent */
+            remote_set_init_geometry(argv[i+1]);
             return 2;
         }
 
@@ -348,14 +349,14 @@ OsVendorInit(void)
 
 //       }
 
+    remote_init();
 #if XORG_VERSION_CURRENT < 11999901
     KdOsInit(&EphyrOsFuncs);
 #endif
     if (serverGeneration == 1) {
         if (!KdCardInfoLast()) {
-            processScreenArg("800x600", NULL);
+            processScreenArg(remote_get_init_geometry(), NULL);
         }
-        remote_init();
     }
 }
 

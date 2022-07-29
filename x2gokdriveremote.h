@@ -393,6 +393,7 @@ struct _remoteHostVars
     char acceptAddr[256];
     char cookie[33];
     char displayName[256];
+    char initGeometry[128];
     int listenPort;
     int jpegQuality;
     uint32_t framenum;
@@ -555,6 +556,8 @@ remote_paint_rect(KdScreenInfo *screen,
 void request_selection_from_client(enum SelectionType selection);
 void rebuild_caches(void);
 void remote_set_rootless(void);
+void remote_set_init_geometry(char* geometry);
+const char*  remote_get_init_geometry();
 void remote_check_windowstree(WindowPtr root);
 void remote_check_window(WindowPtr win);
 struct remoteWindow* remote_find_window(WindowPtr win);
