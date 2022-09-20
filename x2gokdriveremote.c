@@ -4518,13 +4518,13 @@ remote_paint_rect(KdScreenInfo *screen,
 
 uint32_t calculate_crc(uint32_t width, uint32_t height, int32_t dx, int32_t dy)
 {
-    uint32_t crc=adler32(0L, Z_NULL, 0);
+    uint32_t crc=crc32(0L, Z_NULL, 0);
 
 
     pthread_mutex_lock(&remoteVars.mainimg_mutex);
     for(uint32_t y=0; y< height;++y)
     {
-        crc=adler32(crc,remoteVars.main_img+ ((y+dy)*remoteVars.main_img_width + dx)*XSERVERBPP, width*XSERVERBPP);
+        crc=crc32(crc,remoteVars.main_img+ ((y+dy)*remoteVars.main_img_width + dx)*XSERVERBPP, width*XSERVERBPP);
     }
 
     pthread_mutex_unlock(&remoteVars.mainimg_mutex);
