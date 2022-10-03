@@ -1,14 +1,15 @@
 --- a/configure.ac	2022-07-12 15:27:57.000000000 +0200
-+++ b/configure.ac	2022-10-03 16:43:13.734545310 +0200
-@@ -32,6 +32,7 @@ RELEASE_NAME="Caramel Ice Cream"
++++ b/configure.ac	2022-10-03 16:54:44.247819939 +0200
+@@ -31,7 +31,7 @@ RELEASE_DATE="2022-07-12"
+ RELEASE_NAME="Caramel Ice Cream"
  AC_CONFIG_SRCDIR([Makefile.am])
  AC_CONFIG_MACRO_DIR([m4])
- AM_INIT_AUTOMAKE([foreign dist-xz])
+-AM_INIT_AUTOMAKE([foreign dist-xz])
 +AM_INIT_AUTOMAKE([foreign dist-xz subdir-objects])
  AC_USE_SYSTEM_EXTENSIONS
  
  # Require xorg-macros minimum of 1.14 for XORG_COMPILER_BRAND in XORG_DEFAULT_OPTIONS
-@@ -580,6 +581,7 @@ AC_ARG_ENABLE(xf86-input-inputtest, AS_H
+@@ -580,6 +580,7 @@ AC_ARG_ENABLE(xf86-input-inputtest, AS_H
  dnl kdrive and its subsystems
  AC_ARG_ENABLE(kdrive,         AS_HELP_STRING([--enable-kdrive], [Build kdrive servers (default: no)]), [KDRIVE=$enableval], [KDRIVE=no])
  AC_ARG_ENABLE(xephyr,         AS_HELP_STRING([--enable-xephyr], [Build the kdrive Xephyr server (default: auto)]), [XEPHYR=$enableval], [XEPHYR=auto])
@@ -16,7 +17,7 @@
  dnl kdrive options
  AC_ARG_ENABLE(libunwind,      AS_HELP_STRING([--enable-libunwind], [Use libunwind for backtracing (default: auto)]), [LIBUNWIND="$enableval"], [LIBUNWIND="auto"])
  AC_ARG_ENABLE(xshmfence,      AS_HELP_STRING([--disable-xshmfence], [Disable xshmfence (default: auto)]), [XSHMFENCE="$enableval"], [XSHMFENCE="auto"])
-@@ -1748,6 +1750,8 @@ if test "x$XORG" = xauto; then
+@@ -1748,6 +1749,8 @@ if test "x$XORG" = xauto; then
  fi
  AC_MSG_RESULT([$XORG])
  
@@ -25,7 +26,7 @@
  if test "x$XORG" = xyes; then
  	PKG_CHECK_MODULES([LIBXCVT], $LIBXCVT)
  
-@@ -1956,7 +1960,6 @@ if test "x$XORG" = xyes; then
+@@ -1956,7 +1959,6 @@ if test "x$XORG" = xyes; then
  	AC_DEFINE(XORG_SERVER, 1, [Building Xorg server])
  	AC_DEFINE(XORGSERVER, 1, [Building Xorg server])
  	AC_DEFINE(XFree86Server, 1, [Building XFree86 server])
@@ -33,7 +34,7 @@
  	AC_DEFINE(NEED_XF86_TYPES, 1, [Need XFree86 typedefs])
  	AC_DEFINE(NEED_XF86_PROTOTYPES, 1, [Need XFree86 helper functions])
  	AC_DEFINE(__XSERVERNAME__, "Xorg", [Name of X server])
-@@ -2175,9 +2178,15 @@ dnl kdrive DDX
+@@ -2175,9 +2177,15 @@ dnl kdrive DDX
  XEPHYR_LIBS=
  XEPHYR_INCS=
  
@@ -49,7 +50,7 @@
      XEPHYR_REQUIRED_LIBS="xau xdmcp xcb xcb-shape xcb-render xcb-renderutil xcb-aux xcb-image xcb-icccm xcb-shm >= 1.9.3 xcb-keysyms xcb-randr xcb-xkb"
      if test "x$XV" = xyes; then
          XEPHYR_REQUIRED_LIBS="$XEPHYR_REQUIRED_LIBS xcb-xv"
-@@ -2217,6 +2226,43 @@ if test "$KDRIVE" = yes; then
+@@ -2217,6 +2225,43 @@ if test "$KDRIVE" = yes; then
  
      AC_SUBST([XEPHYR_LIBS])
      AC_SUBST([XEPHYR_INCS])
@@ -93,7 +94,7 @@
  fi
  AC_SUBST([KDRIVE_INCS])
  AC_SUBST([KDRIVE_PURE_INCS])
-@@ -2226,6 +2272,7 @@ AC_SUBST([KDRIVE_MAIN_LIB])
+@@ -2226,6 +2271,7 @@ AC_SUBST([KDRIVE_MAIN_LIB])
  AC_SUBST([KDRIVE_LOCAL_LIBS])
  AC_SUBST([KDRIVE_LIBS])
  AM_CONDITIONAL(XEPHYR, [test "x$KDRIVE" = xyes && test "x$XEPHYR" = xyes])
@@ -101,7 +102,7 @@
  
  
  dnl and the rest of these are generic, so they're in config.h
-@@ -2356,6 +2403,8 @@ hw/xquartz/xpr/Makefile
+@@ -2356,6 +2402,8 @@ hw/xquartz/xpr/Makefile
  hw/kdrive/Makefile
  hw/kdrive/ephyr/Makefile
  hw/kdrive/ephyr/man/Makefile
