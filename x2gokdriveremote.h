@@ -116,9 +116,7 @@
 //it define how close should be two pages to search common regions (see find_best_match)
 #define MAX_MATCH_VAL 51
 
-#define JPG_QUALITY 80
-
-
+#define JPG_QUALITY 70
 
 //always 4
 #define XSERVERBPP 4
@@ -171,6 +169,18 @@ enum WinState{WIN_UNCHANGED, WIN_DELETED, WIN_ICONIFIED};
 
 #define EVLENGTH 41
 
+//width of screen region
+#define SCREEN_REG_WIDTH 40
+
+//height of screen region
+#define SCREEN_REG_HEIGHT 40
+
+//represents the screen regions for updates
+typedef struct
+{
+    uint8_t quality;
+    uint32_t winId;
+} screen_region;
 
 typedef struct
 {
@@ -395,7 +405,7 @@ struct _remoteHostVars
     char displayName[256];
     char initGeometry[128];
     int listenPort;
-    int jpegQuality;
+    int jpegQuality, initialJpegQuality;
     uint32_t framenum;
     uint32_t framenum_sent;
     uint32_t eventnum;
@@ -427,6 +437,10 @@ struct _remoteHostVars
 
     int clientsock, serversock;
     BOOL rootless;
+
+    //array of screen regions
+    screen_region* screen_regions;
+    int reg_horiz, reg_vert;
 
 
     struct cache_elem* first_cache_element;
@@ -556,8 +570,8 @@ remote_paint_rect(KdScreenInfo *screen,
 void request_selection_from_client(enum SelectionType selection);
 void rebuild_caches(void);
 void remote_set_rootless(void);
-void remote_set_init_geometry(char* geometry);
-const char*  remote_get_init_geometry();
+void remote_set_init_geometry(const char* geometry);
+const char*  remote_get_init_geometry(void);
 void remote_check_windowstree(WindowPtr root);
 void remote_check_window(WindowPtr win);
 struct remoteWindow* remote_find_window(WindowPtr win);
@@ -569,5 +583,7 @@ void client_win_change(char* buff);
 void client_win_close(uint32_t winId);
 void client_win_iconify(uint32_t winId);
 void remote_check_rootless_windows_for_updates(KdScreenInfo *screen);
-
+void markDirtyRegions(uint32_t x, uint32_t y, uint32_t width, uint32_t height, uint8_t jpegQuality, uint32_t winId);
+int getDirtyScreenRegion(void);
+void send_dirty_region(int index);
 #endif /* X2GOKDRIVE_REMOTE_H */

@@ -1518,7 +1518,7 @@ void remote_send_win_updates(char* updateBuf, uint32_t bufSize)
     *((uint32_t*)buffer)=WINUPDATE;
     *((uint32_t*)buffer+1)=bufSize;
 
-    write(remoteVars.clientsock,buffer,56);
+    l=write(remoteVars.clientsock,buffer,56);
 
     while(sent<bufSize)
     {
@@ -1682,6 +1682,10 @@ static
 void *send_frame_thread (void *threadid)
 {
     enum SelectionType r;
+    int dirty_region;
+    unsigned int ms_to_wait=100;
+    struct timespec ts;
+    struct timeval tp;
 
 #ifdef EPHYR_WANT_DEBUG
     debug_sendThreadId=pthread_self();
@@ -1710,12 +1714,45 @@ void *send_frame_thread (void *threadid)
         }
 
 
-
         if(!remoteVars.first_sendqueue_element && !remoteVars.firstCursor && !remoteVars.selstruct.firstOutputChunk &&
             !remoteVars.cache_rebuilt && !remoteVars.windowsUpdated)
         {
-            /* sleep if frame queue is empty */
-            pthread_cond_wait(&remoteVars.have_sendqueue_cond, &remoteVars.sendqueue_mutex);
+            gettimeofday(&tp, NULL);
+            /* Convert from timeval to timespec */
+            ts.tv_sec  = tp.tv_sec;
+            ts.tv_nsec = tp.tv_usec * 1000+ms_to_wait*1000000UL;//wait ms_to_wait miliseconds
+            if(ts.tv_nsec>=1000000000UL)
+            {
+                ts.tv_nsec-=1000000000UL;
+                ++ts.tv_sec;
+            }
+            /*sleep with timeout till signal from other thread is sent*/
+            switch(pthread_cond_timedwait(&remoteVars.have_sendqueue_cond, &remoteVars.sendqueue_mutex, &ts))
+            {
+                case 0: //have a signal from other thread, continue execution
+                    ms_to_wait=100; //reset timer
+                    break;
+                case ETIMEDOUT: //timeout is ocured, we have nothing else to do, let's see if we need to update some screen regions
+                    dirty_region=getDirtyScreenRegion();
+                    if(dirty_region!=-1)
+                    {
+                        send_dirty_region(dirty_region);
+                        ms_to_wait=1; //we can start to repaint faster till we don't have any new data incoming
+                    }
+                    else
+                    {
+                        /* sleep till we have a signal from another thread if
+                         *frame, cursor ,selection queue is empty and all regions are updated*/
+                        ms_to_wait=100; //reset timer
+                        pthread_cond_wait(&remoteVars.have_sendqueue_cond, &remoteVars.sendqueue_mutex);
+                    }
+                    break;
+                default:
+                    EPHYR_DBG("Error is occured in pthread_cond_timedwait");
+                    ms_to_wait=100; //reset timer
+                    break;
+            }
+
         }
 
         /* mutex is locked on this point */
@@ -1817,7 +1854,17 @@ void *send_frame_thread (void *threadid)
             {
                 remoteVars.maxfr=elems;
             }
-            //                EPHYR_DBG("have %d max frames in queue, current %d", remoteVars.,elems);
+//             EPHYR_DBG(" frames in queue %d, quality %d", elems, remoteVars.jpegQuality);
+            if(elems > 3)
+            {
+                if(remoteVars.jpegQuality >10)
+                    remoteVars.jpegQuality-=10;
+            }
+            if(elems <3)
+            {
+                if(remoteVars.jpegQuality <remoteVars.initialJpegQuality)
+                    remoteVars.jpegQuality+=10;
+            }
             frame=remoteVars.first_sendqueue_element->frame;
 
             /* delete first element from frame queue */
@@ -1845,18 +1892,17 @@ void *send_frame_thread (void *threadid)
 
                 /* unlock sendqueue for main thread */
 
+                markDirtyRegions(x, y, frame_width, frame_height, remoteVars.jpegQuality, winId);
                 pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
                 send_frame(frame_width, frame_height, x, y, crc, frame->regions, winId);
             }
             else
             {
 //                 EPHYR_DBG("Sending main image or screen update");
-
+                markDirtyRegions(x, y, width, height, remoteVars.jpegQuality, winId);
                 pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
                 sendMainImageFromSendThread(width, height, x, y, winId);
             }
-
-
             pthread_mutex_lock(&remoteVars.sendqueue_mutex);
             if(frame)
             {
@@ -1877,30 +1923,23 @@ void *send_frame_thread (void *threadid)
                     frame->regions[i].rect.size.width=0;
                 }
             }
-
             if(remoteVars.cache_size>CACHEMAXELEMENTS)
             {
                 clear_frame_cache(CACHEMAXELEMENTS);
             }
-
             if(remoteVars.first_deleted_elements)
             {
                 send_deleted_elements();
             }
-
             if(remoteVars.first_deleted_cursor)
             {
                 send_deleted_cursors();
             }
-
-
             pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
             remoteVars.framenum++;
         }
         else
         {
-
-
             pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
         }
     }
@@ -3146,6 +3185,8 @@ void terminateServer(int exitStatus)
     {
         free(remoteVars.main_img);
         free(remoteVars.second_buffer);
+        EPHYR_DBG("free screen regions");
+        free(remoteVars.screen_regions);
     }
 
 
@@ -3188,7 +3229,14 @@ void processConfigFileSetting(char* key, char* value)
                 remoteVars.compression=JPEG;
                 EPHYR_DBG("Using JPEG Compression");
             }
-            remoteVars.jpegQuality=(quality-'0')*10+9;
+            remoteVars.initialJpegQuality=(quality-'0')*10+9;
+            if(remoteVars.initialJpegQuality > JPG_QUALITY)
+            {
+                //x2goclient can set by default quality 90, but it doesn't really makes sence, Maybe we could think about overreiding it in the future
+                EPHYR_DBG("JPEG quality %d is requested, x2gokdrive will override it to %d",remoteVars.initialJpegQuality, JPG_QUALITY);
+                remoteVars.initialJpegQuality=JPG_QUALITY;
+            }
+            remoteVars.jpegQuality=remoteVars.initialJpegQuality;
             EPHYR_DBG("Image quality: %d", remoteVars.jpegQuality);
         }
     }
@@ -3283,18 +3331,17 @@ void readOptionsFromFile(void)
 int
 remote_init(void)
 {
-
-    EPHYR_DBG("Setting initial arguments");
     char* displayVar = NULL;
 
     /*init it in OsInit*/
+    EPHYR_DBG("Setting initial arguments");
 
     fclose(stdout);
     fclose(stdin);
 
     remoteVars.serversock=-1;
 
-    remoteVars.jpegQuality=JPG_QUALITY;
+    remoteVars.initialJpegQuality=remoteVars.jpegQuality=JPG_QUALITY;
     remoteVars.compression=DEFAULT_COMPRESSION;
     remoteVars.selstruct.selectionMode = CLIP_BOTH;
     if(!strlen(remote_get_init_geometry()))
@@ -4531,12 +4578,12 @@ uint32_t calculate_crc(uint32_t width, uint32_t height, int32_t dx, int32_t dy)
     return crc;
 }
 
-const char* remote_get_init_geometry()
+const char* remote_get_init_geometry(void)
 {
     return remoteVars.initGeometry;
 }
 
-void remote_set_init_geometry(char* geometry)
+void remote_set_init_geometry ( const char* geometry )
 {
     if(strlen(geometry)>128)
     {
@@ -4598,6 +4645,7 @@ remote_screen_init(KdScreenInfo *screen,
     if(remoteVars.main_img)
     {
         free(remoteVars.main_img);
+        free(remoteVars.screen_regions);
 
         EPHYR_DBG("FREE DBF");
         free(remoteVars.second_buffer);
@@ -4608,8 +4656,15 @@ remote_screen_init(KdScreenInfo *screen,
     EPHYR_DBG("TRYING TO ALLOC  DOUBLE BUF %d", width*height*XSERVERBPP);
     remoteVars.second_buffer=malloc(width*height*XSERVERBPP);
 
-    memset(remoteVars.main_img,0, width*height*XSERVERBPP);
-    memset(remoteVars.second_buffer,0, width*height*XSERVERBPP);
+    remoteVars.reg_horiz=width/SCREEN_REG_WIDTH;
+    if(width%SCREEN_REG_WIDTH)
+        ++remoteVars.reg_horiz;
+    remoteVars.reg_vert=height/SCREEN_REG_HEIGHT;
+    if(height%SCREEN_REG_HEIGHT)
+        ++remoteVars.reg_vert;
+    EPHYR_DBG("Initializing %dx%d screen regions", remoteVars.reg_horiz, remoteVars.reg_vert);
+    remoteVars.screen_regions=malloc(remoteVars.reg_horiz*remoteVars.reg_vert*sizeof(screen_region));
+
     EPHYR_DBG("ALL INITIALIZED");
 
     if(!remoteVars.main_img)
@@ -4622,6 +4677,16 @@ remote_screen_init(KdScreenInfo *screen,
         EPHYR_DBG("failed to init second buf");
         exit(-1);
     }
+
+    if(!remoteVars.second_buffer)
+    {
+        EPHYR_DBG("failed to init screen regions");
+        exit(-1);
+    }
+
+    memset(remoteVars.screen_regions, 0, remoteVars.reg_horiz*remoteVars.reg_vert*sizeof(screen_region));
+    memset(remoteVars.main_img,0, width*height*XSERVERBPP);
+    memset(remoteVars.second_buffer,0, width*height*XSERVERBPP);
 
     remoteVars.main_img_width=width;
     remoteVars.main_img_height=height;
@@ -4654,4 +4719,77 @@ void rebuild_caches(void)
     remoteVars.cache_rebuilt=TRUE;
     pthread_cond_signal(&remoteVars.have_sendqueue_cond);
     pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+}
+
+void markDirtyRegions(uint32_t x, uint32_t y, uint32_t width, uint32_t height, uint8_t jpegQuality, uint32_t winId)
+{
+    int first_horiz, last_horiz;
+    int first_vert, last_vert;
+    int i,j;
+// #warning for debugging
+//     int marked=0;
+    first_horiz=x/SCREEN_REG_WIDTH;
+    first_vert=y/SCREEN_REG_HEIGHT;
+    last_horiz=(x+width)/SCREEN_REG_WIDTH-1;
+    last_vert=(y+height)/SCREEN_REG_HEIGHT-1;
+    if((x+width)%SCREEN_REG_WIDTH)
+        ++last_horiz;
+    if((y+height)%SCREEN_REG_HEIGHT)
+        ++last_vert;
+//     EPHYR_DBG("marking regions at %d,%d for %dx%d, first %dx%d, last %dx%d", x,y,width, height, first_horiz, first_vert, last_horiz, last_vert);
+    for(i=first_vert;i<=last_vert;++i)
+        for(j=first_horiz;j<=last_horiz;++j)
+        {
+//             ++marked;
+            if((remoteVars.screen_regions[i*remoteVars.reg_horiz+j].quality == 0)||(remoteVars.screen_regions[i*remoteVars.reg_horiz+j].quality>jpegQuality))
+                remoteVars.screen_regions[i*remoteVars.reg_horiz+j].quality=jpegQuality;
+            remoteVars.screen_regions[i*remoteVars.reg_horiz+j].winId=winId;
+        }
+//     EPHYR_DBG("Marked %d regions",marked);
+}
+
+int getDirtyScreenRegion(void)
+{
+    int i;
+    int worst_reg=-1;
+    for(i=0;i<remoteVars.reg_horiz*remoteVars.reg_vert;++i)
+    {
+        if(remoteVars.screen_regions[i].quality)
+        {
+            if((worst_reg == -1)||(remoteVars.screen_regions[worst_reg].quality>remoteVars.screen_regions[i].quality))
+            {
+                worst_reg=i;
+            }
+        }
+    }
+    return worst_reg;
+}
+
+void send_dirty_region(int index)
+{
+    //remoteVars.sendqueue_mutex is locked
+    int width, height, x, y, winId;
+    unsigned char compression;
+    if(index==-1)
+        return;
+    x=(index%remoteVars.reg_horiz)*SCREEN_REG_WIDTH;
+    y=(index/remoteVars.reg_horiz)*SCREEN_REG_HEIGHT;
+    if(x+SCREEN_REG_WIDTH > remoteVars.main_img_width)
+        width=remoteVars.main_img_width-x;
+    else
+        width=SCREEN_REG_WIDTH;
+    if(y+SCREEN_REG_HEIGHT > remoteVars.main_img_height)
+        height=remoteVars.main_img_height-y;
+    else
+        height=SCREEN_REG_HEIGHT;
+
+    winId=remoteVars.screen_regions[index].winId;
+    remoteVars.screen_regions[index].quality=0;
+    pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+//     EPHYR_DBG("SEND REGION UPDATE %d,%d %dx%d", x,y,width,height);
+    compression=remoteVars.compression;
+    remoteVars.compression=PNG;
+    sendMainImageFromSendThread(width, height, x, y, winId);
+    remoteVars.compression=compression;
+    pthread_mutex_lock(&remoteVars.sendqueue_mutex);
 }

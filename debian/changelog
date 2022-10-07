@@ -34,6 +34,8 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     - sending KEYRELEASE immediately after KEYPRESS to avoid the "key sticking".
     - set initial geometry form the -geometry command line option.
     - change from alder32 to crc32 to avoid collisions on small frames.
+    - automatically decrease the jpeg quality when to many frames in queue.
+    - update the screen with png frames when no data is transmitted.
 
   [ Mihai Moldovan ]
   * Initial release:
