@@ -1683,7 +1683,8 @@ void *send_frame_thread (void *threadid)
 {
     enum SelectionType r;
     int dirty_region;
-    unsigned int ms_to_wait=100;
+//wait 100*1000 microseconds
+    unsigned int ms_to_wait=100*1000;
     struct timespec ts;
     struct timeval tp;
 
@@ -1720,7 +1721,7 @@ void *send_frame_thread (void *threadid)
             gettimeofday(&tp, NULL);
             /* Convert from timeval to timespec */
             ts.tv_sec  = tp.tv_sec;
-            ts.tv_nsec = tp.tv_usec * 1000+ms_to_wait*1000000UL;//wait ms_to_wait miliseconds
+            ts.tv_nsec = tp.tv_usec * 1000+ms_to_wait*1000UL;//wait ms_to_wait microseconds
             if(ts.tv_nsec>=1000000000UL)
             {
                 ts.tv_nsec-=1000000000UL;
@@ -1730,26 +1731,26 @@ void *send_frame_thread (void *threadid)
             switch(pthread_cond_timedwait(&remoteVars.have_sendqueue_cond, &remoteVars.sendqueue_mutex, &ts))
             {
                 case 0: //have a signal from other thread, continue execution
-                    ms_to_wait=100; //reset timer
+                    ms_to_wait=100*1000; //reset timer
                     break;
                 case ETIMEDOUT: //timeout is ocured, we have nothing else to do, let's see if we need to update some screen regions
                     dirty_region=getDirtyScreenRegion();
                     if(dirty_region!=-1)
                     {
                         send_dirty_region(dirty_region);
-                        ms_to_wait=1; //we can start to repaint faster till we don't have any new data incoming
+                        ms_to_wait=200; //we can start to repaint faster till we don't have any new data incoming
                     }
                     else
                     {
                         /* sleep till we have a signal from another thread if
                          *frame, cursor ,selection queue is empty and all regions are updated*/
-                        ms_to_wait=100; //reset timer
+                        ms_to_wait=100*1000; //reset timer
                         pthread_cond_wait(&remoteVars.have_sendqueue_cond, &remoteVars.sendqueue_mutex);
                     }
                     break;
                 default:
                     EPHYR_DBG("Error is occured in pthread_cond_timedwait");
-                    ms_to_wait=100; //reset timer
+                    ms_to_wait=100*1000; //reset timer
                     break;
             }
 
