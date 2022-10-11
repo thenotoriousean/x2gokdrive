@@ -246,6 +246,18 @@ ddxProcessArgument(int argc, char **argv, int i)
         UseMsg();
         exit(1);
     }
+    else if (!strcmp(argv[i], "-quality"))
+    {
+        if ((i + 1) < argc)
+        {
+            /* compat with nxagent */
+            remote_set_jpeg_quality(argv[i+1]);
+            return 2;
+        }
+
+        UseMsg();
+        exit(1);
+    }
     else if (!strcmp(argv[i], "-name"))
     {
         if ((i + 1) < argc)

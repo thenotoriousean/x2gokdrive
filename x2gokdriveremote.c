@@ -3342,7 +3342,9 @@ remote_init(void)
 
     remoteVars.serversock=-1;
 
-    remoteVars.initialJpegQuality=remoteVars.jpegQuality=JPG_QUALITY;
+    if(!remoteVars.initialJpegQuality)
+        remoteVars.initialJpegQuality=remoteVars.jpegQuality=JPG_QUALITY;
+    EPHYR_DBG("JPEG quality is %d", remoteVars.initialJpegQuality);
     remoteVars.compression=DEFAULT_COMPRESSION;
     remoteVars.selstruct.selectionMode = CLIP_BOTH;
     if(!strlen(remote_get_init_geometry()))
@@ -4594,6 +4596,14 @@ void remote_set_init_geometry ( const char* geometry )
     strncpy(remoteVars.initGeometry,geometry,strlen(geometry));
 }
 
+void remote_set_jpeg_quality(const char* quality)
+{
+    sscanf(quality, "%d", &remoteVars.initialJpegQuality);
+    if(remoteVars.initialJpegQuality<10 || remoteVars.initialJpegQuality > 90)
+    {
+        remoteVars.initialJpegQuality=JPG_QUALITY;
+    }
+}
 
 void remote_set_display_name(const char* name)
 {

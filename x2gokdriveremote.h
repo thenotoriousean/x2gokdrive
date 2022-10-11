@@ -571,6 +571,7 @@ void request_selection_from_client(enum SelectionType selection);
 void rebuild_caches(void);
 void remote_set_rootless(void);
 void remote_set_init_geometry(const char* geometry);
+void remote_set_jpeg_quality(const char* quality);
 const char*  remote_get_init_geometry(void);
 void remote_check_windowstree(WindowPtr root);
 void remote_check_window(WindowPtr win);
