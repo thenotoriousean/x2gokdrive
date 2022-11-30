@@ -709,7 +709,11 @@ void setOutput(ScreenPtr pScreen, RROutputPtr output, RRCrtcPtr crtc, int width,
     modeInfo.height = height;
     modeInfo.hTotal =width;
     modeInfo.vTotal = height;
-    modeInfo.dotClock =0;
+    modeInfo.dotClock= ((CARD32) width * (CARD32) height *
+                         (CARD32) 60);
+    //+vSync|-hSync
+    modeInfo.modeFlags=0x0004|0x0002;
+;
 
     modeInfo.nameLength = strlen(modename);
     mode = RRModeGet(&modeInfo, modename);

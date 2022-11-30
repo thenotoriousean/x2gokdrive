@@ -164,6 +164,7 @@ void remote_handle_signal(int signum)
             }
             case RUNNING:
             {
+                send_srv_disconnect();
                 disconnect_client();
                 return;
             }
@@ -387,7 +388,14 @@ void remote_sendVersion(void)
     *((uint32_t*)buffer)=SERVERVERSION; //4B
     *((uint16_t*)buffer+2)=FEATURE_VERSION;
     EPHYR_DBG("Sending server version: %d", FEATURE_VERSION);
-    l=write(remoteVars.clientsock,buffer,56);
+    if(remoteVars.serverType==TCP)
+    {
+        l=write(remoteVars.clientsock,buffer,56);
+    }
+    else
+    {
+        l=send_packet_as_datagrams(buffer, 6, ServerSyncPacket);
+    }
     remoteVars.server_version_sent=TRUE;
 }
 
@@ -398,17 +406,34 @@ void request_selection_from_client(enum SelectionType selection)
 
     *((uint32_t*)buffer)=DEMANDCLIENTSELECTION; //4B
     *((uint16_t*)buffer+2)=(uint16_t)selection;
-    l=write(remoteVars.clientsock,buffer,56);
+    if(remoteVars.serverType==TCP)
+        l=write(remoteVars.clientsock,buffer,56);
+    else
+        l=send_packet_as_datagrams(buffer, 6, ServerControlPacket);
     EPHYR_DBG("requesting selection from client");
 }
 
 static
 int32_t send_cursor(struct cursorFrame* cursor)
 {
-    unsigned char buffer[64] = {0};
+    unsigned char* buffer;
+    unsigned char static_buffer[64]={0};
     _X_UNUSED int ln = 0;
     int l = 0;
     int sent = 0;
+    int total = 0;
+    int hdr_sz=7*4;
+
+    if(remoteVars.serverType==UDP)
+    {
+        //packet size: header size + data size
+        total=hdr_sz +cursor->size;
+        buffer=malloc(total);
+    }
+    else
+    {
+        buffer=static_buffer;
+    }
 
     *((uint32_t*)buffer)=CURSOR; //4B
 
@@ -431,17 +456,26 @@ int32_t send_cursor(struct cursorFrame* cursor)
 //     EPHYR_DBG("SENDING CURSOR %d with size %d", cursor->serialNumber, cursor->size);
 
 //    #warning check this
-    ln=write(remoteVars.clientsock,buffer,56);
-
-    while(sent<cursor->size)
+    if(remoteVars.serverType==TCP)
     {
-        l=write(remoteVars.clientsock, cursor->data+sent,((cursor->size-sent)<MAXMSGSIZE)?(cursor->size-sent):MAXMSGSIZE);
-        if(l<0)
+        ln=write(remoteVars.clientsock,buffer,56);
+
+        while(sent<cursor->size)
         {
-            EPHYR_DBG("Error sending cursor!!!!!");
-            break;
+            l=write(remoteVars.clientsock, cursor->data+sent,((cursor->size-sent)<MAXMSGSIZE)?(cursor->size-sent):MAXMSGSIZE);
+            if(l<0)
+            {
+                EPHYR_DBG("Error sending cursor!!!!!");
+                break;
+            }
+            sent+=l;
         }
-        sent+=l;
+    }
+    else
+    {
+        memcpy(buffer+hdr_sz, cursor->data, cursor->size);
+        sent=send_packet_as_datagrams(buffer, total, ServerControlPacket);
+        free(buffer);
     }
     remoteVars.data_sent+=sent;
 //    EPHYR_DBG("SENT total %d", total);
@@ -453,87 +487,136 @@ static
 int32_t send_frame(u_int32_t width, uint32_t height, uint32_t x, uint32_t y, uint32_t crc, struct frame_region* regions, uint32_t winId)
 {
     unsigned char buffer[64] = {0};
+    unsigned char* head_buffer=buffer;
+    unsigned char* data=0;
+    unsigned int header_size=8*4;
+    unsigned int region_header_size=8*4;
     _X_UNUSED int ln = 0;
     int l = 0;
     int sent = 0;
+    int i;
+    //number of datagrams
 
     uint32_t total=0;
     uint32_t numofregions=0;
 
-    for(int i=0;i<9;++i)
+    for(i=0;i<9;++i)
     {
         if(regions[i].rect.size.width && regions[i].rect.size.height)
             ++numofregions;
     }
-    *((uint32_t*)buffer)=FRAME;
-    *((uint32_t*)buffer+1)=width;
-    *((uint32_t*)buffer+2)=height;
-    *((uint32_t*)buffer+3)=x;
-    *((uint32_t*)buffer+4)=y;
-    *((uint32_t*)buffer+5)=numofregions;
-    *((uint32_t*)buffer+6)=crc;
+
+    //calculating total size of the data need to be sent
+    if(remoteVars.serverType==UDP)
+    {
+        //frame header size
+        total=header_size;
+        for(i=0;i<9;++i)
+        {
+            if(!(regions[i].rect.size.width && regions[i].rect.size.height))
+                continue;
+            //region header size
+            total+=header_size;
+            total+=regions[i].size;
+        }
+//         EPHYR_DBG("Sending frame, total size %d", total);
+        data=malloc(total);
+        memset(data,0,header_size);
+        head_buffer=data;
+    }
+
+    *((uint32_t*)head_buffer)=FRAME;
+    *((uint32_t*)head_buffer+1)=width;
+    *((uint32_t*)head_buffer+2)=height;
+    *((uint32_t*)head_buffer+3)=x;
+    *((uint32_t*)head_buffer+4)=y;
+    *((uint32_t*)head_buffer+5)=numofregions;
+    *((uint32_t*)head_buffer+6)=crc;
     if(remoteVars.rootless)
     {
-        *((uint32_t*)buffer+7)=winId;
+        *((uint32_t*)head_buffer+7)=winId;
         /*if(winId)
         {
             EPHYR_DBG("Sending frame for Window 0x%X",winId);
         }*/
     }
 
-
-//    if(numofregions)
-//        EPHYR_DBG("SENDING NEW FRAME %x", crc);
-//    else
-//        EPHYR_DBG("SENDING REFERENCE %x", crc);
-
-//    #warning check this
-    ln=write(remoteVars.clientsock, buffer,56);
-    for(int i=0;i<9;++i)
+    if(remoteVars.serverType==TCP)
+    {
+        ln=write(remoteVars.clientsock, buffer,56);
+    }
+    else
+    {
+        //increment offset on frame header size
+        head_buffer+=header_size;
+    }
+    for(i=0;i<9;++i)
     {
         if(!(regions[i].rect.size.width && regions[i].rect.size.height))
             continue;
+        //        EPHYR_DBG("SENDING FRAME REGION %x %dx%d %d",regions[i].source_crc, regions[i].rect.size.width, regions[i].rect.size.height,
+        //                  regions[i].size);
+        *((uint32_t*)head_buffer)=regions[i].source_crc;
 
-//        EPHYR_DBG("SENDING FRAME REGION %x %dx%d %d",regions[i].source_crc, regions[i].rect.size.width, regions[i].rect.size.height,
-//                  regions[i].size);
+        //      if(*((uint32_t*)buffer)=regions[i].source_crc)
+        //          EPHYR_DBG("SENDING REFERENCE %x", *((uint32_t*)buffer)=regions[i].source_crc);
 
-        *((uint32_t*)buffer)=regions[i].source_crc;
+        *((uint32_t*)head_buffer+1)=regions[i].source_coordinates.x;
+        *((uint32_t*)head_buffer+2)=regions[i].source_coordinates.y;
+        *((uint32_t*)head_buffer+3)=regions[i].rect.lt_corner.x;
+        *((uint32_t*)head_buffer+4)=regions[i].rect.lt_corner.y;
+        *((uint32_t*)head_buffer+5)=regions[i].rect.size.width;
+        *((uint32_t*)head_buffer+6)=regions[i].rect.size.height;
+        *((uint32_t*)head_buffer+7)=regions[i].size;
 
-//      if(*((uint32_t*)buffer)=regions[i].source_crc)
-//          EPHYR_DBG("SENDING REFERENCE %x", *((uint32_t*)buffer)=regions[i].source_crc);
-
-        *((uint32_t*)buffer+1)=regions[i].source_coordinates.x;
-        *((uint32_t*)buffer+2)=regions[i].source_coordinates.y;
-        *((uint32_t*)buffer+3)=regions[i].rect.lt_corner.x;
-        *((uint32_t*)buffer+4)=regions[i].rect.lt_corner.y;
-        *((uint32_t*)buffer+5)=regions[i].rect.size.width;
-        *((uint32_t*)buffer+6)=regions[i].rect.size.height;
-        *((uint32_t*)buffer+7)=regions[i].size;
-
-        sent = 0;
-//        #warning check this
-        ln=write(remoteVars.clientsock, buffer, 64);
-
-        while(sent<regions[i].size)
+        if(remoteVars.serverType==UDP)
         {
-            l=write(remoteVars.clientsock,regions[i].compressed_data+sent,
-                    ((regions[i].size-sent)<MAXMSGSIZE)?(regions[i].size-sent):MAXMSGSIZE);
-            if(l<0)
-            {
-                EPHYR_DBG("Error sending file!!!!!");
-                break;
-            }
-            sent+=l;
+            //increment offset on region header size
+            head_buffer+=region_header_size;
+            //copy region data to data
+            memcpy(head_buffer,regions[i].compressed_data, regions[i].size);
+            head_buffer+=regions[i].size;
         }
-        total+=sent;
-//        EPHYR_DBG("SENT %d",sent);
-//
-//        EPHYR_DBG("\ncache elements %d, cache size %lu(%dMB), connection time=%d, sent %lu(%dMB)\n",
-//                  cache_elements, cache_size, (int) (cache_size/1024/1024),
-//                  time(NULL)-con_start_time, data_sent, (int) (data_sent/1024/1024));
-//
+        else
+        {
+            sent = 0;
+            //        #warning check this
+            ln=write(remoteVars.clientsock, buffer, 64);
 
+            while(sent<regions[i].size)
+            {
+                l=write(remoteVars.clientsock,regions[i].compressed_data+sent,
+                        ((regions[i].size-sent)<MAXMSGSIZE)?(regions[i].size-sent):MAXMSGSIZE);
+                if(l<0)
+                {
+                    EPHYR_DBG("Error sending file!!!!!");
+                    break;
+                }
+                sent+=l;
+            }
+            total+=sent;
+            //        EPHYR_DBG("SENT %d",sent);
+            //
+            //        EPHYR_DBG("\ncache elements %d, cache size %lu(%dMB), connection time=%d, sent %lu(%dMB)\n",
+            //                  cache_elements, cache_size, (int) (cache_size/1024/1024),
+            //                  time(NULL)-con_start_time, data_sent, (int) (data_sent/1024/1024));
+        }
     }
+    //if proto TCP all data is sent at this moment
+    if(remoteVars.serverType==UDP)
+    {
+        if(remoteVars.compression==JPEG)
+        {
+            //if it compressed with JPEG is a frame, if not - refresh
+            total=send_packet_as_datagrams(data, total, ServerFramePacket);
+        }
+        else
+        {
+            total=send_packet_as_datagrams(data, total, ServerRepaintPacket);
+        }
+        free(data);
+    }
+
     remoteVars.data_sent+=total;
 
 //     EPHYR_DBG("SENT total %d", total);
@@ -544,8 +627,11 @@ int32_t send_frame(u_int32_t width, uint32_t height, uint32_t x, uint32_t y, uin
 static
 int send_deleted_elements(void)
 {
-    unsigned char buffer[56] = {0};
+    unsigned char* buffer;
+    unsigned char static_buffer[56] = {0};
     unsigned char* list = NULL;
+    int total = 0;
+    int hdr_sz=2*4;
 
     _X_UNUSED int ln = 0;
     int l = 0;
@@ -554,14 +640,24 @@ int send_deleted_elements(void)
     unsigned int i = 0;
     struct deleted_elem* elem = NULL;
 
+    length=remoteVars.deleted_list_size*sizeof(uint32_t);
+    if(remoteVars.serverType==UDP)
+    {
+        //packet size: header size + data size
+        total=hdr_sz + length;
+        buffer=malloc(total);
+    }
+    else
+    {
+        buffer=static_buffer;
+    }
+
+
     *((uint32_t*)buffer)=DELETED;
     *((uint32_t*)buffer+1)=remoteVars.deleted_list_size;
 
-    list=malloc(sizeof(uint32_t)*remoteVars.deleted_list_size);
+    list=malloc(length);
 
-//    #warning check this
-    ln=write(remoteVars.clientsock,buffer,56);
-//     data_sent+=48;
     while(remoteVars.first_deleted_elements)
     {
 //        EPHYR_DBG("To DELETE FRAME %x", remoteVars.first_deleted_elements->crc);
@@ -576,26 +672,40 @@ int send_deleted_elements(void)
     remoteVars.last_deleted_elements=0l;
 
 //    EPHYR_DBG("SENDING IMG length - %d, number - %d\n",length,framenum_sent++);
-    length=remoteVars.deleted_list_size*sizeof(uint32_t);
-    while(sent<length)
+    if(remoteVars.serverType==TCP)
     {
-        l=write(remoteVars.clientsock,list+sent,((length-sent)<MAXMSGSIZE)?(length-sent):MAXMSGSIZE);
-        if(l<0)
+        ln=write(remoteVars.clientsock,buffer,56);
+        while(sent<length)
         {
-            EPHYR_DBG("Error sending list of deleted elements!!!!!");
-            break;
+            l=write(remoteVars.clientsock,list+sent,((length-sent)<MAXMSGSIZE)?(length-sent):MAXMSGSIZE);
+            if(l<0)
+            {
+                EPHYR_DBG("Error sending list of deleted elements!!!!!");
+                break;
+            }
+            sent+=l;
         }
-        sent+=l;
+    }
+    else
+    {
+        memcpy(buffer+hdr_sz, list, length);
+        sent=send_packet_as_datagrams(buffer, total, ServerControlPacket);
+        free(buffer);
     }
     remoteVars.deleted_list_size=0;
+    free(list);
     return sent;
 }
 
 static
 int send_deleted_cursors(void)
 {
-    unsigned char buffer[56] = {0};
+    unsigned char* buffer;
+    unsigned char static_buffer[56] = {0};
     unsigned char* list = NULL;
+    int total = 0;
+    int hdr_sz=2*4;
+
     _X_UNUSED int ln = 0;
     int l = 0;
     int length, sent = 0;
@@ -603,13 +713,24 @@ int send_deleted_cursors(void)
     unsigned int i=0;
     struct deletedCursor* elem = NULL;
 
+    length=remoteVars.deletedcursor_list_size*sizeof(uint32_t);
+    if(remoteVars.serverType==UDP)
+    {
+        //packet size: header size + data size
+        total=hdr_sz + length;
+        buffer=malloc(total);
+    }
+    else
+    {
+        buffer=static_buffer;
+    }
+
+
     *((uint32_t*)buffer)=DELETEDCURSOR;
     *((uint32_t*)buffer+1)=remoteVars.deletedcursor_list_size;
 
-//    #warning check this
-    ln=write(remoteVars.clientsock,buffer,56);
 
-    list=malloc(sizeof(uint32_t)*remoteVars.deletedcursor_list_size);
+    list=malloc(length);
 
     while(remoteVars.first_deleted_cursor)
     {
@@ -625,17 +746,28 @@ int send_deleted_cursors(void)
     remoteVars.last_deleted_cursor=0l;
 
 //    EPHYR_DBG("Sending list from %d elements", deletedcursor_list_size);
-    length=remoteVars.deletedcursor_list_size*sizeof(uint32_t);
-    while(sent<length)
+    if(remoteVars.serverType==TCP)
     {
-        l=write(remoteVars.clientsock,list+sent,((length-sent)<MAXMSGSIZE)?(length-sent):MAXMSGSIZE);
-        if(l<0)
+        ln=write(remoteVars.clientsock,buffer,56);
+        while(sent<length)
         {
-            EPHYR_DBG("Error sending list of deleted cursors!!!!!");
-            break;
+            l=write(remoteVars.clientsock,list+sent,((length-sent)<MAXMSGSIZE)?(length-sent):MAXMSGSIZE);
+            if(l<0)
+            {
+                EPHYR_DBG("Error sending list of deleted cursors!!!!!");
+                break;
+            }
+            sent+=l;
         }
-        sent+=l;
     }
+    else
+    {
+        memcpy(buffer+hdr_sz, list, length);
+        sent=send_packet_as_datagrams(buffer, total, ServerControlPacket);
+        free(buffer);
+    }
+    free(list);
+
     remoteVars.deletedcursor_list_size=0;
     return sent;
 }
@@ -667,29 +799,22 @@ void send_reinit_notification(void)
     _X_UNUSED int l;
     *((uint32_t*)buffer)=REINIT;
     EPHYR_DBG("SENDING REINIT NOTIFICATION");
-    l=write(remoteVars.clientsock,buffer,56);
+    if(remoteVars.serverType==TCP)
+        l=write(remoteVars.clientsock,buffer,56);
+    else
+        l=send_packet_as_datagrams(buffer,4,ServerControlPacket);
 }
 
-int send_selection_chunk(int sel, unsigned char* data, uint32_t length, uint32_t format, BOOL first, BOOL last, uint32_t compressed, uint32_t total)
+int send_selection_chunk(int sel, unsigned char* data, uint32_t length, uint32_t format, BOOL first, BOOL last, uint32_t compressed, uint32_t total_sz)
 {
-    unsigned char buffer[56] = {0};
+
+    unsigned char* buffer;
+    unsigned char static_buffer[56]={0};
     _X_UNUSED int ln = 0;
     int l = 0;
     int sent = 0;
-
-
-    *((uint32_t*)buffer)=SELECTION;    //0
-    *((uint32_t*)buffer+1)=sel;        //4
-    *((uint32_t*)buffer+2)=format;     //8
-    *((uint32_t*)buffer+3)=length;     //16
-    *((uint32_t*)buffer+4)=first;      //20
-    *((uint32_t*)buffer+5)=last;       //24
-    *((uint32_t*)buffer+6)=compressed; //28
-    *((uint32_t*)buffer+7)=total; //32
-
-
-//    #warning check this
-    ln=write(remoteVars.clientsock,buffer,56);
+    int total = 0;
+    int hdr_sz=8*4;
 
     //if the data is compressed, send "compressed" amount of bytes
 //     EPHYR_DBG("sending chunk. total %d, chunk %d, compressed %d", total, length, compressed);
@@ -698,16 +823,47 @@ int send_selection_chunk(int sel, unsigned char* data, uint32_t length, uint32_t
         length=compressed;
     }
 
-
-    while(sent<length)
+    if(remoteVars.serverType==UDP)
     {
-        l=write(remoteVars.clientsock,data+sent,((length-sent)<MAXMSGSIZE)?(length-sent):MAXMSGSIZE);
-        if(l<0)
+        //packet size: header size + data size
+        total=hdr_sz +length;
+        buffer=malloc(total);
+    }
+    else
+    {
+        buffer=static_buffer;
+    }
+
+    *((uint32_t*)buffer)=SELECTION;    //0
+    *((uint32_t*)buffer+1)=sel;        //4
+    *((uint32_t*)buffer+2)=format;     //8
+    *((uint32_t*)buffer+3)=length;     //16
+    *((uint32_t*)buffer+4)=first;      //20
+    *((uint32_t*)buffer+5)=last;       //24
+    *((uint32_t*)buffer+6)=compressed; //28
+    *((uint32_t*)buffer+7)=total_sz; //32
+
+
+
+    if(remoteVars.serverType==TCP)
+    {
+        ln=write(remoteVars.clientsock,buffer,56);
+        while(sent<length)
         {
-            EPHYR_DBG("Error sending selection!!!!!");
-            break;
+            l=write(remoteVars.clientsock,data+sent,((length-sent)<MAXMSGSIZE)?(length-sent):MAXMSGSIZE);
+            if(l<0)
+            {
+                EPHYR_DBG("Error sending selection!!!!!");
+                break;
+            }
+            sent+=l;
         }
-        sent+=l;
+    }
+    else
+    {
+        memcpy(buffer+hdr_sz, data, length);
+        sent=send_packet_as_datagrams(buffer, total, ServerControlPacket);
+        free(buffer);
     }
     return sent;
 }
@@ -1771,6 +1927,7 @@ void *send_frame_thread (void *threadid)
             remoteVars.cache_rebuilt=FALSE;
             pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
             send_reinit_notification();
+            clean_everything();
             pthread_mutex_lock(&remoteVars.sendqueue_mutex);
         }
 
@@ -2124,13 +2281,19 @@ void disconnect_client(void)
     EPHYR_DBG("DISCONNECTING CLIENT, DOING SOME CLEAN UP");
 
     pthread_mutex_lock(&remoteVars.sendqueue_mutex);
+    if(remoteVars.checkKeepAliveTimer)
+    {
+        TimerFree(remoteVars.checkKeepAliveTimer);
+        remoteVars.checkKeepAliveTimer=0;
+    }
+    if(remoteVars.sendKeepAliveTimer)
+    {
+        TimerFree(remoteVars.sendKeepAliveTimer);
+        remoteVars.sendKeepAliveTimer=0;
+    }
     remoteVars.client_connected=FALSE;
     setAgentState(SUSPENDED);
-    delete_all_windows();
-    clear_send_queue();
-    clear_frame_cache(0);
-    freeCursors();
-    clear_output_selection();
+    clean_everything();
 #if XORG_VERSION_CURRENT >= 11900000
     EPHYR_DBG("Remove notify FD for client sock %d",remoteVars.clientsock);
     RemoveNotifyFd(remoteVars.clientsock);
@@ -2403,6 +2566,218 @@ void readInputSelectionHeader(char* buff)
     pthread_mutex_unlock(&remoteVars.selstruct.inMutex);
 }
 
+//length is only important for UDP connections. In case of TCP it'll be always EVLENGTH
+BOOL remote_process_client_event ( char* buff , int length)
+{
+    uint32_t event_type=*((uint32_t*)buff);
+    //updating keep alive time
+    pthread_mutex_lock(&remoteVars.sendqueue_mutex);
+    remoteVars.last_client_keepalive_time=time(NULL);
+    if(remoteVars.client_version>=3 && remoteVars.checkKeepAliveTimer)
+    {
+        remoteVars.checkKeepAliveTimer=TimerSet(remoteVars.checkKeepAliveTimer,0,CLIENTALIVE_TIMEOUT, checkClientAlive, NULL);
+    }
+
+    pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+
+    switch(event_type)
+    {
+        case MotionNotify:
+        {
+            uint32_t x=*((uint32_t*)buff+1);
+            uint32_t y=*((uint32_t*)buff+2);
+
+            //                    EPHYR_DBG("HAVE MOTION EVENT %d, %d from client\n",x,y);
+            ephyrClientMouseMotion(x,y);
+            break;
+        }
+        case ButtonPress:
+        case ButtonRelease:
+        {
+            uint32_t state=*((uint32_t*)buff+1);
+            uint32_t button=*((uint32_t*)buff+2);
+            //                    EPHYR_DBG("HAVE BUTTON PRESS/RELEASE EVENT %d, %d from client\n",state,button);
+            ephyrClientButton(event_type,state, button);
+            break;
+        }
+        case KeyPress:
+        {
+            uint32_t state=*((uint32_t*)buff+1);
+            uint32_t key=*((uint32_t*)buff+2);
+            //                    EPHYR_DBG("HAVE KEY PRESS EVENT state: %d(%x), key: %d(%x) from client\n",state,state, key, key);
+            ephyrClientKey(event_type,state, key);
+            //send key release immeidately after key press to avoid "key sticking"
+            ephyrClientKey(KeyRelease,state, key);
+            break;
+        }
+        case KeyRelease:
+        {
+            uint32_t state=*((uint32_t*)buff+1);
+            uint32_t key=*((uint32_t*)buff+2);
+            //                    EPHYR_DBG("HAVE KEY RELEASE EVENT state: %d(%x), key: %d(%x) from client\n",state,state, key, key);
+            ephyrClientKey(event_type,state, key);
+            break;
+        }
+        case GEOMETRY:
+        {
+            uint16_t width=*((uint16_t*)buff+2);
+            uint16_t height=*((uint16_t*)buff+3);
+            struct VirtScreen screens[4] = {{0}};
+            remoteVars.client_initialized=TRUE;
+            EPHYR_DBG("Client want resize to %dx%d",width,height);
+            memset(screens,0, sizeof(struct VirtScreen)*4);
+            for(int j=0;j<4;++j)
+            {
+                char* record=buff+9+j*8;
+                screens[j].width=*((uint16_t*)record);
+                screens[j].height=*((uint16_t*)record+1);
+                screens[j].x=*((int16_t*)record+2);
+                screens[j].y=*((int16_t*)record+3);
+                if(!screens[j].width || !screens[j].height)
+                {
+                    break;
+                }
+                EPHYR_DBG("SCREEN %d - (%dx%d) - %d,%d", j, screens[j].width, screens[j].height, screens[j].x, screens[j].y);
+            }
+            ephyrResizeScreen (remoteVars.ephyrScreen->pScreen,width,height, screens);
+            break;
+        }
+        case UPDATE:
+        {
+            int32_t width=*((uint32_t*)buff+1);
+            int32_t height=*((uint32_t*)buff+2);
+            int32_t x=*((uint32_t*)buff+3);
+            int32_t y=*((uint32_t*)buff+4);
+            uint32_t winid=0;
+            if(remoteVars.rootless)
+            {
+                winid=*((uint32_t*)buff+5);
+            }
+            //                     EPHYR_DBG("HAVE UPDATE request from client, window 0x%X %dx%d %d,%d\n",winid, width, height, x,y );
+            pthread_mutex_lock(&remoteVars.mainimg_mutex);
+            //                     EPHYR_DBG("DBF: %p, %d, %d",remoteVars.main_img, remoteVars.main_img_width, remoteVars.main_img_height);
+            if(remoteVars.main_img  && x+width <= remoteVars.main_img_width  && y+height <= remoteVars.main_img_height )
+            {
+                pthread_mutex_unlock(&remoteVars.mainimg_mutex);
+                add_frame(width, height, x, y, 0, 0, winid);
+            }
+            else
+            {
+                EPHYR_DBG("UPDATE: skip request");
+                pthread_mutex_unlock(&remoteVars.mainimg_mutex);
+            }
+            break;
+        }
+        case SELECTIONEVENT:
+        {
+            readInputSelectionHeader(buff);
+            break;
+        }
+        case CLIENTVERSION:
+        {
+            int16_t ver=*((uint16_t*)buff+2);
+            int16_t os=*((uint16_t*)buff+3);
+            set_client_version(ver, os);
+            EPHYR_DBG("Client information: vesrion %d, os %d", ver, os);
+            pthread_cond_signal(&remoteVars.have_sendqueue_cond);
+            break;
+        }
+        case DEMANDSELECTION:
+        {
+            int16_t sel=*((uint16_t*)buff+2);
+            //                     EPHYR_DBG("Client requesting selection %d", sel);
+            client_sel_request_notify(sel);
+            break;
+        }
+        case KEEPALIVE:
+        {
+            //receive keepalive event.  In UDP case we are also using it for synchronization
+            if(remoteVars.serverType==UDP)
+            {
+                int16_t lastContr=*((uint16_t*)buff+2);
+//                 EPHYR_DBG("Client synchronization, last control packet %d, last frame packet %d", lastContr, lastFr);
+                pthread_mutex_lock(&remoteVars.server_dgram_mutex);
+                remove_dgram_from_list(&(remoteVars.server_control_datagrams), lastContr, FALSE);
+                pthread_mutex_unlock(&remoteVars.server_dgram_mutex);
+            }
+            break;
+        }
+        case RESENDSCONTROL:
+        {
+            resend_dgrams(buff+4,length-4, ServerControlPacket);
+            break;
+        }
+        case RESENDFRAME:
+        {
+            resend_frame( *((uint32_t*)buff+1) );
+            break;
+        }
+        case CACHEREBUILD:
+        {
+            //rebuild all frame and cursors caches
+            rebuild_caches();
+            break;
+        }
+        case WINCHANGE:
+        {
+            client_win_change(buff);
+            break;
+        }
+        case DISCONNECTCLIENT:
+        {
+            EPHYR_DBG("Client sent disconnect event");
+            disconnect_client();
+            break;
+        }
+        default:
+        {
+            EPHYR_DBG("UNSUPPORTED EVENT: %d",event_type);
+            return FALSE;
+        }
+    }
+    return TRUE;
+}
+
+void
+resend_dgrams(char* buffer, int length, uint8_t dgType)
+{
+    int processed=0;
+    uint16_t packSeq;
+    uint16_t missedDgs;
+    uint16_t dgSeq;
+    uint16_t i;
+    while(processed<length)
+    {
+        packSeq=*( (uint16_t*) (buffer+processed) );
+        processed+=2;
+        missedDgs=*( (uint16_t*) (buffer+processed) );
+        processed+=2;
+        if(missedDgs)
+        {
+            EPHYR_DBG("Client missing %d datagrams, from packet %d, type %d",missedDgs, packSeq, dgType);
+            for(i=0;i<missedDgs;++i)
+            {
+                if(processed >= length)
+                {
+                    EPHYR_DBG("WARNING, Client requested wrong amount of datagrams, stop processing...");
+                    send_sync_failed_notification();
+                    return;
+                }
+                dgSeq=*( (uint16_t*) (buffer+processed) );
+                resend_dgram(dgType, packSeq, dgSeq);
+                processed+=2;
+            }
+            processed+=missedDgs*2;
+        }
+        else
+        {
+            EPHYR_DBG("Client missing packet %d, type %d", packSeq, dgType);
+            resend_dgram_packet(dgType, packSeq);
+        }
+    }
+}
+
+
 void
 clientReadNotify(int fd, int ready, void *data)
 {
@@ -2418,6 +2793,11 @@ clientReadNotify(int fd, int ready, void *data)
     pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
     if(!con)
         return;
+    if(remoteVars.serverType==UDP)
+    {
+        remote_recv_dgram();
+        return;
+    }
 
     /* read max 99 events */
     length=read(remoteVars.clientsock,remoteVars.eventBuffer + remoteVars.evBufferOffset, EVLENGTH*99);
@@ -2425,6 +2805,7 @@ clientReadNotify(int fd, int ready, void *data)
     if(length<0)
     {
         EPHYR_DBG("WRONG data - %d\n",length);
+//         disconnect_client();
         return;
     }
     if(!length)
@@ -2434,7 +2815,6 @@ clientReadNotify(int fd, int ready, void *data)
         return;
     }
 //    EPHYR_DBG("Got ev bytes - %d\n",eventnum++);
-
 
     length+=remoteVars.evBufferOffset;
     iterations=length/EVLENGTH;
@@ -2449,219 +2829,11 @@ clientReadNotify(int fd, int ready, void *data)
         }
         else
         {
-            uint32_t event_type=*((uint32_t*)buff);
-
-            switch(event_type)
+            if(!remote_process_client_event(buff,0))
             {
-                case MotionNotify:
-                {
-                    uint32_t x=*((uint32_t*)buff+1);
-                    uint32_t y=*((uint32_t*)buff+2);
-
-//                    EPHYR_DBG("HAVE MOTION EVENT %d, %d from client\n",x,y);
-                    ephyrClientMouseMotion(x,y);
-                    break;
-                }
-                case ButtonPress:
-                case ButtonRelease:
-                {
-                    uint32_t state=*((uint32_t*)buff+1);
-                    uint32_t button=*((uint32_t*)buff+2);
-
-//                    EPHYR_DBG("HAVE BUTTON PRESS/RELEASE EVENT %d, %d from client\n",state,button);
-                    ephyrClientButton(event_type,state, button);
-                    break;
-                }
-                case KeyPress:
-                {
-                    uint32_t state=*((uint32_t*)buff+1);
-                    uint32_t key=*((uint32_t*)buff+2);
-
-//                    EPHYR_DBG("HAVE KEY PRESS EVENT state: %d(%x), key: %d(%x) from client\n",state,state, key, key);
-//                    if (state & ShiftMask)
-//                    {
-//                        EPHYR_DBG("SHIFT");
-//                    }
-//                    if (state & LockMask)
-//                    {
-//                        EPHYR_DBG("LOCK");
-//                    }
-//                    if (state & ControlMask)
-//                    {
-//                        EPHYR_DBG("CONTROL");
-//                    }
-//                    if (state & Mod1Mask)
-//                    {
-//                        EPHYR_DBG("MOD1");
-//                    }
-//                    if (state & Mod2Mask)
-//                    {
-//                        EPHYR_DBG("MOD2");
-//                    }
-//                    if (state & Mod3Mask)
-//                    {
-//                        EPHYR_DBG("MOD3");
-//                    }
-//                    if (state & Mod4Mask)
-//                    {
-//                        EPHYR_DBG("MOD4");
-//                    }
-//                    if (state & Mod5Mask)
-//                    {
-//                        EPHYR_DBG("MOD5");
-//                    }
-
-                    ephyrClientKey(event_type,state, key);
-
-//send key release immeidately after key press to avoid "key sticking"
-                    ephyrClientKey(KeyRelease,state, key);
-                    break;
-                }
-                case KeyRelease:
-                {
-                    uint32_t state=*((uint32_t*)buff+1);
-                    uint32_t key=*((uint32_t*)buff+2);
-
-//                    EPHYR_DBG("HAVE KEY RELEASE EVENT state: %d(%x), key: %d(%x) from client\n",state,state, key, key);
-//                    if (state & ShiftMask)
-//                    {
-//                        EPHYR_DBG("SHIFT");
-//                    }
-//                    if (state & LockMask)
-//                    {
-//                        EPHYR_DBG("LOCK");
-//                    }
-//                    if (state & ControlMask)
-//                    {
-//                        EPHYR_DBG("CONTROL");
-//                    }
-//                    if (state & Mod1Mask)
-//                    {
-//                        EPHYR_DBG("MOD1");
-//                    }
-//                    if (state & Mod2Mask)
-//                    {
-//                        EPHYR_DBG("MOD2");
-//                    }
-//                    if (state & Mod3Mask)
-//                    {
-//                        EPHYR_DBG("MOD3");
-//                    }
-//                    if (state & Mod4Mask)
-//                    {
-//                        EPHYR_DBG("MOD4");
-//                    }
-//                    if (state & Mod5Mask)
-//                    {
-//                        EPHYR_DBG("MOD5");
-//                    }
-                    ephyrClientKey(event_type,state, key);
-                    break;
-                }
-                case GEOMETRY:
-                {
-                    uint16_t width=*((uint16_t*)buff+2);
-                    uint16_t height=*((uint16_t*)buff+3);
-                    struct VirtScreen screens[4] = {{0}};
-
-                    remoteVars.client_initialized=TRUE;
-                    EPHYR_DBG("Client want resize to %dx%d",width,height);
-
-                    memset(screens,0, sizeof(struct VirtScreen)*4);
-                    for(int j=0;j<4;++j)
-                    {
-                        char* record=buff+9+j*8;
-                        screens[j].width=*((uint16_t*)record);
-                        screens[j].height=*((uint16_t*)record+1);
-                        screens[j].x=*((int16_t*)record+2);
-                        screens[j].y=*((int16_t*)record+3);
-
-                        if(!screens[j].width || !screens[j].height)
-                        {
-                            break;
-                        }
-                        EPHYR_DBG("SCREEN %d - (%dx%d) - %d,%d", j, screens[j].width, screens[j].height, screens[j].x, screens[j].y);
-                    }
-                    ephyrResizeScreen (remoteVars.ephyrScreen->pScreen,width,height, screens);
-                    break;
-                }
-                case UPDATE:
-                {
-                    int32_t width=*((uint32_t*)buff+1);
-                    int32_t height=*((uint32_t*)buff+2);
-
-                    int32_t x=*((uint32_t*)buff+3);
-                    int32_t y=*((uint32_t*)buff+4);
-                    uint32_t winid=0;
-                    if(remoteVars.rootless)
-                    {
-                        winid=*((uint32_t*)buff+5);
-                    }
-
-//                     EPHYR_DBG("HAVE UPDATE request from client, window 0x%X %dx%d %d,%d\n",winid, width, height, x,y );
-                    pthread_mutex_lock(&remoteVars.mainimg_mutex);
-
-//                     EPHYR_DBG("DBF: %p, %d, %d",remoteVars.main_img, remoteVars.main_img_width, remoteVars.main_img_height);
-
-                    if(remoteVars.main_img  && x+width <= remoteVars.main_img_width  && y+height <= remoteVars.main_img_height )
-                    {
-
-                        pthread_mutex_unlock(&remoteVars.mainimg_mutex);
-                        add_frame(width, height, x, y, 0, 0, winid);
-                    }
-                    else
-                    {
-                        EPHYR_DBG("UPDATE: skip request");
-
-                        pthread_mutex_unlock(&remoteVars.mainimg_mutex);
-                    }
-                    break;
-                }
-                case SELECTIONEVENT:
-                {
-                    readInputSelectionHeader(buff);
-                    break;
-                }
-                case CLIENTVERSION:
-                {
-                    int16_t ver=*((uint16_t*)buff+2);
-                    int16_t os=*((uint16_t*)buff+3);
-                    set_client_version(ver, os);
-                    EPHYR_DBG("Client information: vesrion %d, os %d", ver, os);
-                    pthread_cond_signal(&remoteVars.have_sendqueue_cond);
-                    break;
-                }
-                case DEMANDSELECTION:
-                {
-                    int16_t sel=*((uint16_t*)buff+2);
-//                     EPHYR_DBG("Client requesting selection %d", sel);
-                    client_sel_request_notify(sel);
-                    break;
-                }
-                case KEEPALIVE:
-                {
-                    //receive keepalive event, don't need to do anything
-                    break;
-                }
-                case CACHEREBUILD:
-                {
-                    //rebuild all frame and cursors caches
-                    rebuild_caches();
-                    break;
-                }
-                case WINCHANGE:
-                {
-                    client_win_change(buff);
-                    break;
-                }
-                default:
-                {
-                    EPHYR_DBG("UNSUPPORTED EVENT: %d",event_type);
-                    /* looks like we have some corrupted data, let's try to reset event buffer */
-                    remoteVars.evBufferOffset=0;
-                    length=0;
-                    break;
-                }
+                /* looks like we have some corrupted data, let's try to reset event buffer */
+                remoteVars.evBufferOffset=0;
+                length=0;
             }
         }
 //        EPHYR_DBG("Processed event - %d %d\n",eventnum++, eventbytes);
@@ -2924,7 +3096,14 @@ void set_client_version(uint16_t ver, uint16_t os)
     //Linux clients supporting sending selection on demand (not sending data if not needed)
     //Web client support clipboard and selection on demand starting from v.4
     remoteVars.selstruct.clientSupportsOnDemandSelection=(((ver > 1) && (os == OS_LINUX)) || ((ver > 3) && (os == WEB)));
-
+    if(remoteVars.client_version>=3)
+    {
+        //start timer for checking if client alive
+        pthread_mutex_lock(&remoteVars.sendqueue_mutex);
+        remoteVars.checkKeepAliveTimer=TimerSet(0,0,CLIENTALIVE_TIMEOUT, checkClientAlive, NULL);
+        remoteVars.sendKeepAliveTimer=TimerSet(0,0,SERVERALIVE_TIMEOUT, sendServerAlive, NULL);
+        pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+    }
 }
 
 #if XORG_VERSION_CURRENT < 11900000
@@ -2992,64 +3171,86 @@ unsigned int checkSocketConnection(OsTimerPtr timer, CARD32 time, void* args)
 void serverAcceptNotify(int fd, int ready_sock, void *data)
 {
     int ret;
-    remoteVars.clientsock = accept ( remoteVars.serversock, (struct sockaddr *) &remoteVars.address, &remoteVars.addrlen );
-    if (remoteVars.clientsock <= 0)
+    char msg[33];
+    int length=32;
+    int ready=0;
+
+    if(remoteVars.serverType==TCP)
     {
-        EPHYR_DBG( "ACCEPT ERROR OR CANCELD!\n");
-        return;
-    }
-    EPHYR_DBG ("Connection from (%s)...\n", inet_ntoa (remoteVars.address.sin_addr));
-
-    //only accept one client, close server socket
-    close_server_socket();
-
-    if(strlen(remoteVars.acceptAddr))
-    {
-        struct addrinfo hints, *res;
-        int errcode;
-
-        memset (&hints, 0, sizeof (hints));
-        hints.ai_family = AF_INET;
-        hints.ai_socktype = SOCK_STREAM;
-        hints.ai_flags |= AI_CANONNAME;
-
-        errcode = getaddrinfo (remoteVars.acceptAddr, NULL, &hints, &res);
-        if (errcode != 0 || !res)
+        remoteVars.clientsock = accept ( remoteVars.serversock, (struct sockaddr *) &remoteVars.address, &remoteVars.addrlen );
+        if (remoteVars.clientsock <= 0)
         {
-            EPHYR_DBG ("ERROR LOOKUP %s", remoteVars.acceptAddr);
-            terminateServer(-1);
-        }
-        if(  ((struct sockaddr_in *) (res->ai_addr))->sin_addr.s_addr != remoteVars.address.sin_addr.s_addr)
-        {
-            EPHYR_DBG("Connection only allowed from %s",inet_ntoa ( ((struct sockaddr_in *)(res->ai_addr))->sin_addr));
-            shutdown(remoteVars.clientsock, SHUT_RDWR);
-            close(remoteVars.clientsock);
+            EPHYR_DBG( "ACCEPT ERROR OR CANCELD!\n");
             return;
         }
-    }
-    if(strlen(remoteVars.cookie))
-    {
-        char msg[33];
-        int length=32;
-        int ready=0;
+        EPHYR_DBG ("Connection from (%s)...\n", inet_ntoa (remoteVars.address.sin_addr));
 
-        //            EPHYR_DBG("Checking cookie: %s",remoteVars.cookie);
+        //only accept one client, close server socket
+        close_server_socket();
 
-        while(ready<length)
+        if(strlen(remoteVars.acceptAddr))
         {
-            int chunk=read(remoteVars.clientsock, msg+ready, 32-ready);
+            struct addrinfo hints, *res;
+            int errcode;
 
-            if(chunk<=0)
+            memset (&hints, 0, sizeof (hints));
+            hints.ai_family = AF_INET;
+            hints.ai_socktype = SOCK_STREAM;
+            hints.ai_flags |= AI_CANONNAME;
+
+            errcode = getaddrinfo (remoteVars.acceptAddr, NULL, &hints, &res);
+            if (errcode != 0 || !res)
             {
-                EPHYR_DBG("READ COOKIE ERROR");
+                EPHYR_DBG ("ERROR LOOKUP %s", remoteVars.acceptAddr);
+                terminateServer(-1);
+            }
+            if(  ((struct sockaddr_in *) (res->ai_addr))->sin_addr.s_addr != remoteVars.address.sin_addr.s_addr)
+            {
+                EPHYR_DBG("Connection only allowed from %s",inet_ntoa ( ((struct sockaddr_in *)(res->ai_addr))->sin_addr));
                 shutdown(remoteVars.clientsock, SHUT_RDWR);
                 close(remoteVars.clientsock);
                 return;
             }
-            ready+=chunk;
-
-            EPHYR_DBG("got %d COOKIE BYTES from client", ready);
         }
+        if(strlen(remoteVars.cookie))
+        {
+            while(ready<length)
+            {
+                int chunk=read(remoteVars.clientsock, msg+ready, 32-ready);
+                if(chunk<=0)
+                {
+                    EPHYR_DBG("READ COOKIE ERROR");
+                    shutdown(remoteVars.clientsock, SHUT_RDWR);
+                    close(remoteVars.clientsock);
+                    return;
+                }
+                ready+=chunk;
+            }
+        }
+
+    }
+    else
+    {
+        ready = recvfrom(remoteVars.serversock, msg, length,  MSG_WAITALL,  (struct sockaddr *) &remoteVars.address, &remoteVars.addrlen);
+        EPHYR_DBG ("Connection from (%s)...\n", inet_ntoa (remoteVars.address.sin_addr));
+        remoteVars.clientsock=remoteVars.serversock;
+        ret=connect(remoteVars.clientsock, (struct sockaddr *) &remoteVars.address, remoteVars.addrlen);
+        if(ret)
+        {
+            EPHYR_DBG("Error, failed to connect to client socket: %s",gai_strerror(ret));
+            shutdown(remoteVars.clientsock, SHUT_RDWR);
+            close(remoteVars.clientsock);
+            return;
+        }
+        else
+        {
+            EPHYR_DBG("Connected to client UDP socket...");
+        }
+    }
+
+    if(strlen(remoteVars.cookie))
+    {
+        EPHYR_DBG("got %d COOKIE BYTES from client", ready);
         if(strncmp(msg,remoteVars.cookie,32))
         {
             EPHYR_DBG("Wrong cookie");
@@ -3071,6 +3272,7 @@ void serverAcceptNotify(int fd, int ready_sock, void *data)
     #endif /* XORG_VERSION_CURRENT */
     remoteVars.client_connected=TRUE;
     remoteVars.server_version_sent=FALSE;
+    remoteVars.clientEventSeq=0-1;
     set_client_version(0,0);
     if(remoteVars.checkConnectionTimer)
     {
@@ -3112,9 +3314,19 @@ void open_socket(void)
 {
     const int y = 1;
 
-    remoteVars.serversock=socket (AF_INET, SOCK_STREAM, 0);
-    setsockopt( remoteVars.serversock, SOL_SOCKET, SO_REUSEADDR, &y, sizeof(int));
-    remoteVars.address.sin_family = AF_INET;
+    if(remoteVars.serverType==TCP)
+    {
+        EPHYR_DBG("Openning TCP socket...");
+        remoteVars.serversock=socket (AF_INET, SOCK_STREAM, 0);
+        setsockopt( remoteVars.serversock, SOL_SOCKET, SO_REUSEADDR, &y, sizeof(int));
+        remoteVars.address.sin_family = AF_INET;
+    }
+    else
+    {
+        EPHYR_DBG("Openning UDP socket...");
+        remoteVars.serversock=socket (AF_INET, SOCK_DGRAM, 0);
+        remoteVars.address.sin_family = AF_UNSPEC;
+    }
     remoteVars.address.sin_addr.s_addr = INADDR_ANY;
 
     if(! strlen(remoteVars.acceptAddr))
@@ -3146,7 +3358,7 @@ void open_socket(void)
 
 #if XORG_VERSION_CURRENT >= 11900000
     EPHYR_DBG("Set notify FD for server sock: %d",remoteVars.serversock);
-    EPHYR_DBG ("waiting for TCP connection\n");
+    EPHYR_DBG ("waiting for Client connection\n");
     SetNotifyFd(remoteVars.serversock, serverAcceptNotify, X_NOTIFY_READ, NULL);
 #endif /* XORG_VERSION_CURRENT */
 
@@ -3159,6 +3371,7 @@ void terminateServer(int exitStatus)
     setAgentState(TERMINATING);
     if(remoteVars.client_connected)
     {
+        send_srv_disconnect();
         disconnect_client();
         pthread_join(remoteVars.send_thread_id,NULL);
         remoteVars.send_thread_id=0;
@@ -3180,6 +3393,8 @@ void terminateServer(int exitStatus)
 
     pthread_mutex_destroy(&remoteVars.mainimg_mutex);
     pthread_mutex_destroy(&remoteVars.sendqueue_mutex);
+    pthread_mutex_destroy(&remoteVars.server_dgram_mutex);
+    pthread_mutex_destroy(&remoteVars.client_dgram_mutex);
     pthread_cond_destroy(&remoteVars.have_sendqueue_cond);
 
     if(remoteVars.main_img)
@@ -3346,7 +3561,11 @@ remote_init(void)
         remoteVars.initialJpegQuality=remoteVars.jpegQuality=JPG_QUALITY;
     EPHYR_DBG("JPEG quality is %d", remoteVars.initialJpegQuality);
     remoteVars.compression=DEFAULT_COMPRESSION;
-    remoteVars.selstruct.selectionMode = CLIP_BOTH;
+
+    remoteVars.selstruct.selectionMode = CLIP_NONE;
+#warning change this defaults values
+    remoteVars.serverType=UDP;
+
     if(!strlen(remote_get_init_geometry()))
     {
         EPHYR_DBG("Setting initial geometry to \"800x600\"");
@@ -3355,6 +3574,8 @@ remote_init(void)
 
     pthread_mutex_init(&remoteVars.mainimg_mutex, NULL);
     pthread_mutex_init(&remoteVars.sendqueue_mutex,NULL);
+    pthread_mutex_init(&remoteVars.server_dgram_mutex,NULL);
+    pthread_mutex_init(&remoteVars.client_dgram_mutex,NULL);
     pthread_cond_init(&remoteVars.have_sendqueue_cond,NULL);
 
     displayVar=secure_getenv("DISPLAY");
@@ -4434,6 +4655,89 @@ void remote_check_rootless_windows_for_updates(KdScreenInfo *screen)
     pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
 }
 
+//check if the point belongs to region. If the point is close enough, but not inside of region, extend the region boundaries
+BOOL
+insideOfRegion(struct PaintRectRegion* reg, int x , int y)
+{
+    if(!reg)
+        return FALSE;
+    if(x >= reg->x1 - MAXDISTANCETOREGION && x <= reg->x2+MAXDISTANCETOREGION  &&  y >= reg->y1 - MAXDISTANCETOREGION && y<= reg->y2 + MAXDISTANCETOREGION)
+    {
+        if(x<reg->x1)
+            reg->x1=x;
+        if(x>reg->x2)
+            reg->x2=x;
+        if(y<reg->y1)
+            reg->y1=y;
+        if(y>reg->y2)
+            reg->y2=y;
+        return TRUE;
+    }
+    return FALSE;
+}
+
+//find the region, point belongs to
+struct PaintRectRegion*
+findRegionForPoint(struct PaintRectRegion* firstRegion, int x , int y)
+{
+    while(firstRegion)
+    {
+        if(insideOfRegion(firstRegion, x,y))
+            return firstRegion;
+        firstRegion=firstRegion->next;
+    }
+    return firstRegion;
+}
+
+BOOL
+unitePaintRegions(struct PaintRectRegion* firstRegion)
+{
+    struct PaintRectRegion* next;
+    int ux1,ux2,uy1,uy2;
+
+    BOOL haveUnited=FALSE;
+    if(!firstRegion)
+        return FALSE;
+    if(!firstRegion->next)
+        return FALSE;
+    next=firstRegion->next;
+    while(next)
+    {
+        if(!next->united)
+        {
+           //check if we need to unite with this one
+            ux1=(firstRegion->x1 < next->x1)?firstRegion->x1:next->x1;
+            ux2=(firstRegion->x2 > next->x2)?firstRegion->x2:next->x2;
+            uy1=(firstRegion->y1 < next->y1)?firstRegion->y1:next->y1;
+            uy2=(firstRegion->y2 > next->y2)?firstRegion->y2:next->y2;
+            //if united size is smaller or same as separated size, we'll unite them
+            if(
+                ((firstRegion->x2-firstRegion->x1 +1)*(firstRegion->y2-firstRegion->y1+1) + (next->x2-next->x1 +1)*(next->y2-next->y1+1))>
+                (ux2-ux1 +1)*(uy2-uy1+1) )
+            {
+//                 EPHYR_DBG("Uniting regions %d:%d-%d:%d and %d:%d-%d:%d", firstRegion->x1, firstRegion->y1, firstRegion->x2, firstRegion->y2, next->x1, next->y1, next->x2, next->y2);
+                haveUnited=TRUE;
+                next->united=TRUE;
+                firstRegion->x1=ux1;
+                firstRegion->x2=ux2;
+                firstRegion->y1=uy1;
+                firstRegion->y2=uy2;
+            }
+        }
+        next=next->next;
+    }
+    next=firstRegion->next;
+    while(next)
+    {
+        if(!next->united)
+        {
+           return haveUnited||unitePaintRegions(next);
+        }
+        next=next->next;
+    }
+    return haveUnited;
+}
+
 void
 remote_paint_rect(KdScreenInfo *screen,
                   int sx, int sy, int dx, int dy, int width, int height)
@@ -4443,6 +4747,17 @@ remote_paint_rect(KdScreenInfo *screen,
 
 
     uint32_t size=width*height*XSERVERBPP;
+    struct PaintRectRegion *regions=NULL;
+    struct PaintRectRegion *currentRegion=NULL;
+    struct PaintRectRegion *lastRegion=NULL;
+    uint32_t reg_size;
+    int reg_width, reg_height;
+    int numOfRegs=0;
+    int totalSizeOfRegions=0;
+    int totalDirtySize=0;
+    BOOL allUnited=FALSE;
+
+
     if(remoteVars.rootless)
     {
         remote_check_rootless_windows_for_updates(screen);
@@ -4458,7 +4773,7 @@ remote_paint_rect(KdScreenInfo *screen,
         char maxdiff = 0;
         char mindiff = 0;
 
-//        EPHYR_DBG("REPAINT %dx%d sx %d, sy %d, dx %d, dy %d", width, height, sx, sy, dx, dy);
+//         EPHYR_DBG("---REPAINT %d:%d,  %dx%d", dx, dy, width, height);
 
         dirtyx_max=dx-1;
         dirtyy_max=dy-1;
@@ -4514,6 +4829,25 @@ remote_paint_rect(KdScreenInfo *screen,
                 }
                 if(pixIsDirty)
                 {
+                    if(!insideOfRegion(currentRegion,x,y))
+                    {
+                        //point is not inside of current region, find the region, point belongs to
+                        currentRegion=findRegionForPoint(regions, x, y);
+                        if(!currentRegion)
+                        {
+                            //creating new region and add it to the end of the list
+                            currentRegion=malloc(sizeof(struct PaintRectRegion));
+                            currentRegion->next=NULL;
+                            currentRegion->united=FALSE;
+                            currentRegion->x1=currentRegion->x2=x;
+                            currentRegion->y1=currentRegion->y2=y;
+                            if(lastRegion)
+                                lastRegion->next=currentRegion;
+                            if(!regions)
+                                regions=currentRegion;
+                            lastRegion=currentRegion;
+                        }
+                    }
                     if(x>dirtyx_max)
                     {
                         dirtyx_max=x;
@@ -4539,28 +4873,102 @@ remote_paint_rect(KdScreenInfo *screen,
 
         pthread_mutex_unlock(&remoteVars.mainimg_mutex);
 
-
-//        EPHYR_DBG("DIRTY %d,%d - %d,%d", dirtyx_min, dirtyy_min, dirtyx_max, dirtyy_max);
-
-
         width=dirtyx_max-dirtyx_min+1;
         height=dirtyy_max-dirtyy_min+1;
+//         EPHYR_DBG("DIRTY %d:%d,  %dx%d---", dirtyx_min, dirtyy_min, width, height);
 //        int oldsize=size;
-        size=width*height*XSERVERBPP;
+        totalDirtySize=size=width*height*XSERVERBPP;
         if(width<=0 || height<=0||size<=0)
         {
-//            EPHYR_DBG("NO CHANGES DETECTED, NOT UPDATING");
+//             EPHYR_DBG("NO CHANGES DETECTED, NOT UPDATING");
             return;
         }
         dx=sx=dirtyx_min;
         dy=sy=dirtyy_min;
+//         remoteVars.sizeOfRects+=totalDirtySize;
 
 //        if(size!=oldsize)
 //        {
 //            EPHYR_DBG("new update rect dimensions: %dx%d", width, height);
 //        }
+/*
+#warning debug block
+        currentRegion=regions;
+        while(currentRegion)
+        {
+            totalSizeOfRegions+=(currentRegion->x2-currentRegion->x1 +1)*(currentRegion->y2-currentRegion->y1+1)*XSERVERBPP;
+            numOfRegs++;
+            currentRegion=currentRegion->next;
+        }
+//         EPHYR_DBG("---before union, regions: %d, total size %d", numOfRegs, totalSizeOfRegions);
+        totalSizeOfRegions=0;
+        numOfRegs=0;
 
-        add_frame(width, height, dx, dy, calculate_crc(width, height,dx,dy), size,0);
+//end of debug block
+*/
+        while(!allUnited)
+        {
+            currentRegion=regions;
+            allUnited=TRUE;
+            while(currentRegion)
+            {
+                if(!currentRegion->united)
+                {
+                    if(unitePaintRegions(currentRegion))
+                    {
+                        allUnited=FALSE;
+                    }
+                }
+                currentRegion=currentRegion->next;
+            }
+        }
+        currentRegion=regions;
+        while(currentRegion)
+        {
+            if(!currentRegion->united)
+            {
+                totalSizeOfRegions+=(currentRegion->x2-currentRegion->x1 +1)*(currentRegion->y2-currentRegion->y1+1)*XSERVERBPP;
+            }
+            currentRegion=currentRegion->next;
+        }
+        currentRegion=regions;
+        while(currentRegion)
+        {
+            if(!currentRegion->united)
+            {
+                reg_width=currentRegion->x2-currentRegion->x1 +1;
+                reg_height=currentRegion->y2-currentRegion->y1+1;
+                reg_size=reg_width*reg_height*XSERVERBPP;
+                numOfRegs++;
+                if(totalDirtySize-totalSizeOfRegions > 0)
+                {
+                    add_frame(reg_width, reg_height, currentRegion->x1, currentRegion->y1, calculate_crc(reg_width, reg_height, currentRegion->x1,currentRegion->y1), reg_size,0);
+                }
+                //             EPHYR_DBG("Region %d - %d:%d %dx%d", numOfRegs, currentRegion->x1, currentRegion->y1, reg_width, reg_height);
+            }
+            regions=currentRegion;
+            currentRegion=currentRegion->next;
+            free(regions);
+        }
+
+//         EPHYR_DBG("---after union, regions: %d, total size %d", numOfRegs, totalSizeOfRegions);
+        /*if(totalDirtySize-totalSizeOfRegions > 0)
+        {
+            remoteVars.sizeOfRegions+=totalSizeOfRegions;
+            EPHYR_DBG("rects %lu, regs %lu, transferred %d%%", remoteVars.sizeOfRects, remoteVars.sizeOfRegions,
+                      (int)((((double)remoteVars.sizeOfRegions) / ((double)remoteVars.sizeOfRects))*100)) ;
+            //EPHYR_DBG("regions: %d dirty size=%d, total reg size=%d, diff=%d ",numOfRegs, totalDirtySize, totalSizeOfRegions, totalDirtySize-totalSizeOfRegions);
+        }*/
+
+        if(totalDirtySize-totalSizeOfRegions <= 0)
+        {
+            /*if(totalDirtySize-totalSizeOfRegions < 0)
+            {
+                EPHYR_DBG("TOTAL SIZE of regions worse than dirty rect %d %d",totalDirtySize, totalSizeOfRegions);
+            }
+            remoteVars.sizeOfRegions+=totalDirtySize;*/
+            add_frame(width, height, dx, dy, calculate_crc(width, height,dx,dy), size,0);
+        }
     }
 }
 
@@ -4723,10 +5131,6 @@ void rebuild_caches(void)
 {
     EPHYR_DBG("CLIENT REQUESTED CLEARING ALL CACHES AND QUEUES");
     pthread_mutex_lock(&remoteVars.sendqueue_mutex);
-    clear_send_queue();
-    clear_frame_cache(0);
-    freeCursors();
-    delete_all_windows();
     remoteVars.cache_rebuilt=TRUE;
     pthread_cond_signal(&remoteVars.have_sendqueue_cond);
     pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
@@ -4803,4 +5207,628 @@ void send_dirty_region(int index)
     sendMainImageFromSendThread(width, height, x, y, winId);
     remoteVars.compression=compression;
     pthread_mutex_lock(&remoteVars.sendqueue_mutex);
+}
+
+//split packet to datagrams and send it
+int send_packet_as_datagrams(unsigned char* data, uint32_t length, uint8_t dgType)
+{
+    /*split to datagrams, reserve header space for each dgram, set sequence number for each dgram ,set correct flag FOR EACH DGRAM and send all datagrams*/
+
+    uint16_t* seqNumber;
+    uint16_t dgSeqNumber=0;
+    uint16_t dgInPack;
+    uint32_t sent_bytes=0;
+    uint16_t dgram_length;
+    unsigned char* dgram;
+    uint32_t checksum;
+    int writeRes;
+    uint16_t syncPackSeq=0;
+    pthread_mutex_lock(&remoteVars.server_dgram_mutex);
+
+    dgInPack=length/(UDPDGRAMSIZE-SRVDGRAMHEADERSIZE);
+    if(length%(UDPDGRAMSIZE-SRVDGRAMHEADERSIZE))
+        ++dgInPack;
+
+//     EPHYR_DBG("Sending DG packet of %d bytes",length);
+    //setting sequence number
+    switch(dgType)
+    {
+        case ServerControlPacket:
+            seqNumber=&remoteVars.controlPacketSeq;
+            break;
+        case ServerFramePacket:
+            seqNumber=&remoteVars.framePacketSeq;
+            break;
+        case ServerRepaintPacket:
+            seqNumber=&remoteVars.repaintPacketSeq;
+            break;
+        default:
+            //always 0 for sync packets
+            seqNumber=&syncPackSeq;
+            break;
+    }
+    //         EPHYR_DBG("Seq number: %d", *seqNumber);
+    while(sent_bytes<length)
+    {
+        if((length-sent_bytes)+SRVDGRAMHEADERSIZE <= UDPDGRAMSIZE)
+        {
+            dgram_length=(length-sent_bytes)+SRVDGRAMHEADERSIZE;
+        }
+        else
+        {
+            dgram_length=UDPDGRAMSIZE;
+        }
+
+        dgram=malloc(dgram_length);
+        memset(dgram,0,SRVDGRAMHEADERSIZE);
+        *((uint16_t*)dgram+2)=(*seqNumber);
+        *((uint16_t*)dgram+3)=dgInPack;
+        *((uint16_t*)dgram+4)=dgSeqNumber++;
+        *((uint8_t*)dgram+10)=dgType;
+        memcpy(dgram+SRVDGRAMHEADERSIZE, data+sent_bytes, dgram_length-SRVDGRAMHEADERSIZE);
+
+        checksum=crc32(0L, Z_NULL, 0);
+        checksum=crc32(checksum,dgram,dgram_length);
+        //setting checksum
+        *((uint32_t*)dgram)=checksum;
+        writeRes=write(remoteVars.clientsock, dgram, dgram_length);
+        if(writeRes!=(int)dgram_length)
+        {
+//             EPHYR_DBG("Warning, sending packet failed. Sent %d bytes instead of %d",writeRes,dgram_length);
+        }
+        sent_bytes+=(dgram_length-SRVDGRAMHEADERSIZE);
+        switch(dgType)
+        {
+            case ServerControlPacket:
+            {
+                //add dgram to list
+                add_dgram_to_list(dgram, dgram_length, &remoteVars.server_control_datagrams);
+                break;
+            }
+            default:
+                free(dgram);
+        }
+    }
+    (*seqNumber)++;
+    pthread_mutex_unlock(&remoteVars.server_dgram_mutex);
+    return sent_bytes;
+}
+//add dgram to list
+void
+add_dgram_to_list(unsigned char*  dgram, uint16_t length, struct dgram_element** dg_list)
+{
+    //dgram mutex is locked on this point
+    struct dgram_element* dg=malloc(sizeof(struct dgram_element));
+    struct dgram_element* current;
+    dg->length=length;
+    dg->data=dgram;
+    dg->next=NULL;
+    if(*dg_list)
+    {
+        current=*dg_list;
+        while(current->next)
+        {
+            current=current->next;
+        }
+        current->next=dg;
+    }
+    else
+    {
+        *dg_list=dg;
+    }
+}
+
+//remove datagrams from list
+// if !remove_all, stop after removing packet with seq==last_pack_seq
+void
+remove_dgram_from_list(struct dgram_element** dg_list, uint16_t last_pack_seq, BOOL remove_all)
+{
+
+    //dgram mutex should be locked on this point!!!
+    struct dgram_element *current, *next, *prev=NULL;
+    uint16_t current_seq;
+    int32_t current_seq_long;
+    int32_t last_pack_seq_long;
+
+    current=*dg_list;
+    while(current)
+    {
+        current_seq= *((uint16_t*)(current->data)+2);
+        current_seq_long=current_seq;
+        last_pack_seq_long=last_pack_seq;
+        //this is for the case when the seq is going over the max of the uint16
+        if(abs(current_seq_long-last_pack_seq_long)>64535 && (current_seq_long<1000) )
+        {
+            current_seq_long+=65536;
+        }
+        if(abs(current_seq_long-last_pack_seq_long)>64535 && (last_pack_seq_long<1000) )
+        {
+            last_pack_seq_long+=65536;
+        }
+
+        if(remove_all || (current_seq_long <= last_pack_seq_long))
+        {
+            next=current->next;
+            if(prev)
+                prev->next=next;
+            if(*dg_list==current)
+                *dg_list=next;
+            free(current->data);
+            free(current);
+            current=next;
+        }
+        else
+        {
+            prev=current;
+            current=current->next;
+        }
+    }
+}
+
+void
+resend_dgram(uint8_t dgType, uint16_t packSeq, uint16_t dgSeq)
+{
+    uint16_t dgram_length;
+    unsigned char* dgram=NULL;
+    int write_res;
+    struct dgram_element *list, *cur;
+    switch (dgType)
+    {
+        case ServerControlPacket:
+            list=remoteVars.server_control_datagrams;
+            break;
+        default:
+            EPHYR_DBG("Requested resending dgram of unsupported type %d", dgType);
+            send_sync_failed_notification();
+            return;
+    }
+    pthread_mutex_lock(&remoteVars.server_dgram_mutex);
+    cur=list;
+    while(cur)
+    {
+        if((*((uint16_t*)cur->data+2)==packSeq) && (*((uint16_t*)cur->data+4)==dgSeq))
+        {
+            break;
+        }
+        cur=cur->next;
+    }
+    if(!cur)
+    {
+        EPHYR_DBG("WARNING! requested datagram of type %d with packet sequense %d and dg sequence %d not found in list", dgType, packSeq, dgSeq);
+    }
+    else
+    {
+        dgram_length=cur->length;
+        dgram=malloc(cur->length);
+        memcpy(dgram, cur->data, dgram_length);
+    }
+    pthread_mutex_unlock(&remoteVars.server_dgram_mutex);
+    if(!dgram)
+    {
+        send_sync_failed_notification();
+        return;
+    }
+    write_res=write(remoteVars.clientsock, dgram, dgram_length);
+    if(write_res!=(int)dgram_length)
+    {
+        EPHYR_DBG("Warning, sending packet failed. Sent %d bytes instead of %d",write_res,dgram_length);
+    }
+    free(dgram);
+}
+
+void
+resend_dgram_packet(uint8_t dgType, uint16_t packSeq)
+{
+    uint16_t dg_in_pack=0;
+    uint16_t i;
+    struct dgram_element *list, *cur;
+    switch (dgType)
+    {
+        case ServerControlPacket:
+            list=remoteVars.server_control_datagrams;
+            break;
+        default:
+            EPHYR_DBG("Requested resending dgram of unsupported type %d", dgType);
+            send_sync_failed_notification();
+            return;
+    }
+    pthread_mutex_lock(&remoteVars.server_dgram_mutex);
+    cur=list;
+    while(cur)
+    {
+        if(*((uint16_t*)cur->data+2)==packSeq)
+        {
+            break;
+        }
+        cur=cur->next;
+    }
+    if(!cur)
+    {
+        EPHYR_DBG("WARNING! requested packet of type %d with packet sequense %d not found in list", dgType, packSeq);
+        pthread_mutex_unlock(&remoteVars.server_dgram_mutex);
+        send_sync_failed_notification();
+        return;
+    }
+    else
+    {
+        dg_in_pack=*((uint16_t*)cur->data+3);
+    }
+    pthread_mutex_unlock(&remoteVars.server_dgram_mutex);
+    EPHYR_DBG("resending packet of type %d with sequence %d and number of packets %d", dgType, packSeq, dg_in_pack);
+    for(i=0;i<dg_in_pack;++i)
+        resend_dgram(dgType, packSeq, i);
+}
+
+unsigned int
+checkClientAlive(OsTimerPtr timer, CARD32 time_card, void* args)
+{
+    time_t time_diff;
+    pthread_mutex_lock(&remoteVars.sendqueue_mutex);
+    time_diff=time(NULL)-remoteVars.last_client_keepalive_time;
+    pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+
+    if(time_diff>=CLIENTALIVE_TIMEOUT/1000)
+    {
+        EPHYR_DBG("no data from client since %d seconds, diconnecting...", (int)time_diff);
+        disconnect_client();
+        return 0;
+    }
+    return CLIENTALIVE_TIMEOUT;
+}
+
+unsigned int sendServerAlive(OsTimerPtr timer, CARD32 time_card, void* args)
+{
+    unsigned char buffer[56] = {0};
+    _X_UNUSED int l;
+
+    *((uint32_t*)buffer)=SRVKEEPALIVE; //4B
+    if(remoteVars.serverType==TCP)
+    {
+        l=write(remoteVars.clientsock,buffer,56);
+    }
+    else
+    {
+        //send also synchronization data
+        pthread_mutex_lock(&remoteVars.client_dgram_mutex);
+        *((uint16_t*)buffer+2)=remoteVars.clientEventSeq;
+        pthread_mutex_unlock(&remoteVars.client_dgram_mutex);
+        l=send_packet_as_datagrams(buffer, 6, ServerSyncPacket);
+    }
+    return SERVERALIVE_TIMEOUT;
+}
+
+void
+send_srv_disconnect(void)
+{
+        unsigned char buffer[56] = {0};
+    _X_UNUSED int l;
+
+    if(remoteVars.client_version<3)
+        return;
+    *((uint32_t*)buffer)=SRVDISCONNECT; //4B
+    if(remoteVars.serverType==TCP)
+    {
+        l=write(remoteVars.clientsock,buffer,56);
+    }
+    else
+    {
+        l=send_packet_as_datagrams(buffer, 4, ServerSyncPacket);
+    }
+}
+
+void
+send_sync_failed_notification(void)
+{
+    unsigned char buffer[56] = {0};
+    //only using with UDP connections
+    if(remoteVars.serverType==TCP)
+    {
+        return;
+    }
+
+    *((uint32_t*)buffer)=SRVSYNCFAILED; //4B
+    send_packet_as_datagrams(buffer, 4, ServerControlPacket);
+}
+
+void
+clean_everything(void)
+{
+    //sendqueue_mutex is locked
+    clear_send_queue();
+    clear_frame_cache(0);
+    freeCursors();
+    clear_output_selection();
+    delete_all_windows();
+    pthread_mutex_lock(&remoteVars.server_dgram_mutex);
+    remove_dgram_from_list(&remoteVars.server_control_datagrams, 0, TRUE);
+    remoteVars.framePacketSeq=remoteVars.controlPacketSeq=remoteVars.repaintPacketSeq=0;
+    pthread_mutex_unlock(&remoteVars.server_dgram_mutex);
+    pthread_mutex_lock(&remoteVars.client_dgram_mutex);
+    remove_dgram_from_list(&remoteVars.client_event_datagrams, 0, TRUE);
+    remove_resend_request(0, TRUE);
+    remoteVars.clientEventSeq=0-1;
+    pthread_mutex_unlock(&remoteVars.client_dgram_mutex);
+}
+
+struct dgram_element* find_dgram_in_list(struct dgram_element** dg_list, uint16_t pack_seq)
+{
+    //dgram mutex should be locked on this point!!!
+    struct dgram_element *current;
+    uint16_t current_seq;
+    current=*dg_list;
+    while(current)
+    {
+        current_seq= *((uint16_t*)(current->data)+2);
+        if(current_seq==pack_seq)
+            break;
+        current=current->next;
+    }
+    return current;
+}
+
+void
+remote_check_event_packet_integrity(uint16_t seq_to_process)
+{
+    struct dgram_element* dgram;
+    unsigned char* dgram_data;
+    uint16_t current_seq;
+    uint16_t dgram_length;
+    struct timeval tv;
+    time_t curmsec;
+    BOOL have_missing=FALSE;
+    uint16_t *packets_process, *packets_missing;
+    int process_len=0, missing_len=0, i;
+    int max_len;
+    struct dgram_request_element *req;
+    unsigned char buffer[6];//4B EVENT and 2B missing seq;
+
+    gettimeofday(&tv, NULL);
+    curmsec=tv.tv_sec*1000+tv.tv_usec/1000;
+
+    pthread_mutex_lock(&remoteVars.client_dgram_mutex);
+    current_seq=remoteVars.clientEventSeq+1;
+    //went over max of uint16_t
+    if(current_seq>seq_to_process)
+        max_len=((int)seq_to_process+65536)-current_seq+1;
+    else
+        max_len=seq_to_process-current_seq+1;
+    packets_process=malloc(sizeof(uint16_t)*max_len);
+    packets_missing=malloc(sizeof(uint16_t)*max_len);
+
+    while(1)
+    {
+        dgram=find_dgram_in_list(&remoteVars.client_event_datagrams, current_seq);
+        if(!dgram)
+        {
+            have_missing=TRUE;
+            req=find_resend_request(current_seq);
+            if(!req)
+            {
+                //create new request
+                req=malloc(sizeof(struct dgram_request_element));
+                req->next=NULL;
+                req->seq=current_seq;
+                req->msec=curmsec;
+                if(remoteVars.cl_event_resend_request_last)
+                {
+                    remoteVars.cl_event_resend_request_last->next=req;
+                }
+                remoteVars.cl_event_resend_request_last=req;
+                if(!remoteVars.cl_event_resend_request_first)
+                {
+                    remoteVars.cl_event_resend_request_first=req;
+                }
+                packets_missing[missing_len++]=current_seq;
+                EPHYR_DBG("Missing event datagram %d",current_seq);
+            }
+            else
+            {
+                //already requested this dgram;
+                if(curmsec > req->msec + 200)
+                {//200 msec ellapsed since we requested it, requesting again
+                    packets_missing[missing_len++]=current_seq;
+                    req->msec=curmsec;
+                    EPHYR_DBG("Still missing event datagram %d, requesting again",current_seq);
+                }
+            }
+        }
+        else
+        {
+            if(!have_missing)
+            {
+                //till now all packets are ok
+                remoteVars.clientEventSeq=packets_process[process_len++]=current_seq;
+            }
+        }
+        if(current_seq==seq_to_process)
+            break;
+        ++current_seq;
+    }
+    pthread_mutex_unlock(&remoteVars.client_dgram_mutex);
+
+    //process events
+    for(i=0;i<process_len;++i)
+    {
+        pthread_mutex_lock(&remoteVars.client_dgram_mutex);
+        dgram_data=NULL;
+
+        dgram=find_dgram_in_list(&remoteVars.client_event_datagrams, packets_process[i]);
+        if(dgram)
+        {
+            dgram_data=malloc(dgram->length);
+            dgram_length=dgram->length;
+            memcpy(dgram_data, dgram->data, dgram->length);
+        }
+        remove_dgram_from_list(&remoteVars.client_event_datagrams, packets_process[i], FALSE);
+        pthread_mutex_unlock(&remoteVars.client_dgram_mutex);
+        if(dgram_data)
+        {
+            remote_process_client_event((char*)dgram_data+CLDGRAMHEADERSIZE, dgram_length-CLDGRAMHEADERSIZE);
+            free(dgram_data);
+        }
+    }
+
+    *((uint32_t*)buffer)=RESENDEVENTS; //4B
+    //request resend missing events
+    for(i=0;i<missing_len;++i)
+    {
+        *((uint16_t*)buffer+2)=packets_missing[i];
+        send_packet_as_datagrams(buffer, 6, ServerSyncPacket);
+    }
+    free(packets_missing);
+    free(packets_process);
+}
+
+void
+remote_recv_dgram(void)
+{
+    char buffer[UDPDGRAMSIZE];
+    uint32_t crc, checksum;
+    uint16_t seq;
+    uint8_t dgType;
+    int32_t current_long;
+    int32_t last_long;
+    unsigned char* dgram;
+
+
+    int length=read(remoteVars.clientsock,buffer, UDPDGRAMSIZE);
+//     EPHYR_DBG("Read datagram with size %d",length);
+    if(length<=CLDGRAMHEADERSIZE)
+    {
+//         EPHYR_DBG("Error reading datagram, the size is smaller than a header size: %d", length);
+        return;
+    }
+    checksum=*((uint32_t*)buffer);
+    memset(buffer, 0, 4);
+    crc=crc32(0L, Z_NULL, 0);
+    crc=crc32(crc,(unsigned char*)buffer,length);
+    if(crc!=checksum)
+    {
+        EPHYR_DBG("checksum failed %d instead of %d",crc,checksum);
+        return;
+    }
+    seq=*((uint16_t*)buffer+2);
+    dgType=*((uint8_t*)buffer+6);
+
+    switch(dgType)
+    {
+        case ClientEventPacket:
+//             EPHYR_DBG("Client event DG %d",seq);
+            break;
+        default:
+            //Sync packets should be procesed immeidately
+            remote_process_client_event(buffer+CLDGRAMHEADERSIZE, length-CLDGRAMHEADERSIZE);
+            return;
+    }
+    current_long=seq;
+    pthread_mutex_lock(&remoteVars.client_dgram_mutex);
+    last_long=remoteVars.clientEventSeq;
+    if(abs(current_long-last_long)>64535 && (current_long<1000) )
+    {
+        current_long+=65536;
+    }
+
+    if(abs(current_long-last_long)>64535 && (last_long<1000) )
+    {
+        last_long+=65536;
+    }
+
+    if(current_long<=last_long)
+    {
+        EPHYR_DBG("Late client event sequence arrived: %d, last processed: %d", seq, remoteVars.clientEventSeq);
+        pthread_mutex_unlock(&remoteVars.client_dgram_mutex);
+        return;
+    }
+    dgram=malloc(length);
+    memcpy(dgram,buffer,length);
+    add_dgram_to_list(dgram, length, &remoteVars.client_event_datagrams);
+    //if it's resendet dgram, remove request
+    remove_resend_request(seq, FALSE);
+    pthread_mutex_unlock(&remoteVars.client_dgram_mutex);
+    remote_check_event_packet_integrity(seq);
+}
+
+struct dgram_request_element*
+find_resend_request(uint16_t seq)
+{
+    struct dgram_request_element* cur=remoteVars.cl_event_resend_request_first;
+    while(cur)
+    {
+        if(cur->seq==seq)
+            return cur;
+        cur=cur->next;
+    }
+    return NULL;
+}
+
+void
+remove_resend_request(uint16_t seq, BOOL all)
+{
+    struct dgram_request_element* cur=remoteVars.cl_event_resend_request_first;
+    struct dgram_request_element *next, *prev=NULL;
+    while(cur)
+    {
+        next=cur->next;
+        if(all)
+        {
+            free(cur);
+        }
+        else
+        {
+            if(cur->seq==seq)
+            {
+                if(prev)
+                {
+                    prev->next=next;
+                }
+                if(cur==remoteVars.cl_event_resend_request_first)
+                {
+                    remoteVars.cl_event_resend_request_first=next;
+                }
+                if(cur==remoteVars.cl_event_resend_request_last)
+                {
+                    remoteVars.cl_event_resend_request_last=prev;
+                }
+                free(cur);
+            }
+            else
+            {
+                prev=cur;
+            }
+
+        }
+        cur=next;
+    }
+    if(all)
+    {
+        remoteVars.cl_event_resend_request_first=remoteVars.cl_event_resend_request_last=NULL;
+    }
+}
+
+void
+resend_frame(uint32_t crc)
+{
+
+    unsigned char* data;
+    unsigned char* packet;
+    uint32_t size;
+    struct cache_elem* frame=find_cache_element(crc);
+    EPHYR_DBG("Client asks to resend frame from cash with crc %x",crc);
+    if(remoteVars.serverType==TCP)
+        return;
+    pthread_mutex_lock(&remoteVars.sendqueue_mutex);
+    if(! frame)
+    {
+        EPHYR_DBG("requested frame not found in cache");
+        pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+        return;
+    }
+    data=image_compress(frame->width, frame->height, frame->data, &(size), CACHEBPP, 0l);
+    pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+    packet=malloc(size+8);
+    *((uint32_t*)packet)=CACHEFRAME;
+    *((uint32_t*)packet+1)=crc;
+    memcpy(packet+8, data, size);
+    free(data);
+    send_packet_as_datagrams(packet,size+8,ServerFramePacket);
 }

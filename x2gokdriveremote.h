@@ -100,15 +100,26 @@
 //Changes 4 - 5: support for CACHEREBUILD event
 //Changes 5 - 6: support for rootless mode
 //Changes 6 - 7: Sending KEYRELEASE immediately after KEYPRESS to avoid the "key sticking"
+//Changes 7 - 8: support for UDP sockets
 
-#define FEATURE_VERSION 7
+#define FEATURE_VERSION 8
 
 #define MAXMSGSIZE 1024*16
+
+//max size for UDP dgram 1200 (experimental value for VPN, maybe we should determine the MTU size later)
+#define UDPDGRAMSIZE 1200
+
+//UDP Server DGRAM Header - 4B checksum + 2B packet seq number + 2B amount of datagrams + 2B datagram seq number + 1B type
+#define SRVDGRAMHEADERSIZE (4+2+2+2+1)
+//UDP Client DGRAM Header - 4B checksum + 2B packet seq number + 1B type
+#define CLDGRAMHEADERSIZE (4+2+1)
 
 //port to listen by default
 #define DEFAULT_PORT 15000
 
 #define ACCEPT_TIMEOUT 30000 //msec
+#define CLIENTALIVE_TIMEOUT 30000 //msec
+#define SERVERALIVE_TIMEOUT 5000 //msec
 
 //if true, will save compressed jpg in file
 #define JPGDEBUG FALSE
@@ -121,7 +132,7 @@
 //always 4
 #define XSERVERBPP 4
 
-enum msg_type{FRAME,DELETED, CURSOR, DELETEDCURSOR, SELECTION, SERVERVERSION, DEMANDCLIENTSELECTION, REINIT, WINUPDATE};
+enum msg_type{FRAME,DELETED, CURSOR, DELETEDCURSOR, SELECTION, SERVERVERSION, DEMANDCLIENTSELECTION, REINIT, WINUPDATE, SRVKEEPALIVE, SRVDISCONNECT, SRVSYNCFAILED, RESENDEVENTS, CACHEFRAME};
 enum AgentState{STARTING, RUNNING, RESUMING, SUSPENDING, SUSPENDED, TERMINATING, TERMINATED};
 enum Compressions{JPEG,PNG};
 enum SelectionType{PRIMARY,CLIPBOARD};
@@ -135,6 +146,22 @@ enum WinType{WINDOW_TYPE_DESKTOP, WINDOW_TYPE_DOCK, WINDOW_TYPE_TOOLBAR, WINDOW_
 
 //new state requested by WINCHANGE event
 enum WinState{WIN_UNCHANGED, WIN_DELETED, WIN_ICONIFIED};
+
+//which type of server socket to use
+enum ServerType{TCP, UDP};
+
+//UDP datagrams types
+enum ServerDgramTypes{
+    ServerFramePacket, //dgram belongs to packet representing frame
+    ServerControlPacket, //dgram belongs to packet which couldn't be missed, but doesn't need to be processed in the real time
+    ServerRepaintPacket, // dgram belongs to packet with screen repaint and the loss can be ignored
+    ServerSyncPacket //dgram belongs to packet with sync request
+};
+
+enum ClientDgramType{
+    ClientEventPacket, //Event packet, high priority
+    ClientSyncPacket //Packet with synchronization data
+};
 
 //Size of 1 window update (new or changed window) = 4xwinId + type of update + 7 coordinates + visibility + type of window + size of name buffer + icon_size
 #define WINUPDSIZE 4*sizeof(uint32_t) + sizeof(int8_t) + 7*sizeof(int16_t) + sizeof(int8_t) + sizeof(int8_t) + sizeof(int16_t) + sizeof(int32_t)
@@ -166,6 +193,15 @@ enum WinState{WIN_UNCHANGED, WIN_DELETED, WIN_ICONIFIED};
 #define KEEPALIVE 12
 #define CACHEREBUILD 13
 #define WINCHANGE 14
+//resend missing server control dgrams
+#define RESENDSCONTROL 15
+//client is going to disconnect
+#define DISCONNECTCLIENT 16
+//synchronization with client has failed
+#define CLIENTSYNCFAILED 17
+//ask to resend particular frame
+#define RESENDFRAME 18
+
 
 #define EVLENGTH 41
 
@@ -174,6 +210,17 @@ enum WinState{WIN_UNCHANGED, WIN_DELETED, WIN_ICONIFIED};
 
 //height of screen region
 #define SCREEN_REG_HEIGHT 40
+
+//the distance to determinate if the point belongs to region
+#define MAXDISTANCETOREGION 40
+//regions to split the paint rectangle
+struct PaintRectRegion
+{
+    int x1, x2, y1, y2;
+    struct PaintRectRegion* next;
+    BOOL united;
+};
+
 
 //represents the screen regions for updates
 typedef struct
@@ -212,6 +259,23 @@ struct frame_region
     uint32_t source_crc;
     point_t source_coordinates;
 };
+
+//elemnet of the dgram list
+struct dgram_element
+{
+    unsigned char* data;
+    uint16_t length;
+    struct dgram_element* next;
+};
+
+//resend void request_selection_from_client(enum SelectionType selection)
+struct dgram_request_element
+{
+    uint16_t seq;
+    time_t msec;
+    struct dgram_request_element* next;
+};
+
 
 
 //we can find out cursor type by analyzing size of data.
@@ -395,7 +459,7 @@ struct remoteWindow
 struct _remoteHostVars
 {
     unsigned char compression;
-    OsTimerPtr checkConnectionTimer;
+    OsTimerPtr checkConnectionTimer, checkKeepAliveTimer, sendKeepAliveTimer;
     int agentState;
     BOOL nxagentMode;
     char optionsFile[256];
@@ -415,6 +479,12 @@ struct _remoteHostVars
 
     unsigned long send_thread_id;
 
+    enum ServerType serverType;
+    uint16_t framePacketSeq;
+    uint16_t controlPacketSeq;
+    uint16_t repaintPacketSeq;
+    uint16_t clientEventSeq;
+
     //client information
     enum OS_VERSION client_os;
     uint16_t client_version;
@@ -432,8 +502,9 @@ struct _remoteHostVars
     KdScreenInfo* ephyrScreen;
     uint32_t main_img_height, main_img_width;
 
-//    #warning remove this hack
-    int numofimg;
+/*#warning for debug purposes
+    uint64_t sizeOfRects;
+    uint64_t sizeOfRegions;*/
 
     int clientsock, serversock;
     BOOL rootless;
@@ -441,7 +512,6 @@ struct _remoteHostVars
     //array of screen regions
     screen_region* screen_regions;
     int reg_horiz, reg_vert;
-
 
     struct cache_elem* first_cache_element;
     struct cache_elem* last_cache_element;
@@ -469,10 +539,18 @@ struct _remoteHostVars
     struct sentCursor* sentCursorsHead;
     struct sentCursor* sentCursorsTail;
 
+    struct dgram_element* server_control_datagrams;
+    struct dgram_element* client_event_datagrams;
+    struct dgram_request_element *cl_event_resend_request_first, *cl_event_resend_request_last;
+
     struct remoteWindow* windowList;
     BOOL windowsUpdated;
 
     pthread_mutex_t sendqueue_mutex;
+    //mutex for server dgrams_synchronization
+    pthread_mutex_t server_dgram_mutex;
+    //mutex for client dgrams_synchronization
+    pthread_mutex_t client_dgram_mutex;
     pthread_mutex_t mainimg_mutex;
     pthread_cond_t have_sendqueue_cond;
 
@@ -481,6 +559,8 @@ struct _remoteHostVars
 
     BOOL client_connected;
     BOOL client_initialized;
+    //last time when client sent sync packet
+    time_t last_client_keepalive_time;
 
     //if all cache are cleared and notofictaion to client should be send
     BOOL cache_rebuilt;
@@ -488,8 +568,11 @@ struct _remoteHostVars
     struct SelectionStructure selstruct;
 } ;
 
-int send_selection_chunk(int sel, unsigned char* data, uint32_t length, uint32_t format, BOOL first, BOOL last, uint32_t compressed, uint32_t total);
+int send_selection_chunk(int sel, unsigned char* data, uint32_t length, uint32_t format, BOOL first, BOOL last, uint32_t compressed, uint32_t total_sz);
 int send_output_selection(struct OutputChunk* chunk);
+
+int send_packet_as_datagrams(unsigned char* data, uint32_t length, uint8_t dgType);
+void resend_dgrams(char* buffer, int length, uint8_t dgType);
 
 void set_client_version(uint16_t ver, uint16_t os);
 
@@ -575,6 +658,8 @@ void remote_set_jpeg_quality(const char* quality);
 const char*  remote_get_init_geometry(void);
 void remote_check_windowstree(WindowPtr root);
 void remote_check_window(WindowPtr win);
+BOOL remote_process_client_event(char* buff, int length);
+void remote_recv_dgram(void);
 struct remoteWindow* remote_find_window(WindowPtr win);
 WindowPtr remote_find_window_on_screen(WindowPtr win, WindowPtr root);
 WindowPtr remote_find_window_on_screen_by_id(uint32_t winId, WindowPtr root);
@@ -587,4 +672,22 @@ void remote_check_rootless_windows_for_updates(KdScreenInfo *screen);
 void markDirtyRegions(uint32_t x, uint32_t y, uint32_t width, uint32_t height, uint8_t jpegQuality, uint32_t winId);
 int getDirtyScreenRegion(void);
 void send_dirty_region(int index);
+void add_dgram_to_list(unsigned char*  dgram, uint16_t length, struct dgram_element** dg_list);
+void remove_dgram_from_list(struct dgram_element** dg_list, uint16_t last_pack_seq, BOOL remove_all);
+void resend_dgram(uint8_t dgType, uint16_t packSeq, uint16_t dgSeq);
+void resend_dgram_packet(uint8_t dgType, uint16_t packSeq);
+unsigned int checkClientAlive(OsTimerPtr timer, CARD32 time_card, void* args);
+unsigned int sendServerAlive(OsTimerPtr timer, CARD32 time_card, void* args);
+void send_srv_disconnect(void);
+BOOL insideOfRegion(struct PaintRectRegion* reg, int x , int y);
+struct PaintRectRegion* findRegionForPoint(struct PaintRectRegion* firstRegion, int x , int y);
+BOOL unitePaintRegions(struct PaintRectRegion* firstRegion);
+void send_sync_failed_notification(void);
+//perform cleanup of all caches and queues when disconnecting or performing reinitialization
+void clean_everything(void);
+void remote_check_event_packet_integrity(uint16_t seq_to_process);
+struct dgram_element* find_dgram_in_list(struct dgram_element** dg_list, uint16_t pack_seq);
+struct dgram_request_element* find_resend_request(uint16_t seq);
+void remove_resend_request(uint16_t seq, BOOL all);
+void resend_frame(uint32_t crc);
 #endif /* X2GOKDRIVE_REMOTE_H */
