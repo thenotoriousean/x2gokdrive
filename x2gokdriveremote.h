@@ -212,7 +212,7 @@ enum ClientDgramType{
 #define SCREEN_REG_HEIGHT 40
 
 //the distance to determinate if the point belongs to region
-#define MAXDISTANCETOREGION 40
+#define MAXDISTANCETOREGION 20
 //regions to split the paint rectangle
 struct PaintRectRegion
 {

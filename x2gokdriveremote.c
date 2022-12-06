@@ -4750,12 +4750,16 @@ remote_paint_rect(KdScreenInfo *screen,
     struct PaintRectRegion *regions=NULL;
     struct PaintRectRegion *currentRegion=NULL;
     struct PaintRectRegion *lastRegion=NULL;
+    BOOL noRegions=FALSE;
     uint32_t reg_size;
     int reg_width, reg_height;
     int numOfRegs=0;
     int totalSizeOfRegions=0;
     int totalDirtySize=0;
     BOOL allUnited=FALSE;
+    int centerx, centery;
+    int xinc, yinc, firstquatx, lastquatx, firstqauty, lastquaty;
+    int quarter;
 
 
     if(remoteVars.rootless)
@@ -4791,7 +4795,8 @@ remote_paint_rect(KdScreenInfo *screen,
         maxdiff=2;
         mindiff=-2;
 
-        /* check if updated rec really is as big */
+        /* determine actual dimensions of the region which is updated */
+//         int dirty_pix=0;
         for(int32_t y=dy; y< dy+height;++y)
         {
             uint32_t ind=(y*remoteVars.main_img_width+dx)*XSERVERBPP;
@@ -4800,11 +4805,6 @@ remote_paint_rect(KdScreenInfo *screen,
                 BOOL pixIsDirty=FALSE;
                 //CHECK R-COMPONENT
                 int16_t diff=remoteVars.main_img[ind]-remoteVars.second_buffer[ind];
-
-//              if(x > 250 && x<255 && y >5 && y< 7)
-//              {
-//                  EPHYR_DBG("rdiff %d - %u %u ", diff, remoteVars.main_img[ind],remoteVars.second_buffer[ind]);
-//              }
                 if(diff>maxdiff || diff< mindiff)
                 {
                     pixIsDirty=TRUE;
@@ -4829,25 +4829,7 @@ remote_paint_rect(KdScreenInfo *screen,
                 }
                 if(pixIsDirty)
                 {
-                    if(!insideOfRegion(currentRegion,x,y))
-                    {
-                        //point is not inside of current region, find the region, point belongs to
-                        currentRegion=findRegionForPoint(regions, x, y);
-                        if(!currentRegion)
-                        {
-                            //creating new region and add it to the end of the list
-                            currentRegion=malloc(sizeof(struct PaintRectRegion));
-                            currentRegion->next=NULL;
-                            currentRegion->united=FALSE;
-                            currentRegion->x1=currentRegion->x2=x;
-                            currentRegion->y1=currentRegion->y2=y;
-                            if(lastRegion)
-                                lastRegion->next=currentRegion;
-                            if(!regions)
-                                regions=currentRegion;
-                            lastRegion=currentRegion;
-                        }
-                    }
+//                     dirty_pix++;
                     if(x>dirtyx_max)
                     {
                         dirtyx_max=x;
@@ -4864,25 +4846,127 @@ remote_paint_rect(KdScreenInfo *screen,
                     {
                         dirtyy_min=y;
                     }
-                    //copy only RGB part (A always same)
+                    //copy only RGB part, use A part to mark the pixel dirty or clean
                     memcpy(remoteVars.second_buffer+ind, remoteVars.main_img+ind,3);
+                    remoteVars.main_img[ind+3]=255;//will mark the pixel as dirty for further process
                 }
+                else
+                    remoteVars.main_img[ind+3]=0;//will mark the pixel as clean for further process
                 ind+=XSERVERBPP;
+            }
+        }
+        width=dirtyx_max-dirtyx_min+1;
+        height=dirtyy_max-dirtyy_min+1;
+        totalDirtySize=size=width*height*XSERVERBPP;
+        if(width<=0 || height<=0||size<=0)//no changes, not doing anything
+        {
+//             EPHYR_DBG("NO CHANGES DETECTED, NOT UPDATING");
+            pthread_mutex_unlock(&remoteVars.mainimg_mutex);
+            return;
+        }
+//         EPHYR_DBG("DIRTY %dx%d - %dx%d total pix %d, dirty pix %d---", dirtyx_min, dirtyy_min, dirtyx_max, dirtyy_max, width*height, dirty_pix);
+
+        if(width<=4 || height<=4)
+        {
+            //rectangle is to small, don't try to split it
+            noRegions=TRUE;
+        }
+
+        /* check if we can transfer dirty pixels in the smaller region instead of sending all rectangle
+         * we are starting from the center of the region and going to it edges to better process
+         * the regions where dirty pixels are only on the edges, like windows, which are only changing
+         * the color of frame, but the content is remaing same
+         */
+
+        if(!noRegions)
+        {
+            centerx=dirtyx_min+width/2;
+            centery=dirtyy_min+height/2;
+
+            for(quarter=0;quarter<4;++quarter)
+            {
+                switch(quarter)
+                {
+                    case 0:
+                        firstquatx=centerx;
+                        firstqauty=centery;
+                        lastquatx=dirtyx_min;
+                        lastquaty=dirtyy_min;
+                        xinc=-1;
+                        yinc=-1;
+                        break;
+                    case 1:
+                        firstquatx=centerx+1;
+                        firstqauty=centery;
+                        lastquatx=dirtyx_max;
+                        lastquaty=dirtyy_min;
+                        xinc=1;
+                        yinc=-1;
+                        break;
+                    case 2:
+                        firstquatx=centerx;
+                        firstqauty=centery+1;
+                        lastquatx=dirtyx_min;
+                        lastquaty=dirtyy_max;
+                        xinc=-1;
+                        yinc=1;
+                        break;
+                    case 3:
+                        firstquatx=centerx+1;
+                        firstqauty=centery+1;
+                        lastquatx=dirtyx_max;
+                        lastquaty=dirtyy_max;
+                        xinc=1;
+                        yinc=1;
+                        break;
+                }
+//                 EPHYR_DBG("Process quarter %d - %dx%d -%dx%d", quarter, firstquatx, firstqauty, lastquatx, lastquaty);
+                for(int32_t y=firstqauty;; y+=yinc)
+                {
+                    for(int32_t x=firstquatx;; x+=xinc)
+                    {
+                        int32_t ind=(y*remoteVars.main_img_width+x)*XSERVERBPP;
+                        if(remoteVars.main_img[ind+3])//pixel is dirty
+                        {
+                            if(!insideOfRegion(currentRegion,x,y))
+                            {
+                                //point is not inside of current region, find the region, point belongs to
+                                currentRegion=findRegionForPoint(regions, x, y);
+                                if(!currentRegion)
+                                {
+                                    //creating new region and add it to the end of the list
+                                    currentRegion=malloc(sizeof(struct PaintRectRegion));
+                                    currentRegion->next=NULL;
+                                    currentRegion->united=FALSE;
+                                    currentRegion->x1=currentRegion->x2=x;
+                                    currentRegion->y1=currentRegion->y2=y;
+                                    if(lastRegion)
+                                        lastRegion->next=currentRegion;
+                                    if(!regions)
+                                        regions=currentRegion;
+                                    lastRegion=currentRegion;
+                                    //EPHYR_DBG("Creating new region for pix %dx%d",x,y);
+                                }
+/*                                else
+                                {
+                                    EPHYR_DBG("Dirty pix %dx%d from quarter belongs to existing region - %dx%d - %dx%d",x,y, currentRegion->x1, currentRegion->y1, currentRegion->x2, currentRegion->y2);
+                                }*/
+                            }
+/*                            else
+                            {
+                                //EPHYR_DBG("Dirty pix %dx%d belongs to current region - %dx%d - %dx%d",x,y, currentRegion->x1, currentRegion->y1, currentRegion->x2, currentRegion->y2);
+                            }*/
+                        }
+                        if(x==lastquatx)
+                            break;
+                    }
+                    if(y==lastquaty)
+                        break;
+                }
             }
         }
 
         pthread_mutex_unlock(&remoteVars.mainimg_mutex);
-
-        width=dirtyx_max-dirtyx_min+1;
-        height=dirtyy_max-dirtyy_min+1;
-//         EPHYR_DBG("DIRTY %d:%d,  %dx%d---", dirtyx_min, dirtyy_min, width, height);
-//        int oldsize=size;
-        totalDirtySize=size=width*height*XSERVERBPP;
-        if(width<=0 || height<=0||size<=0)
-        {
-//             EPHYR_DBG("NO CHANGES DETECTED, NOT UPDATING");
-            return;
-        }
         dx=sx=dirtyx_min;
         dy=sy=dirtyy_min;
 //         remoteVars.sizeOfRects+=totalDirtySize;
@@ -4891,11 +4975,13 @@ remote_paint_rect(KdScreenInfo *screen,
 //        {
 //            EPHYR_DBG("new update rect dimensions: %dx%d", width, height);
 //        }
-/*
+
 #warning debug block
         currentRegion=regions;
+//         int i=0;
         while(currentRegion)
         {
+//             EPHYR_DBG("Region %d %d:%d %dx%d",i++, currentRegion->x1,currentRegion->y1, (currentRegion->x2-currentRegion->x1),(currentRegion->y2-currentRegion->y1));
             totalSizeOfRegions+=(currentRegion->x2-currentRegion->x1 +1)*(currentRegion->y2-currentRegion->y1+1)*XSERVERBPP;
             numOfRegs++;
             currentRegion=currentRegion->next;
@@ -4905,7 +4991,7 @@ remote_paint_rect(KdScreenInfo *screen,
         numOfRegs=0;
 
 //end of debug block
-*/
+
         while(!allUnited)
         {
             currentRegion=regions;
@@ -4960,7 +5046,7 @@ remote_paint_rect(KdScreenInfo *screen,
             //EPHYR_DBG("regions: %d dirty size=%d, total reg size=%d, diff=%d ",numOfRegs, totalDirtySize, totalSizeOfRegions, totalDirtySize-totalSizeOfRegions);
         }*/
 
-        if(totalDirtySize-totalSizeOfRegions <= 0)
+        if(totalDirtySize-totalSizeOfRegions <= 0 || noRegions)
         {
             /*if(totalDirtySize-totalSizeOfRegions < 0)
             {
