@@ -815,6 +815,7 @@ int send_selection_chunk(int sel, unsigned char* data, uint32_t length, uint32_t
     int sent = 0;
     int total = 0;
     int hdr_sz=8*4;
+    uint32_t uncompressed_length=length;
 
     //if the data is compressed, send "compressed" amount of bytes
 //     EPHYR_DBG("sending chunk. total %d, chunk %d, compressed %d", total, length, compressed);
@@ -837,7 +838,7 @@ int send_selection_chunk(int sel, unsigned char* data, uint32_t length, uint32_t
     *((uint32_t*)buffer)=SELECTION;    //0
     *((uint32_t*)buffer+1)=sel;        //4
     *((uint32_t*)buffer+2)=format;     //8
-    *((uint32_t*)buffer+3)=length;     //16
+    *((uint32_t*)buffer+3)=uncompressed_length;     //16
     *((uint32_t*)buffer+4)=first;      //20
     *((uint32_t*)buffer+5)=last;       //24
     *((uint32_t*)buffer+6)=compressed; //28
@@ -3343,6 +3344,16 @@ void open_socket(void)
         EPHYR_DBG("Listen on port %d", remoteVars.listenPort);
         remoteVars.address.sin_port = htons (remoteVars.listenPort);
     }
+    if(!remoteVars.udpPort)
+    {
+        EPHYR_DBG("UDP port %d", DEFAULT_PORT+1);
+        remoteVars.udp_address.sin_port = htons (DEFAULT_PORT+1);
+    }
+    else
+    {
+        EPHYR_DBG("Listen on port %d", remoteVars.udpPort);
+        remoteVars.udp_address.sin_port = htons (remoteVars.udpPort);
+    }
     if (bind ( remoteVars.serversock,
         (struct sockaddr *) &remoteVars.address,
                sizeof (remoteVars.address)) != 0)
@@ -3472,6 +3483,11 @@ void processConfigFileSetting(char* key, char* value)
         sscanf(value, "%d",&remoteVars.listenPort);
         EPHYR_DBG("listen %d", remoteVars.listenPort);
     }
+    else if(!strcmp(key, "listen_udp"))
+    {
+        sscanf(value, "%d",&remoteVars.udpPort);
+        EPHYR_DBG("listen %d", remoteVars.udpPort);
+    }
     else if(!strcmp(key, "clipboard"))
     {
         if(!strcmp(value,"client"))
@@ -3562,7 +3578,7 @@ remote_init(void)
     EPHYR_DBG("JPEG quality is %d", remoteVars.initialJpegQuality);
     remoteVars.compression=DEFAULT_COMPRESSION;
 
-    remoteVars.selstruct.selectionMode = CLIP_NONE;
+    remoteVars.selstruct.selectionMode = CLIP_BOTH;
 #warning change this defaults values
     remoteVars.serverType=UDP;
 

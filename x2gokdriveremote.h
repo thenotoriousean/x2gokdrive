@@ -469,6 +469,7 @@ struct _remoteHostVars
     char displayName[256];
     char initGeometry[128];
     int listenPort;
+    int udpPort;
     int jpegQuality, initialJpegQuality;
     uint32_t framenum;
     uint32_t framenum_sent;
@@ -555,7 +556,7 @@ struct _remoteHostVars
     pthread_cond_t have_sendqueue_cond;
 
     socklen_t addrlen;
-    struct sockaddr_in address;
+    struct sockaddr_in address, udp_address;
 
     BOOL client_connected;
     BOOL client_initialized;

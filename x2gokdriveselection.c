@@ -767,7 +767,6 @@ void send_notify_to_client(xcb_atom_t selection, xcb_atom_t mime)
 {
     //creating the selection chunk with no data, which notifyes client that we have a selection
     struct OutputChunk* chunk= malloc(sizeof(struct OutputChunk));
-//     EPHYR_DBG("send selection notify to client");
 
 
     memset((void*)chunk,0,sizeof(struct OutputChunk));
