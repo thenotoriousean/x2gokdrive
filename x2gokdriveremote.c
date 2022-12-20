@@ -3077,25 +3077,6 @@ void serverAcceptNotify(int fd, int ready_sock, void *data)
         }
     }
 
-/*    if(remoteVars.serverType == UDPFRAMES)
-    {
-        ready = recvfrom(remoteVars.serversock, msg, length,  MSG_WAITALL,  (struct sockaddr *) &remoteVars.address, &remoteVars.addrlen);
-        EPHYR_DBG ("Connection from (%s)...\n", inet_ntoa (remoteVars.address.sin_addr));
-        remoteVars.clientsock=remoteVars.serversock;
-        ret=connect(remoteVars.clientsock, (struct sockaddr *) &remoteVars.address, remoteVars.addrlen);
-        if(ret)
-        {
-            EPHYR_DBG("Error, failed to connect to client socket: %s",gai_strerror(ret));
-            shutdown(remoteVars.clientsock, SHUT_RDWR);
-            close(remoteVars.clientsock);
-            return;
-        }
-        else
-        {
-            EPHYR_DBG("Connected to client UDP socket...");
-        }
-    }
-*/
     if(strlen(remoteVars.cookie))
     {
         EPHYR_DBG("got %d COOKIE BYTES from client", ready);
@@ -3158,43 +3139,92 @@ void close_server_socket(void)
 void
 open_udp_socket(void)
 {
-/*    const int y = 1;
+    int32_t tmp_cookie[8] ;
+    unsigned char buffer[56] = {0};
+    struct pollfd fds[2];
+    int nfds = 1;
+    int ready;
     EPHYR_DBG("Openning UDP socket...");
-    remoteVars.serversock=socket (AF_INET, SOCK_DGRAM, 0);
-    remoteVars.address.sin_family = AF_UNSPEC;
-    remoteVars.address.sin_addr.s_addr = INADDR_ANY;
+    remoteVars.sock_udp=socket (AF_INET, SOCK_DGRAM, 0);
+    remoteVars.udp_address.sin_family = AF_UNSPEC;
+    remoteVars.udp_address.sin_addr.s_addr = INADDR_ANY;
+    remoteVars.udpPort=remoteVars.listenPort+1000;
 
-    if(! strlen(remoteVars.acceptAddr))
-        EPHYR_DBG("Accepting connections from 0.0.0.0");
-    else
-        EPHYR_DBG("Accepting connections from %s", remoteVars.acceptAddr);
-    if(!remoteVars.udpPort)
+    while (1)
     {
-        EPHYR_DBG("UDP port %d", DEFAULT_PORT+1);
-        remoteVars.udp_address.sin_port = htons (DEFAULT_PORT+1);
-    }
-    else
-    {
-        EPHYR_DBG("Listen on port %d", remoteVars.udpPort);
+        EPHYR_DBG("Trying to listen UDP port %d", remoteVars.udpPort);
         remoteVars.udp_address.sin_port = htons (remoteVars.udpPort);
+        if (bind ( remoteVars.sock_udp,
+            (struct sockaddr *) &remoteVars.udp_address,
+                   sizeof (remoteVars.udp_address)) != 0)
+        {
+            EPHYR_DBG( "UDP PORT %d IN USE!\n",remoteVars.udpPort);
+            ++remoteVars.udpPort;
+        }
+        else
+        {
+            EPHYR_DBG("Accepting UDP connection on %d",remoteVars.udpPort);
+            break;
+        }
     }
-    if (bind ( remoteVars.serversock,
-        (struct sockaddr *) &remoteVars.address,
-               sizeof (remoteVars.address)) != 0)
+    listen (remoteVars.sock_udp, 1);
+    remoteVars.udp_addrlen = sizeof (struct sockaddr_in);
+    for(int i=0;i<8;++i)
     {
-        EPHYR_DBG( "UDP PORT IN USE!\n");
-        terminateServer(-1);
+        tmp_cookie[i]=rand();
+        srand(tmp_cookie[i]);
+//         EPHYR_DBG("Cookie %d - %d",i,tmp_cookie[i]);
     }
-    listen (remoteVars.serversock, 1);
-    remoteVars.addrlen = sizeof (struct sockaddr_in);
 
-#if XORG_VERSION_CURRENT >= 11900000
-    EPHYR_DBG("Set notify FD for server sock: %d",remoteVars.serversock);
-    EPHYR_DBG ("waiting for Client connection\n");
-    SetNotifyFd(remoteVars.serversock, serverAcceptNotifyUDP, X_NOTIFY_READ, NULL);
-#endif // XORG_VERSION_CURRENT
 
-    EPHYR_DBG("Server UDP socket is ready");*/
+    *((uint32_t*)buffer)=UDPOPEN; //4B
+    *((uint32_t*)buffer+1)=(uint32_t)remoteVars.udpPort; //4B
+    memcpy(buffer+8,tmp_cookie,4*8);
+    write(remoteVars.clientsock_tcp,buffer,56);
+    memset(fds, 0 , sizeof(fds));
+
+    fds[0].fd = remoteVars.sock_udp;
+    fds[0].events = POLLIN;
+    //wait max 3 seconds for connection on UDP port
+    if(poll(fds, nfds, 3000))
+    {
+        ready = recvfrom(remoteVars.sock_udp, buffer, 56,  MSG_WAITALL,  (struct sockaddr *) &remoteVars.udp_address, &remoteVars.udp_addrlen);
+        EPHYR_DBG ("UDP Connection from (%s)...\n", inet_ntoa (remoteVars.udp_address.sin_addr));
+        if(ready != 8*4)
+        {
+            EPHYR_DBG("Wrong message size, expecting %d, received %d", 8*4, ready);
+        }
+        else
+        {
+            if(!memcmp(buffer, tmp_cookie, 8*4))
+            {
+                ready=connect(remoteVars.sock_udp, (struct sockaddr *) &remoteVars.udp_address, remoteVars.udp_addrlen);
+                if(ready)
+                {
+                    EPHYR_DBG("Error, failed to connect to client UDP socket: %s",gai_strerror(ready));
+                }
+                else
+                {
+                    //we are connected, return from function
+                    EPHYR_DBG("Connected to client UDP socket...");
+                    remoteVars.send_frames_over_udp=TRUE;
+                    return;
+                }
+            }
+            else
+            {
+                EPHYR_DBG("Client sent wrong cookie over UDP socket, disconnecting");
+            }
+        }
+    }
+    else
+    {
+        EPHYR_DBG("No incoming UDP connection in 5 seconds");
+    }
+    //no connection is established, closing udp socket and sending notification
+    close_udp_socket();
+    *((uint32_t*)buffer)=UDPFAILED; //4B
+    write(remoteVars.clientsock_tcp,buffer,56);
 }
 
 void open_socket(void)
@@ -3214,14 +3244,10 @@ void open_socket(void)
         EPHYR_DBG("Accepting connections from %s", remoteVars.acceptAddr);
     if(!remoteVars.listenPort)
     {
-        EPHYR_DBG("Listen on port %d", DEFAULT_PORT);
-        remoteVars.tcp_address.sin_port = htons (DEFAULT_PORT);
+        remoteVars.listenPort=DEFAULT_PORT;
     }
-    else
-    {
-        EPHYR_DBG("Listen on port %d", remoteVars.listenPort);
-        remoteVars.tcp_address.sin_port = htons (remoteVars.listenPort);
-    }
+    EPHYR_DBG("Listen on port %d", remoteVars.listenPort);
+    remoteVars.tcp_address.sin_port = htons (remoteVars.listenPort);
     if (bind ( remoteVars.serversock_tcp,
         (struct sockaddr *) &remoteVars.tcp_address,
                sizeof (remoteVars.tcp_address)) != 0)
@@ -5320,10 +5346,18 @@ close_client_sockets(void)
 {
     shutdown(remoteVars.clientsock_tcp, SHUT_RDWR);
     close(remoteVars.clientsock_tcp);
-    if(remoteVars.send_frames_over_udp)
+    close_udp_socket();
+}
+
+void close_udp_socket(void)
+{
+    if(remoteVars.send_frames_over_udp || remoteVars.sock_udp !=-1)
     {
+        EPHYR_DBG("Closing UDP Socket");
         shutdown(remoteVars.sock_udp, SHUT_RDWR);
         close(remoteVars.sock_udp);
         remoteVars.send_frames_over_udp=FALSE;
+        remoteVars.sock_udp=-1;
     }
 }
+

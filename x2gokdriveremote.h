@@ -86,9 +86,7 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <arpa/inet.h>
-#if XORG_VERSION_CURRENT < 11900000
 #include <poll.h>
-#endif /* XORG_VERSION_CURRENT */
 
 
 //FEATURE_VERSION is not cooresponding to actual version of server
@@ -568,6 +566,7 @@ void open_udp_socket(void);
 void close_server_socket(void);
 
 void close_client_sockets(void);
+void close_udp_socket(void);
 
 void setAgentState(int state);
 
