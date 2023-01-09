@@ -100,6 +100,14 @@ x2gokdrive (0.0.0.1-0x2go1) UNRELEASED; urgency=medium
     - Makefile.am: revert print-debugging again.
     - patches.xorg/1.18.4/xorg-server-configure-ac.patch: correctly add
       -pthread and -lpthread references *after* the pkgconfig checks execute.
+    - quilt.env: add instructions from where to run the source command, this
+      got me confused two years later.
+    - patches.xorg/: add 1.20.13 subdirectory for Ubuntu Focal (20.04) with
+      rebased patch set.
+    - patches.xorg/: add 21.1.4 subdirectory for Ubuntu Kinetic (22.10) with
+      rebased patch set.
+    - patches.xorg/21.1.4/xorg-server-configure-ac.patch: fix FTBFS, typo when
+      applying patch.
   * debian/control:
     + Grammar fix.
     + Remove dependencies that refer to disabled features.
