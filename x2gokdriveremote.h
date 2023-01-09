@@ -115,7 +115,7 @@
 
 #define ACCEPT_TIMEOUT 30000 //msec
 #define CLIENTALIVE_TIMEOUT 30000 //msec
-#define SERVERALIVE_TIMEOUT 5000 //msec
+#define SERVERALIVE_TIMEOUT 10 //sec
 
 //if true, will save compressed jpg in file
 #define JPGDEBUG FALSE
@@ -437,7 +437,8 @@ struct remoteWindow
 struct _remoteHostVars
 {
     unsigned char compression;
-    OsTimerPtr checkConnectionTimer, checkKeepAliveTimer, sendKeepAliveTimer;
+    OsTimerPtr checkConnectionTimer, checkKeepAliveTimer;
+    time_t lastServerKeepAlive;
     int agentState;
     BOOL nxagentMode;
     char optionsFile[256];
@@ -644,7 +645,6 @@ void markDirtyRegions(uint32_t x, uint32_t y, uint32_t width, uint32_t height, u
 int getDirtyScreenRegion(void);
 void send_dirty_region(int index);
 unsigned int checkClientAlive(OsTimerPtr timer, CARD32 time_card, void* args);
-unsigned int sendServerAlive(OsTimerPtr timer, CARD32 time_card, void* args);
 void send_srv_disconnect(void);
 BOOL insideOfRegion(struct PaintRectRegion* reg, int x , int y);
 struct PaintRectRegion* findRegionForPoint(struct PaintRectRegion* firstRegion, int x , int y);
@@ -652,4 +652,6 @@ BOOL unitePaintRegions(struct PaintRectRegion* firstRegion);
 //perform cleanup of all caches and queues when disconnecting or performing reinitialization
 void clean_everything(void);
 void resend_frame(uint32_t crc);
+ssize_t remote_write_socket(int fd, const void *buf, size_t count);
+void sendServerAlive(void);
 #endif /* X2GOKDRIVE_REMOTE_H */

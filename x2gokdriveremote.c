@@ -388,7 +388,7 @@ void remote_sendVersion(void)
     *((uint32_t*)buffer)=SERVERVERSION; //4B
     *((uint16_t*)buffer+2)=FEATURE_VERSION;
     EPHYR_DBG("Sending server version: %d", FEATURE_VERSION);
-    l=write(remoteVars.clientsock_tcp,buffer,56);
+    l=remote_write_socket(remoteVars.clientsock_tcp,buffer,56);
     remoteVars.server_version_sent=TRUE;
 }
 
@@ -399,7 +399,7 @@ void request_selection_from_client(enum SelectionType selection)
 
     *((uint32_t*)buffer)=DEMANDCLIENTSELECTION; //4B
     *((uint16_t*)buffer+2)=(uint16_t)selection;
-    l=write(remoteVars.clientsock_tcp,buffer,56);
+    l=remote_write_socket(remoteVars.clientsock_tcp,buffer,56);
     EPHYR_DBG("requesting selection from client");
 }
 
@@ -435,11 +435,11 @@ int32_t send_cursor(struct cursorFrame* cursor)
 //     EPHYR_DBG("SENDING CURSOR %d with size %d", cursor->serialNumber, cursor->size);
 
 //    #warning check this
-    ln=write(remoteVars.clientsock_tcp,buffer,56);
+    ln=remote_write_socket(remoteVars.clientsock_tcp,buffer,56);
 
     while(sent<cursor->size)
     {
-        l=write(remoteVars.clientsock_tcp, cursor->data+sent,((cursor->size-sent)<MAXMSGSIZE)?(cursor->size-sent):MAXMSGSIZE);
+        l=remote_write_socket(remoteVars.clientsock_tcp, cursor->data+sent,((cursor->size-sent)<MAXMSGSIZE)?(cursor->size-sent):MAXMSGSIZE);
         if(l<0)
         {
             EPHYR_DBG("Error sending cursor!!!!!");
@@ -513,7 +513,7 @@ int32_t send_frame(u_int32_t width, uint32_t height, uint32_t x, uint32_t y, uin
 
     if(!remoteVars.send_frames_over_udp)
     {
-        ln=write(remoteVars.clientsock_tcp, buffer,56);
+        ln=remote_write_socket(remoteVars.clientsock_tcp, buffer,56);
     }
     else
     {
@@ -551,11 +551,11 @@ int32_t send_frame(u_int32_t width, uint32_t height, uint32_t x, uint32_t y, uin
         {
             sent = 0;
             //        #warning check this
-            ln=write(remoteVars.clientsock_tcp, buffer, 64);
+            ln=remote_write_socket(remoteVars.clientsock_tcp, buffer, 64);
 
             while(sent<regions[i].size)
             {
-                l=write(remoteVars.clientsock_tcp,regions[i].compressed_data+sent,
+                l=remote_write_socket(remoteVars.clientsock_tcp,regions[i].compressed_data+sent,
                         ((regions[i].size-sent)<MAXMSGSIZE)?(regions[i].size-sent):MAXMSGSIZE);
                 if(l<0)
                 {
@@ -631,10 +631,10 @@ int send_deleted_elements(void)
     remoteVars.last_deleted_elements=0l;
 
     //    EPHYR_DBG("SENDING IMG length - %d, number - %d\n",length,framenum_sent++);
-    ln=write(remoteVars.clientsock_tcp,buffer,56);
+    ln=remote_write_socket(remoteVars.clientsock_tcp,buffer,56);
     while(sent<length)
     {
-        l=write(remoteVars.clientsock_tcp,list+sent,((length-sent)<MAXMSGSIZE)?(length-sent):MAXMSGSIZE);
+        l=remote_write_socket(remoteVars.clientsock_tcp,list+sent,((length-sent)<MAXMSGSIZE)?(length-sent):MAXMSGSIZE);
         if(l<0)
         {
             EPHYR_DBG("Error sending list of deleted elements!!!!!");
@@ -685,10 +685,10 @@ int send_deleted_cursors(void)
     remoteVars.last_deleted_cursor=0l;
 
 //    EPHYR_DBG("Sending list from %d elements", deletedcursor_list_size);
-    ln=write(remoteVars.clientsock_tcp,buffer,56);
+    ln=remote_write_socket(remoteVars.clientsock_tcp,buffer,56);
     while(sent<length)
     {
-        l=write(remoteVars.clientsock_tcp,list+sent,((length-sent)<MAXMSGSIZE)?(length-sent):MAXMSGSIZE);
+        l=remote_write_socket(remoteVars.clientsock_tcp,list+sent,((length-sent)<MAXMSGSIZE)?(length-sent):MAXMSGSIZE);
         if(l<0)
         {
             EPHYR_DBG("Error sending list of deleted cursors!!!!!");
@@ -729,7 +729,7 @@ void send_reinit_notification(void)
     _X_UNUSED int l;
     *((uint32_t*)buffer)=REINIT;
     EPHYR_DBG("SENDING REINIT NOTIFICATION");
-    l=write(remoteVars.clientsock_tcp,buffer,56);
+    l=remote_write_socket(remoteVars.clientsock_tcp,buffer,56);
 }
 
 int send_selection_chunk(int sel, unsigned char* data, uint32_t length, uint32_t format, BOOL first, BOOL last, uint32_t compressed, uint32_t total_sz)
@@ -762,10 +762,10 @@ int send_selection_chunk(int sel, unsigned char* data, uint32_t length, uint32_t
 
 
 
-    ln=write(remoteVars.clientsock_tcp,buffer,56);
+    ln=remote_write_socket(remoteVars.clientsock_tcp,buffer,56);
     while(sent<length)
     {
-        l=write(remoteVars.clientsock_tcp,data+sent,((length-sent)<MAXMSGSIZE)?(length-sent):MAXMSGSIZE);
+        l=remote_write_socket(remoteVars.clientsock_tcp,data+sent,((length-sent)<MAXMSGSIZE)?(length-sent):MAXMSGSIZE);
         if(l<0)
         {
             EPHYR_DBG("Error sending selection!!!!!");
@@ -1582,11 +1582,11 @@ void remote_send_win_updates(char* updateBuf, uint32_t bufSize)
     *((uint32_t*)buffer)=WINUPDATE;
     *((uint32_t*)buffer+1)=bufSize;
 
-    l=write(remoteVars.clientsock_tcp,buffer,56);
+    l=remote_write_socket(remoteVars.clientsock_tcp,buffer,56);
 
     while(sent<bufSize)
     {
-        l=write(remoteVars.clientsock_tcp,updateBuf+sent,((bufSize-sent)<MAXMSGSIZE)?(bufSize-sent):MAXMSGSIZE);
+        l=remote_write_socket(remoteVars.clientsock_tcp,updateBuf+sent,((bufSize-sent)<MAXMSGSIZE)?(bufSize-sent):MAXMSGSIZE);
         if(l<0)
         {
             EPHYR_DBG("Error sending windows update!!!!!");
@@ -1803,10 +1803,9 @@ void *send_frame_thread (void *threadid)
                     }
                     else
                     {
-                        /* sleep till we have a signal from another thread if
-                         *frame, cursor ,selection queue is empty and all regions are updated*/
+                        /*send server alive event if needed*/
                         ms_to_wait=100*1000; //reset timer
-                        pthread_cond_wait(&remoteVars.have_sendqueue_cond, &remoteVars.sendqueue_mutex);
+                        sendServerAlive();
                     }
                     break;
                 default:
@@ -2190,11 +2189,6 @@ void disconnect_client(void)
     {
         TimerFree(remoteVars.checkKeepAliveTimer);
         remoteVars.checkKeepAliveTimer=0;
-    }
-    if(remoteVars.sendKeepAliveTimer)
-    {
-        TimerFree(remoteVars.sendKeepAliveTimer);
-        remoteVars.sendKeepAliveTimer=0;
     }
     remoteVars.client_connected=FALSE;
     setAgentState(SUSPENDED);
@@ -2953,7 +2947,6 @@ void set_client_version(uint16_t ver, uint16_t os)
         //start timer for checking if client alive
         pthread_mutex_lock(&remoteVars.sendqueue_mutex);
         remoteVars.checkKeepAliveTimer=TimerSet(0,0,CLIENTALIVE_TIMEOUT, checkClientAlive, NULL);
-        remoteVars.sendKeepAliveTimer=TimerSet(0,0,SERVERALIVE_TIMEOUT, sendServerAlive, NULL);
         pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
     }
 }
@@ -3180,7 +3173,7 @@ open_udp_socket(void)
     *((uint32_t*)buffer)=UDPOPEN; //4B
     *((uint32_t*)buffer+1)=(uint32_t)remoteVars.udpPort; //4B
     memcpy(buffer+8,tmp_cookie,4*8);
-    write(remoteVars.clientsock_tcp,buffer,56);
+    remote_write_socket(remoteVars.clientsock_tcp,buffer,56);
     memset(fds, 0 , sizeof(fds));
 
     fds[0].fd = remoteVars.sock_udp;
@@ -3224,7 +3217,7 @@ open_udp_socket(void)
     //no connection is established, closing udp socket and sending notification
     close_udp_socket();
     *((uint32_t*)buffer)=UDPFAILED; //4B
-    write(remoteVars.clientsock_tcp,buffer,56);
+    remote_write_socket(remoteVars.clientsock_tcp,buffer,56);
 }
 
 void open_socket(void)
@@ -5250,7 +5243,7 @@ int send_packet_as_datagrams(unsigned char* data, uint32_t length, uint8_t dgTyp
         checksum=crc32(checksum,dgram,dgram_length);
         //setting checksum
         *((uint32_t*)dgram)=checksum;
-        writeRes=write(remoteVars.sock_udp, dgram, dgram_length);
+        writeRes=remote_write_socket(remoteVars.sock_udp, dgram, dgram_length);
         if(writeRes!=(int)dgram_length)
         {
 //             EPHYR_DBG("Warning, sending packet failed. Sent %d bytes instead of %d",writeRes,dgram_length);
@@ -5279,14 +5272,21 @@ checkClientAlive(OsTimerPtr timer, CARD32 time_card, void* args)
     return CLIENTALIVE_TIMEOUT;
 }
 
-unsigned int sendServerAlive(OsTimerPtr timer, CARD32 time_card, void* args)
+void
+sendServerAlive(void)
 {
     unsigned char buffer[56] = {0};
-    _X_UNUSED int l;
-
-    *((uint32_t*)buffer)=SRVKEEPALIVE; //4B
-    l=write(remoteVars.clientsock_tcp,buffer,56);
-    return SERVERALIVE_TIMEOUT;
+    if(remoteVars.client_os==WEB || remoteVars.client_version<3)
+    {
+        //client doesn't support this event
+        return;
+    }
+    if((time(NULL) - remoteVars.lastServerKeepAlive)>=SERVERALIVE_TIMEOUT)
+    {
+        *((uint32_t*)buffer)=SRVKEEPALIVE; //4B
+        remote_write_socket(remoteVars.clientsock_tcp,buffer,56);
+//         EPHYR_DBG("SENDING SRV KEEPALIVE!!!!");
+    }
 }
 
 void
@@ -5298,7 +5298,7 @@ send_srv_disconnect(void)
     if(remoteVars.client_version<3)
         return;
     *((uint32_t*)buffer)=SRVDISCONNECT; //4B
-    l=write(remoteVars.clientsock_tcp,buffer,56);
+    l=remote_write_socket(remoteVars.clientsock_tcp,buffer,56);
 }
 
 void
@@ -5361,3 +5361,9 @@ void close_udp_socket(void)
     }
 }
 
+ssize_t
+remote_write_socket(int fd, const void *buf, size_t count)
+{
+    remoteVars.lastServerKeepAlive=time(NULL);
+    return write(fd,buf,count);
+}
