@@ -2967,11 +2967,11 @@ void pollEvents(void)
     if(remoteVars.client_connected)
     {
         client = TRUE;
-        fds[0].fd = remoteVars.clientsock;
+        fds[0].fd = remoteVars.clientsock_tcp;
     }  //we are in connecting state, poll server socket
-    else if(remoteVars.serversock != -1)
+    else if(remoteVars.serversock_tcp != -1)
     {
-        fds[0].fd = remoteVars.serversock;
+        fds[0].fd = remoteVars.serversock_tcp;
     }
     else //not polling any sockets
     {
