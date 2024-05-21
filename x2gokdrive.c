@@ -325,6 +325,7 @@ ephyrShadowUpdate(ScreenPtr pScreen, shadowBufPtr pBuf)
 static void
 ephyrInternalDamageRedisplay(ScreenPtr pScreen)
 {
+    //EPHYR_DBG("ephyrInternalDamageRedisplay\n");
     KdScreenPriv(pScreen);
     KdScreenInfo *screen = pScreenPriv->screen;
     EphyrScrPriv *scrpriv = screen->driver;
@@ -336,21 +337,8 @@ ephyrInternalDamageRedisplay(ScreenPtr pScreen)
     pRegion = DamageRegion(scrpriv->pDamage);
 
     if (RegionNotEmpty(pRegion)) {
-        int nbox;
-        BoxPtr pbox;
 
-        {
-            nbox = RegionNumRects(pRegion);
-            pbox = RegionRects(pRegion);
-
-            while (nbox--) {
-                remote_paint_rect(screen,
-                                 pbox->x1, pbox->y1,
-                                 pbox->x1, pbox->y1,
-                                 pbox->x2 - pbox->x1, pbox->y2 - pbox->y1);
-                pbox++;
-            }
-        }
+        encode_main_img4();
         DamageEmpty(scrpriv->pDamage);
     }
 }

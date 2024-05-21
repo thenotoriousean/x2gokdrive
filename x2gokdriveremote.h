@@ -88,6 +88,10 @@
 #include <arpa/inet.h>
 #include <poll.h>
 
+#include <stdint.h>
+#include <x264.h>
+#include <stdbool.h>
+
 
 //FEATURE_VERSION is not cooresponding to actual version of server
 //it used to tell server which features are supported by server
@@ -114,7 +118,7 @@
 #define DEFAULT_PORT 15000
 
 #define ACCEPT_TIMEOUT 30000 //msec
-#define CLIENTALIVE_TIMEOUT 30000 //msec
+#define CLIENTALIVE_TIMEOUT 3000000 //msec
 #define SERVERALIVE_TIMEOUT 10 //sec
 
 //if true, will save compressed jpg in file
@@ -129,9 +133,9 @@
 #define XSERVERBPP 4
 
 enum msg_type{FRAME,DELETED, CURSOR, DELETEDCURSOR, SELECTION, SERVERVERSION, DEMANDCLIENTSELECTION, REINIT, WINUPDATE,
-    SRVKEEPALIVE, SRVDISCONNECT, CACHEFRAME, UDPOPEN, UDPFAILED};
+    SRVKEEPALIVE, SRVDISCONNECT, CACHEFRAME, UDPOPEN, UDPFAILED, H264HEADER};
 enum AgentState{STARTING, RUNNING, RESUMING, SUSPENDING, SUSPENDED, TERMINATING, TERMINATED};
-enum Compressions{JPEG,PNG};
+enum Compressions{JPEG,PNG,H264,H265};
 enum SelectionType{PRIMARY,CLIPBOARD};
 enum SelectionMime{STRING,UTF_STRING,PIXMAP};
 enum ClipboardMode{CLIP_NONE,CLIP_CLIENT,CLIP_SERVER,CLIP_BOTH};
@@ -434,6 +438,18 @@ struct remoteWindow
     WindowPtr ptr, parent, nextSib;
 };
 
+typedef struct{
+  int raw_frame_size;
+  x264_picture_t pic;
+  x264_picture_t pic_out;
+  bool pic_valid;
+  int i_frame;
+  x264_nal_t *nal;
+  int i_nal;
+
+  x264_t* h264_encoder;
+} H264EncoderData;
+
 struct _remoteHostVars
 {
     unsigned char compression;
@@ -654,4 +670,11 @@ void clean_everything(void);
 void resend_frame(uint32_t crc);
 ssize_t remote_write_socket(int fd, const void *buf, size_t count);
 void sendServerAlive(void);
+
+//aditional
+void encode_main_img(void);
+void encode_main_img2(void);
+void encode_main_img3(void);
+void encode_main_img4(void);
+
 #endif /* X2GOKDRIVE_REMOTE_H */

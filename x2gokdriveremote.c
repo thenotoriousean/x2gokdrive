@@ -41,6 +41,9 @@
 #include <zlib.h>
 #include <propertyst.h>
 
+static H264EncoderData* encoder_data;
+// static FILE *fp_bgra;
+
 #ifdef EPHYR_WANT_DEBUG
 extern unsigned long long int debug_sendThreadId;
 extern unsigned long long int debug_selectThreadId;
@@ -79,6 +82,17 @@ typedef struct {
 #define ExPAspect		(1L << 7)	/* program specified min and max aspect ratios */
 #define ExPBaseSize	(1L << 8)
 #define ExPWinGravity	(1L << 9)
+
+#define RGB2YUV(r,g,b,y,u,v)\
+	y = (77*r + 150*g + 29*b)>>8;\
+	u =((128*b - 43*r -85*g)>>8) +128;\
+	v =((128*r - 107*g -21*b)>>8) +128;\
+	y = y < 0 ? 0 : y;\
+	u = u < 0 ? 0 : u;\
+	v = v < 0 ? 0 : v;\
+	y = y > 255 ? 255 : y;\
+	u = u > 255 ? 255 : u;\
+	v = v > 255 ? 255 : v
 
 /* Values */
 
@@ -447,7 +461,7 @@ int32_t send_cursor(struct cursorFrame* cursor)
         }
         sent+=l;
     }
-    remoteVars.data_sent+=sent;
+    // remoteVars.data_sent+=sent;
 //    EPHYR_DBG("SENT total %d", total);
 
     return sent;
@@ -1742,6 +1756,252 @@ void remote_process_window_updates(void)
     pthread_mutex_lock(&remoteVars.sendqueue_mutex);
 }
 
+long MyGetTickCount() {
+  struct timeval tim;
+  gettimeofday(&tim, NULL);
+  long t = (tim.tv_sec * 1000) + (tim.tv_usec / 1000);
+  return t;
+}
+
+void send_h264_data(unsigned char* buffer,int length){
+    // EPHYR_DBG("38\n");
+    int l = 0;
+
+    // long time = MyGetTickCount();
+
+    // char buf[16] = {0};
+    //  *((long*)buf)=time;
+    //sprintf(buf, "%ld", time);
+    // remote_write_socket(remoteVars.clientsock_tcp, buf, 16);
+    
+    int sent = 0;
+    while(sent < length){
+        l = remote_write_socket(remoteVars.clientsock_tcp,buffer+sent,
+                        ((length-sent)<MAXMSGSIZE)?(length-sent):MAXMSGSIZE);
+        if(l<0)
+        {
+            EPHYR_DBG("Error sending file!!!!!");
+            break;
+        }
+        sent+=l;
+    }
+}
+
+void encoder_dispose(H264EncoderData* encoder_data){
+   //EPHYR_DBG("encoder_dispose\n"); 
+  if(encoder_data->h264_encoder){
+    x264_encoder_close( encoder_data->h264_encoder );
+    encoder_data->h264_encoder = NULL;
+  }
+  if(encoder_data->pic_valid){
+    x264_picture_clean( &encoder_data->pic );
+    encoder_data->pic_valid = false;
+  }
+  // free the data
+  free(encoder_data);
+}
+
+int encoder_init(H264EncoderData** p_encoder_data, int width, int height, bool lossless){
+  //EPHYR_DBG("encoder_init\n");
+  // malloc new context
+  H264EncoderData* encoder_data;
+  encoder_data = (H264EncoderData*)malloc(sizeof(H264EncoderData));
+
+  x264_param_t param;
+
+  // encoder_data->raw_frame_size = width*height*3/2;
+  encoder_data->i_frame = 0;
+  encoder_data->h264_encoder = NULL;
+  encoder_data->pic_valid = true;
+
+  /* Get default params for preset/tuning */
+  x264_param_default_preset( &param, "veryfast", "zerolatency");
+
+  /* Configure non-default params */
+  param.i_csp = X264_CSP_BGRA;
+  param.i_width  = width;
+  param.i_height = height;
+  param.b_vfr_input = 0;
+
+  //param.b_repeat_headers = 1;
+  //param.b_annexb = 1;
+  param.i_bframe = 0;
+  //param.i_threads = 8;
+  //para.analyse.i_me_method = X264_ME_DIA;
+
+  param.i_log_level = X264_LOG_NONE;
+
+  // check if img lossless enabled
+  if(lossless){
+    param.rc.i_rc_method = X264_RC_CQP;
+    param.rc.i_qp_constant = 0;
+  }
+  // alloc picture
+  if( x264_picture_alloc( &encoder_data->pic, param.i_csp, param.i_width, param.i_height ) < 0 ){
+    EPHYR_DBG("Fail to allocate picture buffer\n");
+    encoder_dispose(encoder_data);
+    return -1;
+  }
+  // open encoder
+  encoder_data->h264_encoder = x264_encoder_open( &param );
+  if( !encoder_data->h264_encoder ){
+    EPHYR_DBG("Fail to allocate open encoder\n");
+    encoder_dispose(encoder_data);
+    return -1;
+  }
+  // set the pointer to new encoder data
+  *p_encoder_data = encoder_data;
+  return 0;
+}
+
+uint8_t* encoder_get_raw_data_buf(H264EncoderData* encoder_data){
+  return encoder_data->pic.img.plane[0];
+}
+
+int encoder_encode(H264EncoderData* encoder_data, uint8_t** p_encoded_buf, int* p_encoded_size){
+  int i_frame_size;
+  encoder_data->pic.i_pts = encoder_data->i_frame;
+  i_frame_size = x264_encoder_encode( encoder_data->h264_encoder, 
+                                        &encoder_data->nal, &encoder_data->i_nal, 
+                                        &encoder_data->pic, &encoder_data->pic_out );
+  if(i_frame_size < 0){
+    EPHYR_DBG("Encoding error\n");
+    return -1;
+  }
+  else if (i_frame_size){
+    *p_encoded_size = i_frame_size;
+    *p_encoded_buf = encoder_data->nal->p_payload;
+  }
+  else{
+    *p_encoded_size = 0;
+    *p_encoded_buf = NULL;
+  }
+
+  return 0;
+}
+
+int bgra_to_yuv420p(unsigned char *pbgra, unsigned char *pyuv420p, int w, int h)
+{
+    int i,j;
+    unsigned char r,g,b;
+    int y,u,v;
+    unsigned char *py,*pu,*pv;
+
+    py = pyuv420p;
+    pu = py + w * h;
+    pv = pu + w * h / 4;
+
+    for (i = 0; i < h; i++)
+    {
+        for (j = 0; j < w; j++)
+        {
+            b = pbgra[(i*w + j)*4];
+            g = pbgra[(i*w + j)*4 +1];
+            r = pbgra[(i*w + j)*4 +2];
+            RGB2YUV(r,g,b,y,u,v);
+
+            *py++ = y;
+            if ((i & 0x1) && (j & 0x1))
+            {
+                *pu++ = u;
+                *pv++ = v;
+            }
+        }
+    }
+
+    return 0;
+}
+
+void encode_main_img(void){
+    // EPHYR_DBG("encode_main_img");
+    unsigned char* bgr_data;
+    unsigned char* out_buffer;
+    int out_size;
+    
+    bgr_data = malloc(remoteVars.main_img_width*remoteVars.main_img_height * CACHEBPP);
+
+    pthread_mutex_lock(&remoteVars.mainimg_mutex);
+
+    for(int32_t j=0; j<remoteVars.main_img_width*remoteVars.main_img_height; j++){
+        memcpy(bgr_data+j*CACHEBPP, remoteVars.main_img+j*XSERVERBPP, CACHEBPP);
+    }
+
+    pthread_mutex_unlock(&remoteVars.mainimg_mutex);
+
+    pthread_mutex_lock(&remoteVars.sendqueue_mutex);
+
+    encoder_data->pic.img.plane[0] = bgr_data;
+    if(encoder_encode(encoder_data,&out_buffer, &out_size) < 0){
+        EPHYR_DBG("Encode error\n");
+    }
+
+    if(out_size > 0){
+        send_h264_data(out_buffer, out_size);
+    }
+
+    pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+
+    free(bgr_data);
+
+}
+
+void encode_main_img3(void){
+    // EPHYR_DBG("encode_main_img3");
+    unsigned char* yuv_data;
+    unsigned char* out_buffer;
+    int out_size;
+    
+    yuv_data = malloc(remoteVars.main_img_width*remoteVars.main_img_height*3/2);
+
+    pthread_mutex_lock(&remoteVars.mainimg_mutex);
+    
+    bgra_to_yuv420p(remoteVars.main_img, yuv_data, remoteVars.main_img_width, remoteVars.main_img_height);
+
+    pthread_mutex_unlock(&remoteVars.mainimg_mutex);
+
+    pthread_mutex_lock(&remoteVars.sendqueue_mutex);
+
+    encoder_data->pic.img.plane[0] = yuv_data;
+    encoder_data->pic.img.plane[1] = yuv_data+remoteVars.main_img_width*remoteVars.main_img_height;
+    encoder_data->pic.img.plane[2] = yuv_data+remoteVars.main_img_width*remoteVars.main_img_height*5/4;
+    if(encoder_encode(encoder_data,&out_buffer, &out_size) < 0){
+        EPHYR_DBG("Encode error\n");
+    }
+
+    // EPHYR_DBG("out_size: %d\n",out_size);
+    if(out_size > 0){
+        send_h264_data(out_buffer, out_size);
+    }
+
+    pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+
+    free(yuv_data);
+}
+
+void encode_main_img4(void){
+    unsigned char* out_buffer;
+    int out_size;
+
+    pthread_mutex_lock(&remoteVars.mainimg_mutex);
+
+    encoder_data->pic.img.plane[0] = remoteVars.main_img;
+    // fwrite(remoteVars.main_img, 1, remoteVars.main_img_width*remoteVars.main_img_height*4, fp_bgra);
+    if(encoder_encode(encoder_data,&out_buffer, &out_size) < 0){
+        EPHYR_DBG("Encode error\n");
+    }
+
+    pthread_mutex_unlock(&remoteVars.mainimg_mutex);
+    pthread_mutex_lock(&remoteVars.sendqueue_mutex);
+
+    // EPHYR_DBG("out_size: %d\n",out_size);
+    if(out_size > 0){
+        send_h264_data(out_buffer, out_size);
+    }
+
+    pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+
+}
+
 static
 void *send_frame_thread (void *threadid)
 {
@@ -2669,11 +2929,11 @@ clientReadNotify(int fd, int ready, void *data)
     {
         char* buff=remoteVars.eventBuffer+i*EVLENGTH;
 
-        if(remoteVars.selstruct.readingInputBuffer != -1)
-        {
-            readInputSelectionBuffer(buff);
-        }
-        else
+        // if(remoteVars.selstruct.readingInputBuffer != -1)
+        // {
+        //     readInputSelectionBuffer(buff);
+        // }
+        // else
         {
             if(!remote_process_client_event(buff,0))
             {
@@ -3048,12 +3308,12 @@ void serverAcceptNotify(int fd, int ready_sock, void *data)
             EPHYR_DBG ("ERROR LOOKUP %s", remoteVars.acceptAddr);
             terminateServer(-1);
         }
-        if(  ((struct sockaddr_in *) (res->ai_addr))->sin_addr.s_addr != remoteVars.tcp_address.sin_addr.s_addr)
-        {
-            EPHYR_DBG("Connection only allowed from %s",inet_ntoa ( ((struct sockaddr_in *)(res->ai_addr))->sin_addr));
-            close_client_sockets();
-            return;
-        }
+        // if(  ((struct sockaddr_in *) (res->ai_addr))->sin_addr.s_addr != remoteVars.tcp_address.sin_addr.s_addr)
+        // {
+        //     EPHYR_DBG("Connection only allowed from %s",inet_ntoa ( ((struct sockaddr_in *)(res->ai_addr))->sin_addr));
+        //     close_client_sockets();
+        //     return;
+        // }
     }
     if(strlen(remoteVars.cookie))
     {
@@ -3086,6 +3346,7 @@ void serverAcceptNotify(int fd, int ready_sock, void *data)
         EPHYR_DBG("Warning: not checking client's cookie");
     }
 
+  if(remoteVars.compression == JPEG || remoteVars.compression == PNG){
     pthread_mutex_lock(&remoteVars.sendqueue_mutex);
     #if XORG_VERSION_CURRENT >= 11900000
     EPHYR_DBG("Set notify FD for client sock: %d",remoteVars.clientsock_tcp);
@@ -3107,14 +3368,38 @@ void serverAcceptNotify(int fd, int ready_sock, void *data)
     setAgentState(RUNNING);
 
     pthread_mutex_unlock(&remoteVars.sendqueue_mutex);
+  }
+  else{
+    #if XORG_VERSION_CURRENT >= 11900000
+    EPHYR_DBG("Set notify FD for client sock: %d",remoteVars.clientsock_tcp);
+    SetNotifyFd(remoteVars.clientsock_tcp, clientReadNotify, X_NOTIFY_READ, NULL);
+    #endif // XORG_VERSION_CURRENT
+    remoteVars.client_connected=TRUE;
+    remoteVars.server_version_sent=FALSE;
+    set_client_version(0,0);
+    if(remoteVars.checkConnectionTimer)
+    {
+        TimerFree(remoteVars.checkConnectionTimer);
+        remoteVars.checkConnectionTimer=0;
+    }
+    remoteVars.client_initialized=FALSE;
+    remoteVars.con_start_time=time(NULL);
+    remoteVars.data_sent=0;
+    remoteVars.data_copy=0;
+    remoteVars.evBufferOffset=0;
+    setAgentState(RUNNING);
+
+  }
 
    //here start a send thread
+   if(remoteVars.compression != H264){
     ret = pthread_create(&remoteVars.send_thread_id, NULL, send_frame_thread, (void *)remoteVars.send_thread_id);
     if (ret)
     {
         EPHYR_DBG("ERROR; return code from pthread_create() is %d\n", ret);
         terminateServer(-1);
     }
+   }
 }
 
 
@@ -3294,9 +3579,9 @@ void terminateServer(int exitStatus)
     if(remoteVars.main_img)
     {
         free(remoteVars.main_img);
-        free(remoteVars.second_buffer);
+        // free(remoteVars.second_buffer);
         EPHYR_DBG("free screen regions");
-        free(remoteVars.screen_regions);
+        // free(remoteVars.screen_regions);
     }
 
 
@@ -3326,6 +3611,15 @@ void processConfigFileSetting(char* key, char* value)
     }
     else if(!strcmp(key, "pack"))
     {
+        if(strncmp(value,"H264",4) == 0){
+            remoteVars.compression = H264;
+            EPHYR_DBG("Using H264 Compression");
+        }
+        else if(strncmp(value,"H265",4) == 0){
+            remoteVars.compression = H265;
+            EPHYR_DBG("Using H265 Compression");
+        }
+        else{
         unsigned char quality=value[strlen(value)-1];
         if(quality>='0'&& quality<='9')
         {
@@ -3349,6 +3643,8 @@ void processConfigFileSetting(char* key, char* value)
             remoteVars.jpegQuality=remoteVars.initialJpegQuality;
             EPHYR_DBG("Image quality: %d", remoteVars.jpegQuality);
         }
+        }
+        remoteVars.compression = H264;
     }
     else if(!strcmp(key, "accept"))
     {
@@ -5053,17 +5349,27 @@ remote_screen_init(KdScreenInfo *screen,
     }
     EPHYR_DBG("TRYING TO ALLOC  MAIN_IMG %d", width*height*XSERVERBPP);
     remoteVars.main_img=malloc(width*height*XSERVERBPP);
-    EPHYR_DBG("TRYING TO ALLOC  DOUBLE BUF %d", width*height*XSERVERBPP);
-    remoteVars.second_buffer=malloc(width*height*XSERVERBPP);
 
-    remoteVars.reg_horiz=width/SCREEN_REG_WIDTH;
-    if(width%SCREEN_REG_WIDTH)
-        ++remoteVars.reg_horiz;
-    remoteVars.reg_vert=height/SCREEN_REG_HEIGHT;
-    if(height%SCREEN_REG_HEIGHT)
-        ++remoteVars.reg_vert;
-    EPHYR_DBG("Initializing %dx%d screen regions", remoteVars.reg_horiz, remoteVars.reg_vert);
-    remoteVars.screen_regions=malloc(remoteVars.reg_horiz*remoteVars.reg_vert*sizeof(screen_region));
+    if(remoteVars.compression == JPEG || remoteVars.compression == PNG)
+    {
+        EPHYR_DBG("TRYING TO ALLOC  DOUBLE BUF %d", width*height*XSERVERBPP);
+        remoteVars.second_buffer=malloc(width*height*XSERVERBPP);
+        remoteVars.reg_horiz=width/SCREEN_REG_WIDTH;
+        if(width%SCREEN_REG_WIDTH)
+            ++remoteVars.reg_horiz;
+        remoteVars.reg_vert=height/SCREEN_REG_HEIGHT;
+        if(height%SCREEN_REG_HEIGHT)
+            ++remoteVars.reg_vert;
+        EPHYR_DBG("Initializing %dx%d screen regions", remoteVars.reg_horiz, remoteVars.reg_vert);
+        remoteVars.screen_regions=malloc(remoteVars.reg_horiz*remoteVars.reg_vert*sizeof(screen_region));
+    }
+
+    /* Encoder Initialization */
+    // fp_bgra = fopen("/root/Desktop/scequence1_1920x1080.raw", "wb");
+    if(encoder_init(&encoder_data, width, height, false) < 0){
+        EPHYR_DBG("Fail to init encoder\n");
+        exit(-1);
+    }
 
     EPHYR_DBG("ALL INITIALIZED");
 
@@ -5072,21 +5378,18 @@ remote_screen_init(KdScreenInfo *screen,
         EPHYR_DBG("failed to init main buf");
         exit(-1);
     }
-    if(!remoteVars.second_buffer)
+    if(!remoteVars.second_buffer || !remoteVars.screen_regions)
     {
-        EPHYR_DBG("failed to init second buf");
-        exit(-1);
+        EPHYR_DBG("failed to init second buf or screen regions");
+        if(remoteVars.compression == JPEG || remoteVars.compression == PNG)
+            exit(-1);
     }
 
-    if(!remoteVars.second_buffer)
-    {
-        EPHYR_DBG("failed to init screen regions");
-        exit(-1);
-    }
-
-    memset(remoteVars.screen_regions, 0, remoteVars.reg_horiz*remoteVars.reg_vert*sizeof(screen_region));
     memset(remoteVars.main_img,0, width*height*XSERVERBPP);
-    memset(remoteVars.second_buffer,0, width*height*XSERVERBPP);
+    if(remoteVars.compression == JPEG || remoteVars.compression == PNG){
+        memset(remoteVars.second_buffer,0, width*height*XSERVERBPP);
+        memset(remoteVars.screen_regions, 0, remoteVars.reg_horiz*remoteVars.reg_vert*sizeof(screen_region));
+    }
 
     remoteVars.main_img_width=width;
     remoteVars.main_img_height=height;
