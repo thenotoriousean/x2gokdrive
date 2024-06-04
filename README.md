@@ -1,7 +1,7 @@
 # 原版安装教程参考：https://wiki.x2go.org/doku.php/wiki:advanced:x2gokdrive:start?s[]=kdrive
 
 # 此版本的x2gokdrive替换了原版的JPEG和PNG编码，使用x264编码器进行编码，具体安装步骤如下：
-1. 下载源码：`git clone git@github.com:thenotoriousean/x2gokdrive.git`
+1. 下载源码：`git clone https://github.com/thenotoriousean/x2gokdrive.git`
 2. 安装xorg-server：`apt-build source xorg-server`
 3. 进入xorg目录进行操作：`cd /var/cache/apt-build/build/xorg-server-1.20.11`
 4. 构建项目：`dpkg-buildpackage -uc -us` 
